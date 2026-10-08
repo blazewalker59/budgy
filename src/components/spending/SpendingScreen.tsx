@@ -38,8 +38,8 @@ export function SpendingScreen() {
   const total = txns.reduce((n, t) => n + t.amount, 0)
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-extrabold tracking-tight">Spending</h1>
+    <div className="space-y-3">
+      <h1 className="text-lg font-extrabold tracking-tight">Spending</h1>
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative min-w-56 flex-1">
           <Search
@@ -90,11 +90,11 @@ export function SpendingScreen() {
           Moved or noted
         </label>
       </div>
-      <p className="text-sm text-muted">
+      <p className="text-xs text-muted">
         {txns.length} purchase{txns.length === 1 ? '' : 's'} ·{' '}
         <span className="font-semibold text-foreground">{dollars(total)}</span>
       </p>
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
         <TxnList txns={txns} limit={150} />
       </div>
     </div>

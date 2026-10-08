@@ -179,30 +179,59 @@ export function upcoming(
   )
 }
 
+export interface CategoryHistory {
+  /** Everyday spending in each month of the window, oldest first. */
+  monthly: Array<number>
+  /**
+   * Average over the window's months since the Category's first purchase,
+   * leaving out Planned Expense payments: a fair starting Target.
+   */
+  typical: number
+  /** The same average with Planned Expense payments in. */
+  withPlanned: number
+  /** Months the average covers (fewer when the Category is new). */
+  months: number
+}
+
 /**
- * Average everyday spending per Category per month over `months`, without
- * Planned Expense payments: a fair starting Target.
+ * Each Category's spending over a window of months. A Category that started
+ * partway through is averaged over the months since, so it isn't diluted.
  */
-export function averages(
+export function categoryHistory(
   ix: LedgerIndex,
-  months: Array<string>,
+  window: Array<string>,
   plannedIds: Set<string>,
   owner: Owner | null = null,
-): Map<string, { everyday: number; all: number }> {
-  const inRange = new Set(months)
-  const out = new Map<string, { everyday: number; all: number }>()
+): Map<string, CategoryHistory> {
+  const index = new Map(window.map((m, i) => [m, i]))
+  const first = new Map<string, string>()
+  const out = new Map<string, CategoryHistory & { all: Array<number> }>()
   for (const t of ix.ledger.txns) {
-    if (!inRange.has(t.month)) continue
-    if (owner && ownerOf(ix, t) !== owner) continue
     const name = categoryOf(ix, t)
-    const a = out.get(name) ?? { everyday: 0, all: 0 }
-    a.all += t.amount
-    if (!plannedIds.has(t.id)) a.everyday += t.amount
-    out.set(name, a)
+    if ((first.get(name) ?? '9999') > t.month) first.set(name, t.month)
+    const i = index.get(t.month)
+    if (i === undefined || (owner && ownerOf(ix, t) !== owner)) continue
+    let h = out.get(name)
+    if (!h) {
+      h = {
+        monthly: window.map(() => 0),
+        all: window.map(() => 0),
+        typical: 0,
+        withPlanned: 0,
+        months: 0,
+      }
+      out.set(name, h)
+    }
+    h.all[i] += t.amount
+    if (!plannedIds.has(t.id)) h.monthly[i] += t.amount
   }
-  for (const a of out.values()) {
-    a.everyday = Math.round(a.everyday / months.length)
-    a.all = Math.round(a.all / months.length)
+  for (const [name, h] of out) {
+    const start = first.get(name) ?? window[0]
+    const active = window.filter((m) => m >= start).length || 1
+    const sum = (list: Array<number>) => list.reduce((a, b) => a + b, 0)
+    h.months = active
+    h.typical = Math.round(sum(h.monthly) / active)
+    h.withPlanned = Math.round(sum(h.all) / active)
   }
   return out
 }

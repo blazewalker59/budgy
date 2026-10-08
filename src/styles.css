@@ -78,21 +78,24 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Form controls in tables: quiet until touched. */
-.field {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 4px 8px;
-  font: inherit;
-  font-size: 14px;
-  color: var(--foreground);
-  min-height: 32px;
-}
-.field:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -1px;
-}
-.field.has-value {
-  border-color: var(--planned);
+/* Form controls: quiet until touched. In the components layer, so
+   utilities (padding, width) still win. */
+@layer components {
+  .field {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 6px;
+    padding: 2px 6px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--foreground);
+    min-height: 28px;
+  }
+  .field:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .field.has-value {
+    border-color: var(--planned);
+  }
 }

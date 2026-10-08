@@ -24,7 +24,7 @@ export function Bar({
   return (
     <div
       className={cn(
-        'relative h-2.5 w-full overflow-hidden rounded-full bg-sunken',
+        'relative h-1.5 w-full overflow-hidden rounded-full bg-sunken',
         className,
       )}
     >

@@ -66,8 +66,11 @@ _Avoid_: limit, allowance
 The Everyday Targets together.
 
 **Typical month**:
-A Category's average monthly spending over the last 12 full months, leaving
-out Planned Expense payments: the fair starting point for a Target.
+A Category's average monthly spending over the last 3, 6 or 12 full months
+(3 unless a Member picks otherwise), leaving out Planned Expense payments. A
+Category that started inside that span is averaged over the months since its
+first purchase, so a new expense isn't diluted. The fair starting point for a
+Target; its trend shows the last 12 months beside it.
 
 **Planned Expense**:
 A known, usually lumpy bill (car insurance twice a year, an annual renewal)

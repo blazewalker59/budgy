@@ -18,6 +18,7 @@ import { TAG_BG } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Bar } from '@/components/shared/Bar'
 import { MonthPicker, OwnerPicker } from '@/components/shared/Pickers'
+import { Section, Stat } from '@/components/shared/Layout'
 import { TxnList } from '@/components/shared/TxnList'
 
 export function MonthScreen({
@@ -51,8 +52,8 @@ export function MonthScreen({
   const isCurrent = month === thisMonth
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <MonthPicker
           month={month}
           months={months}
@@ -71,51 +72,50 @@ export function MonthScreen({
       </div>
 
       {gaps.length > 0 && (
-        <div className="flex gap-2 rounded-xl border border-nice/40 bg-surface p-3 text-sm">
-          <AlertTriangle
-            size={18}
-            className="mt-0.5 shrink-0 text-nice"
-            aria-hidden
-          />
-          <p>
-            Probably missing purchases:{' '}
+        <p className="flex gap-1.5 rounded-lg border border-nice/40 bg-surface px-2.5 py-1.5 text-xs">
+          <AlertTriangle size={14} className="shrink-0 text-nice" aria-hidden />
+          <span>
+            Probably missing:{' '}
             {gaps.map((g, i) => (
               <span key={g.account}>
                 {i > 0 && '; '}
-                <strong>{g.account}</strong> has nothing after{' '}
+                <strong>{g.account}</strong> after{' '}
                 {g.last ? dayLabel(g.last) : 'this month'}
               </span>
             ))}
-            . Import a newer export to fill it in.
-          </p>
-        </div>
+            . Import a newer export.
+          </span>
+        </p>
       )}
 
       <Headline view={view} isCurrent={isCurrent} owner={owner} />
 
-      {isCurrent && !owner && soon.length > 0 && (
-        <ComingUp items={soon} today={book.today} />
-      )}
-
-      <Section
-        title="Everyday categories"
-        hint="Planned bills are counted separately, so they don’t blow a category’s Target."
-      >
-        <CategoryRows
-          rows={view.everyday}
-          pace={isCurrent ? view.elapsed : undefined}
-        />
-      </Section>
-
-      <Stores stores={view.stores} total={view.totals.spent} month={month} />
-
-      {view.housing.length > 0 && (
-        <Section title="Housing" hint="Mortgage, utilities and upkeep.">
-          <CategoryRows rows={view.housing} />
-        </Section>
-      )}
-
-      <CopySummary view={view} owner={owner} />
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
+        <div className="space-y-3">
+          <Section title="Everyday" hint="planned bills counted separately">
+            <CategoryRows
+              rows={view.everyday}
+              pace={isCurrent ? view.elapsed : undefined}
+            />
+          </Section>
+          {view.housing.length > 0 && (
+            <Section title="Housing">
+              <CategoryRows rows={view.housing} />
+            </Section>
+          )}
+        </div>
+        <div className="space-y-3">
+          {isCurrent && !owner && soon.length > 0 && (
+            <ComingUp items={soon} today={book.today} />
+          )}
+          <Stores
+            stores={view.stores}
+            total={view.totals.spent}
+            month={month}
+          />
+          <CopySummary view={view} owner={owner} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -133,9 +133,9 @@ function Headline({
   const left = t.target - t.spent
   const housing = view.housing.reduce((n, r) => n + r.spent + r.plannedPaid, 0)
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat
-        label={owner ? `${owner}’s everyday spending` : 'Everyday spending'}
+        label={owner ? `${owner}’s everyday` : 'Everyday'}
         value={dollars(t.spent)}
         detail={
           t.target
@@ -151,17 +151,17 @@ function Headline({
             spent={t.spent}
             target={t.target}
             pace={isCurrent ? view.elapsed : undefined}
-            className="mt-2"
+            className="mt-1"
           />
         )}
       </Stat>
       <Stat
-        label="Wants (not needs)"
+        label="Wants"
         value={dollars(t.flexibleSpent)}
         detail={
           t.flexibleTarget
-            ? `Target ${dollars(t.flexibleTarget)} · ${signedDollars(t.flexibleSpent - t.flexibleTarget)}`
-            : 'Nice-to-haves and fluff'
+            ? `${signedDollars(t.flexibleSpent - t.flexibleTarget)} vs ${dollars(t.flexibleTarget)}`
+            : 'Nice + fluff'
         }
         tone={
           t.flexibleTarget && t.flexibleSpent > t.flexibleTarget
@@ -177,7 +177,7 @@ function Headline({
             ? `${dollars(t.plannedLeft)} still to come`
             : t.plannedPaid
               ? 'All paid'
-              : 'None due this month'
+              : 'None due'
         }
         tone={t.plannedLeft ? 'planned' : undefined}
       />
@@ -190,66 +190,6 @@ function Headline({
   )
 }
 
-function Stat({
-  label,
-  value,
-  detail,
-  tone,
-  children,
-}: {
-  label: string
-  value: string
-  detail: string
-  tone?: 'over' | 'planned'
-  children?: React.ReactNode
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-surface p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-extrabold tracking-tight">{value}</p>
-      <p
-        className={cn(
-          'mt-0.5 text-sm text-muted',
-          tone === 'over' && 'font-semibold text-over',
-          tone === 'planned' && 'font-semibold text-planned',
-        )}
-      >
-        {detail}
-      </p>
-      {children}
-    </div>
-  )
-}
-
-function Section({
-  title,
-  hint,
-  action,
-  children,
-}: {
-  title: string
-  hint?: string
-  action?: React.ReactNode
-  children: React.ReactNode
-}) {
-  return (
-    <section>
-      <div className="mb-2 flex items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-bold tracking-tight">{title}</h2>
-          {hint && <p className="text-sm text-muted">{hint}</p>}
-        </div>
-        {action}
-      </div>
-      <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-        {children}
-      </div>
-    </section>
-  )
-}
-
 function ComingUp({
   items,
   today,
@@ -258,35 +198,30 @@ function ComingUp({
   today: string
 }) {
   return (
-    <Section
-      title="Coming up"
-      hint="Planned bills in the next 60 days that haven’t been paid yet."
-    >
-      <ul className="divide-y divide-border">
+    <Section title="Coming up" hint="next 60 days, unpaid">
+      <ul className="divide-y divide-border text-[13px]">
         {items.map((o) => (
           <li
             key={`${o.plan.id}-${o.due}`}
-            className="flex items-center justify-between gap-3 px-4 py-3"
+            className="flex items-center justify-between gap-2 px-3 py-1.5"
           >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">{o.plan.name}</p>
-              <p className="text-sm text-muted">
-                {o.plan.category} · due {dayLabel(o.due)}
-              </p>
-            </div>
-            <div className="text-right">
-              <p className="font-bold">{dollars(o.plan.amount)}</p>
-              <p
+            <span className="min-w-0 truncate">
+              <span className="font-semibold">{o.plan.name}</span>
+              <span className="text-muted"> · {dayLabel(o.due)}</span>
+            </span>
+            <span className="shrink-0 tabular-nums">
+              <span
                 className={cn(
-                  'text-sm font-medium',
+                  'mr-2 text-xs font-semibold',
                   o.due < today ? 'text-over' : 'text-planned',
                 )}
               >
                 {o.due < today
                   ? `due ${relativeDays(today, o.due)}`
                   : relativeDays(today, o.due)}
-              </p>
-            </div>
+              </span>
+              <span className="font-bold">{dollars(o.plan.amount)}</span>
+            </span>
           </li>
         ))}
       </ul>
@@ -303,7 +238,7 @@ function CategoryRows({
 }) {
   const [open, setOpen] = useState<string | null>(null)
   if (!rows.length)
-    return <p className="px-4 py-6 text-sm text-muted">Nothing spent.</p>
+    return <p className="px-3 py-3 text-sm text-muted">Nothing spent.</p>
   return (
     <ul className="divide-y divide-border">
       {rows.map((r) => {
@@ -315,23 +250,30 @@ function CategoryRows({
               type="button"
               aria-expanded={isOpen}
               onClick={() => setOpen(isOpen ? null : r.name)}
-              className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 px-4 py-3 text-left hover:bg-sunken/50"
+              className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-3 py-1.5 text-left text-[13px] hover:bg-sunken/50 sm:grid-cols-[10.5rem_minmax(0,1fr)_8rem]"
             >
-              <span className="flex min-w-0 items-center gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
                 <span
                   className={cn('size-2 shrink-0 rounded-full', TAG_BG[r.tag])}
                   title={TAG_LABELS[r.tag]}
                 />
                 <span className="truncate font-semibold">{r.name}</span>
                 {r.planned.length > 0 && (
-                  <span className="shrink-0 rounded bg-planned-soft px-1.5 text-xs font-medium text-planned">
+                  <span
+                    className="shrink-0 rounded bg-planned-soft px-1 text-[10px] font-semibold text-planned"
+                    title={
+                      r.plannedLeft
+                        ? `${dollars(r.plannedLeft)} planned, still to come`
+                        : `${dollars(r.plannedPaid)} planned, paid`
+                    }
+                  >
                     {r.plannedLeft
-                      ? `${dollars(r.plannedLeft)} planned to come`
-                      : `${dollars(r.plannedPaid)} planned, paid`}
+                      ? `+${dollars(r.plannedLeft)} due`
+                      : `${dollars(r.plannedPaid)} ✓`}
                   </span>
                 )}
                 <ChevronDown
-                  size={16}
+                  size={13}
                   className={cn(
                     'shrink-0 text-muted transition',
                     isOpen && 'rotate-180',
@@ -339,35 +281,35 @@ function CategoryRows({
                   aria-hidden
                 />
               </span>
-              <span className="text-right">
-                <span className={cn('font-bold', over && 'text-over')}>
-                  {dollars(r.spent)}
-                </span>
-                <span className="text-sm text-muted">
-                  {r.target !== null ? ` of ${dollars(r.target)}` : ''}
-                </span>
-              </span>
               <Bar
                 spent={r.spent}
                 target={r.target}
                 pace={pace}
-                className="col-span-2"
+                className="order-last col-span-2 sm:order-none sm:col-span-1"
               />
+              <span className="text-right tabular-nums">
+                <span className={cn('font-bold', over && 'text-over')}>
+                  {dollars(r.spent)}
+                </span>
+                <span className="text-muted">
+                  {r.target !== null ? ` / ${dollars(r.target)}` : ''}
+                </span>
+              </span>
             </button>
             {isOpen && (
-              <div className="border-t border-border bg-background/40">
+              <div className="border-t border-border bg-background/50">
                 {r.planned.map((o) => (
                   <p
                     key={`${o.plan.id}-${o.due}`}
-                    className="flex justify-between border-b border-border px-3 py-2 text-sm"
+                    className="flex justify-between gap-2 border-b border-border px-3 py-1 text-xs"
                   >
-                    <span>
+                    <span className="truncate">
                       <span className="font-semibold text-planned">
-                        Planned:
+                        Planned
                       </span>{' '}
                       {o.plan.name}, due {dayLabel(o.due)}
                     </span>
-                    <span className="font-semibold">
+                    <span className="shrink-0 font-semibold">
                       {o.paidBy
                         ? `paid ${dollars(o.paidBy.amount)} ${dayLabel(o.paidBy.date)}`
                         : `${dollars(o.plan.amount)} to come`}
@@ -397,14 +339,12 @@ function Stores({
   if (!stores.length) return null
   const top = stores.slice(0, 3)
   const rest = stores.slice(3, 15)
-  const opened = stores.find((s) => s.store === open)
+  const opened = top.find((s) => s.store === open)
+  const share = (s: StoreMonth) =>
+    total > 0 ? Math.round((s.amount / total) * 100) : 0
   return (
-    <section>
-      <h2 className="text-lg font-bold tracking-tight">Where it went</h2>
-      <p className="mb-2 text-sm text-muted">
-        The biggest stores in {monthLabel(month)}, as hard numbers.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-3">
+    <Section title="Where it went" hint={monthLabel(month)} bare>
+      <div className="grid grid-cols-3 gap-2">
         {top.map((s) => (
           <button
             key={s.store}
@@ -412,60 +352,53 @@ function Stores({
             aria-expanded={open === s.store}
             onClick={() => setOpen(open === s.store ? null : s.store)}
             className={cn(
-              'rounded-2xl border border-border bg-surface p-4 text-left',
+              'min-w-0 rounded-xl border border-border bg-surface px-2.5 py-2 text-left',
               open === s.store && 'ring-2 ring-accent',
             )}
           >
-            <p className="truncate text-sm font-semibold text-muted">
+            <p className="truncate text-xs font-semibold text-muted">
               {s.store}
             </p>
-            <p className="text-3xl font-extrabold tracking-tight">
+            <p className="text-lg font-extrabold leading-tight tracking-tight">
               {dollars(s.amount)}
             </p>
-            <p className="text-sm text-muted">
-              {s.txns.length} purchase{s.txns.length === 1 ? '' : 's'} ·{' '}
-              {total > 0 ? Math.round((s.amount / total) * 100) : 0}% of
-              everyday
+            <p className="truncate text-[11px] text-muted">
+              {s.txns.length}× · {share(s)}%
             </p>
           </button>
         ))}
       </div>
-      {rest.length > 0 && (
-        <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface">
-          <ul className="divide-y divide-border">
-            {rest.map((s) => (
-              <li key={s.store}>
-                <button
-                  type="button"
-                  aria-expanded={open === s.store}
-                  onClick={() => setOpen(open === s.store ? null : s.store)}
-                  className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm hover:bg-sunken/50"
-                >
-                  <span className="truncate font-medium">{s.store}</span>
-                  <span>
-                    <span className="text-muted">{s.txns.length}× </span>
-                    <span className="font-semibold">{dollars(s.amount)}</span>
-                  </span>
-                </button>
-                {open === s.store && (
-                  <div className="border-t border-border bg-background/40">
-                    <TxnList txns={s.txns} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {opened && top.includes(opened) && (
-        <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-surface">
-          <p className="border-b border-border px-4 py-2 text-sm font-semibold">
-            {opened.store} in {monthLabel(month)}
-          </p>
+      {opened && (
+        <div className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
           <TxnList txns={opened.txns} />
         </div>
       )}
-    </section>
+      {rest.length > 0 && (
+        <ul className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface text-[13px]">
+          {rest.map((s) => (
+            <li key={s.store}>
+              <button
+                type="button"
+                aria-expanded={open === s.store}
+                onClick={() => setOpen(open === s.store ? null : s.store)}
+                className="flex w-full items-center justify-between gap-2 px-3 py-1 text-left hover:bg-sunken/50"
+              >
+                <span className="truncate">{s.store}</span>
+                <span className="shrink-0 tabular-nums">
+                  <span className="text-xs text-muted">{s.txns.length}× </span>
+                  <span className="font-semibold">{dollars(s.amount)}</span>
+                </span>
+              </button>
+              {open === s.store && (
+                <div className="border-t border-border bg-background/50">
+                  <TxnList txns={s.txns} />
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   )
 }
 
@@ -503,9 +436,9 @@ function CopySummary({ view, owner }: { view: MonthView; owner?: string }) {
             setTimeout(() => setCopied(false), 2000)
           })
         }
-        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium"
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium"
       >
-        <Copy size={15} aria-hidden /> {copied ? 'Copied' : 'Copy summary'}
+        <Copy size={13} aria-hidden /> {copied ? 'Copied' : 'Copy summary'}
       </button>
     </div>
   )

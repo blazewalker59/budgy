@@ -30,20 +30,23 @@ export function AppShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-dvh bg-background pb-20 sm:pb-8">
+    <div className="min-h-dvh bg-background pb-16 sm:pb-6">
       <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-5xl items-center gap-4 px-4">
-          <Link to="/" className="flex items-center gap-2 font-extrabold">
-            <img src="/favicon.svg" alt="" width={26} height={26} />
+        <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-3">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 text-sm font-extrabold"
+          >
+            <img src="/favicon.svg" alt="" width={22} height={22} />
             budgy
           </Link>
-          <nav className="hidden flex-1 items-center gap-1 sm:flex">
+          <nav className="hidden flex-1 items-center gap-0.5 sm:flex">
             {NAV.map((n) => (
               <Link
                 key={n.to}
                 to={n.to}
                 activeOptions={{ exact: n.to === '/', includeSearch: false }}
-                className="rounded-full px-3 py-1.5 text-sm font-medium text-muted hover:text-foreground"
+                className="rounded-full px-2.5 py-1 text-[13px] font-medium text-muted hover:text-foreground"
                 activeProps={{
                   className: 'bg-surface text-foreground shadow-sm',
                 }}
@@ -52,23 +55,23 @@ export function AppShell({
               </Link>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex items-center gap-0.5">
             <ThemeButton />
             <MemberMenu member={member} />
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 pt-5">{children}</main>
+      <main className="mx-auto max-w-6xl px-3 pt-3">{children}</main>
       <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
         {NAV.map((n) => (
           <Link
             key={n.to}
             to={n.to}
             activeOptions={{ exact: n.to === '/', includeSearch: false }}
-            className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted"
+            className="flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium text-muted"
             activeProps={{ className: 'text-accent' }}
           >
-            <n.icon size={20} aria-hidden />
+            <n.icon size={18} aria-hidden />
             {n.label}
           </Link>
         ))}
@@ -83,10 +86,10 @@ function ThemeButton() {
       type="button"
       aria-label="Switch light or dark"
       onClick={() => setTheme(currentTheme() === 'dark' ? 'light' : 'dark')}
-      className="flex size-9 items-center justify-center rounded-full text-muted hover:text-foreground"
+      className="flex size-8 items-center justify-center rounded-full text-muted hover:text-foreground"
     >
-      <Sun size={18} className="hidden dark:block" aria-hidden />
-      <Moon size={18} className="dark:hidden" aria-hidden />
+      <Sun size={16} className="hidden dark:block" aria-hidden />
+      <Moon size={16} className="dark:hidden" aria-hidden />
     </button>
   )
 }
@@ -100,26 +103,26 @@ function MemberMenu({ member }: { member: Member }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label="Account"
-        className="flex size-9 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-sm font-bold text-accent"
+        className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-accent-soft text-xs font-bold text-accent"
       >
         {member.image ? (
-          <img src={member.image} alt="" className="size-9" />
+          <img src={member.image} alt="" className="size-8" />
         ) : (
           member.name.slice(0, 1).toUpperCase()
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-11 w-56 rounded-xl border border-border bg-surface p-2 shadow-lg">
+        <div className="absolute right-0 top-10 w-56 rounded-xl border border-border bg-surface p-1.5 shadow-lg">
           <p className="px-2 py-1 text-sm font-semibold">{member.name}</p>
-          <p className="truncate px-2 pb-2 text-xs text-muted">
+          <p className="truncate px-2 pb-1.5 text-xs text-muted">
             {member.email}
           </p>
           <button
             type="button"
             onClick={() => void signOut().then(() => window.location.reload())}
-            className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-sm hover:bg-sunken"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
           >
-            <LogOut size={16} aria-hidden /> Sign out
+            <LogOut size={15} aria-hidden /> Sign out
           </button>
         </div>
       )}

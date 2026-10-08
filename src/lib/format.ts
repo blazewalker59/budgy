@@ -17,3 +17,10 @@ export function ownerColor(owner: string): string {
   if (owner === 'Alex') return '#c2417a'
   return '#8a8f93'
 }
+
+/** Tag names short enough for a narrow select. */
+export const TAG_SHORT: Record<Tag, string> = {
+  need: 'Need',
+  nice: 'Nice',
+  fluff: 'Fluff',
+}

@@ -33,142 +33,154 @@ export function UpcomingScreen() {
   const [editing, setEditing] = useState<Plan | null>(null)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Upcoming</h1>
-        <p className="text-sm text-muted">
-          Planned bills are the big, known ones (car insurance, annual
-          renewals). They’re budgeted on their due dates instead of inflating a
+        <h1 className="text-lg font-extrabold tracking-tight">Upcoming</h1>
+        <p className="text-xs text-muted">
+          Big known bills, budgeted on their due dates instead of inflating a
           monthly Target.
         </p>
       </div>
 
-      <Forecast months={months} />
+      <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-3">
+          <Forecast months={months} />
 
-      <section>
-        <h2 className="mb-2 text-lg font-bold tracking-tight">Next 90 days</h2>
-        <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-          {soon.length ? (
-            <ul className="divide-y divide-border">
-              {soon.map((o) => (
-                <OccurrenceRow
-                  key={`${o.plan.id}-${o.due}`}
-                  o={o}
-                  today={book.today}
-                />
-              ))}
-            </ul>
-          ) : (
-            <p className="px-4 py-5 text-sm text-muted">
-              Nothing planned in the next 90 days.
-            </p>
+          <section>
+            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted">
+              Next 90 days
+            </h2>
+            <div className="overflow-hidden rounded-xl border border-border bg-surface">
+              {soon.length ? (
+                <ul className="divide-y divide-border">
+                  {soon.map((o) => (
+                    <OccurrenceRow
+                      key={`${o.plan.id}-${o.due}`}
+                      o={o}
+                      today={book.today}
+                    />
+                  ))}
+                </ul>
+              ) : (
+                <p className="px-3 py-2 text-sm text-muted">
+                  Nothing planned in the next 90 days.
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-3">
+          <section>
+            <div className="mb-1 flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+                Planned bills
+              </h2>
+              <button
+                type="button"
+                onClick={() =>
+                  setEditing({
+                    id: newPlanId(),
+                    name: '',
+                    category: 'Insurance',
+                    store: null,
+                    amount: 0,
+                    cadence: 'semiannual',
+                    anchor: addDays(book.today, 30),
+                    active: true,
+                  })
+                }
+                className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background"
+              >
+                <Plus size={15} aria-hidden /> Add
+              </button>
+            </div>
+            {editing &&
+              !book.ix.ledger.plans.some((p) => p.id === editing.id) && (
+                <PlanForm plan={editing} onDone={() => setEditing(null)} />
+              )}
+            <div className="space-y-2">
+              {book.ix.ledger.plans.map((p) =>
+                editing?.id === p.id ? (
+                  <PlanForm
+                    key={p.id}
+                    plan={editing}
+                    onDone={() => setEditing(null)}
+                  />
+                ) : (
+                  <PlanCard key={p.id} plan={p} onEdit={() => setEditing(p)} />
+                ),
+              )}
+              {!book.ix.ledger.plans.length && !editing && (
+                <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
+                  No planned bills yet. Add one, or start from a suggestion
+                  below.
+                </p>
+              )}
+            </div>
+          </section>
+
+          {suggestions.length > 0 && (
+            <section>
+              <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
+                <Sparkles size={18} className="text-planned" aria-hidden />
+                Looks like a planned bill
+              </h2>
+              <p className="mb-1 text-xs text-muted">
+                Big charges from the same store every few months.
+              </p>
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <ul className="divide-y divide-border">
+                  {suggestions.map((s) => (
+                    <li
+                      key={`${s.category}-${s.store}`}
+                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[13px]"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold">
+                          {s.store}{' '}
+                          <span className="font-normal text-muted">
+                            · {s.category}
+                          </span>
+                        </p>
+                        <p className="text-xs text-muted">
+                          {CADENCE_LABELS[s.cadence]}:{' '}
+                          {s.charges
+                            .slice(-4)
+                            .map(
+                              (c) =>
+                                `${dollars(c.amount)} ${monthLabel(c.month)}`,
+                            )
+                            .join(', ')}
+                          . Next about {dayLabel(s.nextDue)}.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditing({
+                            id: newPlanId(),
+                            name: s.store,
+                            category: s.category,
+                            store: s.store,
+                            amount: s.amount,
+                            cadence: s.cadence,
+                            anchor: s.nextDue,
+                            active: true,
+                          })
+                        }
+                        className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold"
+                      >
+                        Plan for it
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </section>
           )}
         </div>
-      </section>
-
-      <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-bold tracking-tight">Planned bills</h2>
-          <button
-            type="button"
-            onClick={() =>
-              setEditing({
-                id: newPlanId(),
-                name: '',
-                category: 'Insurance',
-                store: null,
-                amount: 0,
-                cadence: 'semiannual',
-                anchor: addDays(book.today, 30),
-                active: true,
-              })
-            }
-            className="inline-flex items-center gap-1 rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background"
-          >
-            <Plus size={15} aria-hidden /> Add
-          </button>
-        </div>
-        {editing && !book.ix.ledger.plans.some((p) => p.id === editing.id) && (
-          <PlanForm plan={editing} onDone={() => setEditing(null)} />
-        )}
-        <div className="space-y-2">
-          {book.ix.ledger.plans.map((p) =>
-            editing?.id === p.id ? (
-              <PlanForm
-                key={p.id}
-                plan={editing}
-                onDone={() => setEditing(null)}
-              />
-            ) : (
-              <PlanCard key={p.id} plan={p} onEdit={() => setEditing(p)} />
-            ),
-          )}
-          {!book.ix.ledger.plans.length && !editing && (
-            <p className="rounded-2xl border border-dashed border-border px-4 py-5 text-sm text-muted">
-              No planned bills yet. Add one, or start from a suggestion below.
-            </p>
-          )}
-        </div>
-      </section>
-
-      {suggestions.length > 0 && (
-        <section>
-          <h2 className="flex items-center gap-2 text-lg font-bold tracking-tight">
-            <Sparkles size={18} className="text-planned" aria-hidden />
-            Looks like a planned bill
-          </h2>
-          <p className="mb-2 text-sm text-muted">
-            Big charges from the same store every few months.
-          </p>
-          <div className="overflow-hidden rounded-2xl border border-border bg-surface">
-            <ul className="divide-y divide-border">
-              {suggestions.map((s) => (
-                <li
-                  key={`${s.category}-${s.store}`}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <div className="min-w-0">
-                    <p className="font-semibold">
-                      {s.store}{' '}
-                      <span className="font-normal text-muted">
-                        · {s.category}
-                      </span>
-                    </p>
-                    <p className="text-sm text-muted">
-                      {CADENCE_LABELS[s.cadence]}:{' '}
-                      {s.charges
-                        .slice(-4)
-                        .map(
-                          (c) => `${dollars(c.amount)} ${monthLabel(c.month)}`,
-                        )
-                        .join(', ')}
-                      . Next about {dayLabel(s.nextDue)}.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setEditing({
-                        id: newPlanId(),
-                        name: s.store,
-                        category: s.category,
-                        store: s.store,
-                        amount: s.amount,
-                        cadence: s.cadence,
-                        anchor: s.nextDue,
-                        active: true,
-                      })
-                    }
-                    className="rounded-full border border-border px-3 py-1.5 text-sm font-medium"
-                  >
-                    Plan for it
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-      )}
+      </div>
     </div>
   )
 }
@@ -181,13 +193,14 @@ function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
   const opened = months.find((m) => m.month === open)
   return (
     <section>
-      <h2 className="text-lg font-bold tracking-tight">The next 12 months</h2>
-      <p className="mb-2 text-sm text-muted">
-        Everyday Targets plus planned bills. Taller purple means a heavier
-        month; tap one for what’s due.
+      <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+        Next 12 months
+      </h2>
+      <p className="mb-1 text-xs text-muted">
+        Everyday Targets + planned bills; tap a month.
       </p>
-      <div className="rounded-2xl border border-border bg-surface p-4">
-        <div className="flex h-44 items-end gap-1.5">
+      <div className="rounded-xl border border-border bg-surface p-3">
+        <div className="flex h-28 items-end gap-1.5">
           {months.map((m) => {
             const heavy = m.everyday + m.planned > typical * 1.1
             return (
@@ -268,10 +281,10 @@ function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
 function OccurrenceRow({ o, today }: { o: Occurrence; today: string }) {
   const late = o.due < today
   return (
-    <li className="flex items-center justify-between gap-3 px-4 py-3">
+    <li className="flex items-center justify-between gap-3 px-3 py-1.5">
       <div className="min-w-0">
         <p className="truncate font-semibold">{o.plan.name}</p>
-        <p className="text-sm text-muted">
+        <p className="text-xs text-muted">
           {o.plan.category} · {dayLabel(o.due)}
         </p>
       </div>
@@ -302,7 +315,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
   return (
     <div
       className={cn(
-        'flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface px-4 py-3',
+        'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-1.5',
         !plan.active && 'opacity-60',
       )}
     >
@@ -311,7 +324,7 @@ function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
           {plan.name}{' '}
           <span className="font-normal text-muted">· {plan.category}</span>
         </p>
-        <p className="text-sm text-muted">
+        <p className="text-xs text-muted">
           {dollars(plan.amount)} {CADENCE_LABELS[plan.cadence].toLowerCase()}
           {next
             ? ` · next ${dayLabel(next.due)} (${relativeDays(book.today, next.due)})`
@@ -362,7 +375,7 @@ function IconButton({
       aria-label={label}
       title={label}
       onClick={onClick}
-      className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground"
+      className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground"
     >
       {children}
     </button>
@@ -384,7 +397,7 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
   const valid = draft.name.trim() && cents && cents > 0
   return (
     <form
-      className="mb-2 grid gap-3 rounded-2xl border-2 border-planned/40 bg-surface p-4 sm:grid-cols-2"
+      className="mb-1 grid gap-3 rounded-xl border-2 border-planned/40 bg-surface p-3 sm:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault()
         if (!valid) return
@@ -476,7 +489,7 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
         <button
           type="submit"
           disabled={!valid}
-          className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background disabled:opacity-40"
+          className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background disabled:opacity-40"
         >
           Save
         </button>

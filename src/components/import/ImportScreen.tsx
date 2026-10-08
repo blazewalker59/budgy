@@ -87,20 +87,20 @@ export function ImportScreen() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div>
-        <h1 className="text-2xl font-extrabold tracking-tight">Import</h1>
-        <p className="text-sm text-muted">
+        <h1 className="text-lg font-extrabold tracking-tight">Import</h1>
+        <p className="text-xs text-muted">
           Export transactions from the finance app as CSV and drop them here.
           Only spending is kept; transfers and income are skipped, and anything
           already imported is never added twice.
         </p>
       </div>
 
-      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-border bg-surface px-4 py-10 text-center hover:border-accent">
+      <label className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border bg-surface px-4 py-5 text-center hover:border-accent">
         <FileUp size={28} className="text-accent" aria-hidden />
         <span className="font-semibold">Choose CSV files</span>
-        <span className="text-sm text-muted">
+        <span className="text-xs text-muted">
           You’ll see what’s new before anything is added.
         </span>
         <input
@@ -118,10 +118,10 @@ export function ImportScreen() {
       {pending.map((p) => (
         <div
           key={`${p.file.name}-${p.file.lastModified}`}
-          className="rounded-2xl border border-border bg-surface p-4"
+          className="rounded-xl border border-border bg-surface p-3"
         >
           <p className="font-semibold">{p.file.name}</p>
-          {p.busy && <p className="text-sm text-muted">Reading…</p>}
+          {p.busy && <p className="text-xs text-muted">Reading…</p>}
           {p.error && (
             <p className="text-sm font-medium text-over">{p.error}</p>
           )}
@@ -186,12 +186,12 @@ export function ImportScreen() {
 
       {history.data && history.data.length > 0 && (
         <section>
-          <h2 className="mb-2 text-lg font-bold tracking-tight">
+          <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted">
             Recent imports
           </h2>
-          <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface text-sm">
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface text-sm">
             {history.data.map((h) => (
-              <li key={h.id} className="flex justify-between gap-3 px-4 py-2.5">
+              <li key={h.id} className="flex justify-between gap-3 px-3 py-1.5">
                 <span className="truncate">
                   {h.fileName}{' '}
                   <span className="text-muted">by {h.importedBy}</span>
@@ -226,18 +226,20 @@ function Accounts() {
   if (!ix.ledger.accounts.length) return null
   return (
     <section>
-      <h2 className="text-lg font-bold tracking-tight">Accounts</h2>
-      <p className="mb-2 text-sm text-muted">
+      <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+        Accounts
+      </h2>
+      <p className="mb-1 text-xs text-muted">
         Whose spending each card or account is. Data that stops early means that
         account is missing from the latest export.
       </p>
-      <ul className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
         {ix.ledger.accounts.map((a) => {
           const s = stats.get(a.name)
           return (
             <li
               key={a.name}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 px-3 py-1.5"
             >
               <div className="min-w-0">
                 <p className="font-semibold">
@@ -247,7 +249,7 @@ function Accounts() {
                   />
                   {a.name}
                 </p>
-                <p className="text-sm text-muted">
+                <p className="text-xs text-muted">
                   {s
                     ? `${s.n} purchases, ${s.first} to ${s.last}`
                     : 'No purchases'}
@@ -315,11 +317,11 @@ function RulesEditor() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="text-lg font-bold tracking-tight"
+        className="text-sm font-bold uppercase tracking-wide text-muted"
       >
         Import rules {open ? '▾' : '▸'}
       </button>
-      <p className="mb-2 text-sm text-muted">
+      <p className="mb-1 text-xs text-muted">
         How exports become names: what each account is called, stores that go by
         another name, local vendors that count as home upkeep, and rows that
         aren’t spending. Changes apply to future imports.
@@ -342,11 +344,11 @@ function RulesEditor() {
               type="button"
               disabled={draft === null}
               onClick={() => void save()}
-              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-semibold text-background disabled:opacity-40"
+              className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background disabled:opacity-40"
             >
               Save rules
             </button>
-            {status && <span className="text-sm text-muted">{status}</span>}
+            {status && <span className="text-xs text-muted">{status}</span>}
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ledger, plan, txn } from '@test/factories'
 import { indexLedger } from '@/lib/model/ledger'
-import { averages, monthView, upcoming } from '@/lib/model/month'
+import { categoryHistory, monthView, upcoming } from '@/lib/model/month'
 import { schedule } from '@/lib/model/plans'
 
 describe('monthView', () => {
@@ -96,7 +96,7 @@ describe('upcoming', () => {
   })
 })
 
-describe('averages', () => {
+describe('categoryHistory', () => {
   it('averages per month with and without planned payments', () => {
     const a = txn({
       date: '2026-01-05',
@@ -111,7 +111,49 @@ describe('averages', () => {
       amount: 110_000,
     })
     const ix = indexLedger(ledger({ txns: [a, b] }))
-    const avg = averages(ix, ['2026-01', '2026-02'], new Set([b.id]))
-    expect(avg.get('Insurance')).toEqual({ everyday: 5_000, all: 60_000 })
+    const h = categoryHistory(ix, ['2026-01', '2026-02'], new Set([b.id])).get(
+      'Insurance',
+    )!
+    expect(h).toEqual({
+      monthly: [10_000, 0],
+      all: [10_000, 110_000],
+      typical: 5_000,
+      withPlanned: 60_000,
+      months: 2,
+    })
+  })
+
+  it('averages a new Category only over the months since it started', () => {
+    const old = txn({
+      date: '2025-11-05',
+      sourceCategory: 'Groceries',
+      amount: 30_000,
+    })
+    const daycare = txn({
+      date: '2026-02-03',
+      sourceCategory: 'Childcare & education',
+      store: 'Daycare',
+      amount: 90_000,
+    })
+    const ix = indexLedger(ledger({ txns: [old, daycare] }))
+    const window = ['2025-12', '2026-01', '2026-02']
+    const h = categoryHistory(ix, window, new Set())
+    expect(h.get('Childcare & education')?.typical).toBe(90_000)
+    expect(h.get('Childcare & education')?.months).toBe(1)
+    expect(h.has('Groceries')).toBe(false)
+  })
+
+  it('narrows to one owner', () => {
+    const mine = txn({ date: '2026-01-05', amount: 4_000 })
+    const hers = txn({
+      date: '2026-01-06',
+      amount: 6_000,
+      account: 'Alex Apple Card',
+    })
+    const ix = indexLedger(ledger({ txns: [mine, hers] }))
+    expect(
+      categoryHistory(ix, ['2026-01'], new Set(), 'Alex').get('Groceries')
+        ?.typical,
+    ).toBe(6_000)
   })
 })

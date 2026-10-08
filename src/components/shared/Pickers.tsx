@@ -22,7 +22,7 @@ export function MonthPicker({
         aria-label="Previous month"
         disabled={month <= first}
         onClick={() => onChange(shiftMonth(month, -1))}
-        className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
       >
         <ChevronLeft size={18} aria-hidden />
       </button>
@@ -30,7 +30,7 @@ export function MonthPicker({
         value={month}
         onChange={(e) => onChange(e.target.value)}
         aria-label="Month"
-        className="field min-w-40 text-base font-semibold"
+        className="field min-w-36 font-semibold"
       >
         {[...months].reverse().map((m) => (
           <option key={m} value={m}>
@@ -43,7 +43,7 @@ export function MonthPicker({
         aria-label="Next month"
         disabled={month >= last}
         onClick={() => onChange(shiftMonth(month, 1))}
-        className="flex size-9 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
       >
         <ChevronRight size={18} aria-hidden />
       </button>
@@ -76,7 +76,7 @@ export function OwnerPicker({
             aria-checked={on}
             onClick={() => onChange(value)}
             className={cn(
-              'rounded-full px-3 py-1 text-sm font-medium text-muted',
+              'rounded-full px-2.5 py-0.5 text-xs font-semibold text-muted',
               on && 'bg-surface text-foreground shadow-sm',
             )}
           >

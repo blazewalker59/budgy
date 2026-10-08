@@ -182,6 +182,8 @@ export function upcoming(
 export interface CategoryHistory {
   /** Everyday spending in each month of the window, oldest first. */
   monthly: Array<number>
+  /** The same with Planned Expense payments in. */
+  allMonthly: Array<number>
   /**
    * Average over the window's months since the Category's first purchase,
    * leaving out Planned Expense payments: a fair starting Target.
@@ -205,7 +207,7 @@ export function categoryHistory(
 ): Map<string, CategoryHistory> {
   const index = new Map(window.map((m, i) => [m, i]))
   const first = new Map<string, string>()
-  const out = new Map<string, CategoryHistory & { all: Array<number> }>()
+  const out = new Map<string, CategoryHistory>()
   for (const t of ix.ledger.txns) {
     const name = categoryOf(ix, t)
     if ((first.get(name) ?? '9999') > t.month) first.set(name, t.month)
@@ -215,14 +217,14 @@ export function categoryHistory(
     if (!h) {
       h = {
         monthly: window.map(() => 0),
-        all: window.map(() => 0),
+        allMonthly: window.map(() => 0),
         typical: 0,
         withPlanned: 0,
         months: 0,
       }
       out.set(name, h)
     }
-    h.all[i] += t.amount
+    h.allMonthly[i] += t.amount
     if (!plannedIds.has(t.id)) h.monthly[i] += t.amount
   }
   for (const [name, h] of out) {
@@ -231,7 +233,7 @@ export function categoryHistory(
     const sum = (list: Array<number>) => list.reduce((a, b) => a + b, 0)
     h.months = active
     h.typical = Math.round(sum(h.monthly) / active)
-    h.withPlanned = Math.round(sum(h.all) / active)
+    h.withPlanned = Math.round(sum(h.allMonthly) / active)
   }
   return out
 }

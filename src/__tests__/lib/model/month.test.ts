@@ -116,7 +116,7 @@ describe('categoryHistory', () => {
     )!
     expect(h).toEqual({
       monthly: [10_000, 0],
-      all: [10_000, 110_000],
+      allMonthly: [10_000, 110_000],
       typical: 5_000,
       withPlanned: 60_000,
       months: 2,

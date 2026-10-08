@@ -7,6 +7,7 @@
 import { Fragment, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Plus } from 'lucide-react'
 import { BudgetMix } from './BudgetMix'
+import { CategorySheet } from './CategorySheet'
 import type { CategoryHistory } from '@/lib/model/month'
 import type { Category, Group, Tag } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
@@ -32,7 +33,7 @@ import { TAG_BG, TAG_SHORT } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { Segmented, Stat } from '@/components/shared/Layout'
-import { Spark } from '@/components/shared/Spark'
+import { TrendSpark } from '@/components/charts/lazy'
 
 type Span = '3' | '6' | '12'
 const SPANS = [
@@ -48,6 +49,7 @@ export function BudgetScreen() {
   const [from, setFrom] = useState(thisMonth)
   const [span, setSpan] = useState<Span>('3')
   const [open, setOpen] = useState<string | null>(null)
+  const [sheet, setSheet] = useState<string | null>(null)
   const window = useMemo(
     () => monthRange(shiftMonth(thisMonth, -1), Number(span)),
     [thisMonth, span],
@@ -181,6 +183,7 @@ export function BudgetScreen() {
         history={history}
         year={year}
         span={window.length}
+        onTrend={setSheet}
         open={open}
         setOpen={setOpen}
       />
@@ -191,10 +194,18 @@ export function BudgetScreen() {
         history={history}
         year={year}
         span={window.length}
+        onTrend={setSheet}
         open={open}
         setOpen={setOpen}
       />
       <AddCategory />
+      {sheet && (
+        <CategorySheet
+          name={sheet}
+          span={window.length}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </div>
   )
 }
@@ -206,6 +217,7 @@ function Table({
   history,
   year,
   span,
+  onTrend,
   open,
   setOpen,
 }: {
@@ -215,6 +227,7 @@ function Table({
   history: Map<string, CategoryHistory>
   year: Map<string, CategoryHistory>
   span: number
+  onTrend: (name: string) => void
   open: string | null
   setOpen: (name: string | null) => void
 }) {
@@ -251,6 +264,7 @@ function Table({
               h={history.get(name)}
               trend={year.get(name)}
               span={span}
+              onTrend={() => onTrend(name)}
               open={open === name}
               toggle={() => setOpen(open === name ? null : name)}
             />
@@ -295,6 +309,7 @@ function Row({
   h,
   trend,
   span,
+  onTrend,
   open,
   toggle,
 }: {
@@ -303,6 +318,7 @@ function Row({
   h?: CategoryHistory
   trend?: CategoryHistory
   span: number
+  onTrend: () => void
   open: boolean
   toggle: () => void
 }) {
@@ -343,12 +359,18 @@ function Row({
             />
           </button>
           {trend && (
-            <Spark
-              values={trend.monthly}
-              target={target}
-              highlight={span}
-              className="mt-0.5 sm:hidden"
-            />
+            <button
+              type="button"
+              onClick={onTrend}
+              aria-label={`${name} by month`}
+              className="mt-0.5 block w-20 rounded hover:bg-sunken sm:hidden"
+            >
+              <TrendSpark
+                values={trend.monthly}
+                target={target}
+                highlight={span}
+              />
+            </button>
           )}
         </td>
         <td className="hidden px-1 py-1 sm:table-cell">
@@ -360,12 +382,19 @@ function Row({
         </td>
         <td className="hidden px-1 py-1 text-right sm:table-cell">
           {trend && (
-            <Spark
-              values={trend.monthly}
-              target={target}
-              highlight={span}
-              className="ml-auto"
-            />
+            <button
+              type="button"
+              onClick={onTrend}
+              aria-label={`${name} by month`}
+              title="See by month"
+              className="ml-auto block w-20 cursor-pointer rounded hover:bg-sunken"
+            >
+              <TrendSpark
+                values={trend.monthly}
+                target={target}
+                highlight={span}
+              />
+            </button>
           )}
         </td>
         <td className="px-1 py-1 text-right tabular-nums">

@@ -2,6 +2,8 @@
 
 @import 'tailwindcss';
 
+@import 'tw-animate-css';
+
 @custom-variant dark (&:is(.dark *));
 
 /*
@@ -98,4 +100,18 @@ body {
   .field.has-value {
     border-color: var(--planned);
   }
+}
+
+/* TanStack Charts: tooltips (portaled anywhere) follow the app's theme. */
+:root {
+  --ts-chart-tooltip-background: var(--surface);
+  --ts-chart-tooltip-color: var(--foreground);
+}
+.ts-chart-tooltip {
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  font-size: 12px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  white-space: pre-line;
 }

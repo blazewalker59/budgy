@@ -18,6 +18,7 @@ import { dollars, parseDollars } from '@/lib/model/money'
 import { CADENCES, CADENCE_LABELS } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
 import { CategorySelect } from '@/components/shared/CategorySelect'
+import { ForecastChart } from '@/components/charts/lazy'
 
 export function UpcomingScreen() {
   const book = useBook()
@@ -187,93 +188,32 @@ export function UpcomingScreen() {
 
 function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
   const [open, setOpen] = useState<string | null>(null)
-  const max = Math.max(...months.map((m) => m.everyday + m.planned), 1)
-  const typical =
-    months.reduce((n, m) => n + m.everyday + m.planned, 0) / months.length
   const opened = months.find((m) => m.month === open)
   return (
     <section>
-      <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+      <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted">
         Next 12 months
       </h2>
-      <p className="mb-1 text-xs text-muted">
-        Everyday Targets + planned bills; tap a month.
-      </p>
-      <div className="rounded-xl border border-border bg-surface p-3">
-        <div className="flex h-28 items-end gap-1.5">
-          {months.map((m) => {
-            const heavy = m.everyday + m.planned > typical * 1.1
-            return (
-              <button
-                key={m.month}
-                type="button"
-                onClick={() => setOpen(open === m.month ? null : m.month)}
-                aria-label={`${monthLabel(m.month)}: ${dollars(m.everyday + m.planned)}`}
-                className="flex h-full flex-1 flex-col justify-end"
-              >
-                <span
-                  className={cn(
-                    'mb-1 text-center text-[10px] font-semibold',
-                    heavy ? 'text-planned' : 'text-muted',
-                  )}
-                >
-                  {m.planned > 0 ? dollars(m.planned) : ''}
-                </span>
-                <span
-                  className={cn(
-                    'block rounded-t bg-planned',
-                    open === m.month && 'ring-2 ring-foreground',
-                  )}
-                  style={{ height: `${(m.planned / max) * 100}%` }}
-                />
-                <span
-                  className="block rounded-b bg-accent/70"
-                  style={{ height: `${(m.everyday / max) * 100}%` }}
-                />
-              </button>
-            )
-          })}
+      <ForecastChart months={months} onSelect={setOpen} />
+      {opened && (
+        <div className="mt-1 rounded-xl border border-border bg-surface px-3 py-2 text-[13px]">
+          <p className="font-semibold">
+            {monthLabel(opened.month, true)}: {dollars(opened.everyday)}{' '}
+            everyday + {dollars(opened.planned)} planned
+            {opened.housing ? ` (+ ${dollars(opened.housing)} housing)` : ''}
+          </p>
+          <ul className="text-xs text-muted">
+            {opened.occurrences.map((o) => (
+              <li key={`${o.plan.id}-${o.due}`}>
+                {dayLabel(o.due)} · {o.plan.name} ·{' '}
+                {dollars(o.paidBy ? o.paidBy.amount : o.plan.amount)}
+                {o.paidBy ? ' (paid)' : ''}
+              </li>
+            ))}
+            {!opened.occurrences.length && <li>No planned bills.</li>}
+          </ul>
         </div>
-        <div className="mt-1 flex gap-1.5">
-          {months.map((m) => (
-            <span
-              key={m.month}
-              className="flex-1 text-center text-[11px] text-muted"
-            >
-              {monthLabel(m.month).slice(0, 3)}
-            </span>
-          ))}
-        </div>
-        <p className="mt-3 flex flex-wrap gap-4 text-xs text-muted">
-          <span>
-            <span className="mr-1 inline-block size-2 rounded-sm bg-accent/70" />
-            Everyday Targets
-          </span>
-          <span>
-            <span className="mr-1 inline-block size-2 rounded-sm bg-planned" />
-            Planned bills
-          </span>
-        </p>
-        {opened && (
-          <div className="mt-3 border-t border-border pt-3 text-sm">
-            <p className="font-semibold">
-              {monthLabel(opened.month, true)}: {dollars(opened.everyday)}{' '}
-              everyday + {dollars(opened.planned)} planned
-              {opened.housing ? ` (+ ${dollars(opened.housing)} housing)` : ''}
-            </p>
-            <ul className="mt-1 text-muted">
-              {opened.occurrences.map((o) => (
-                <li key={`${o.plan.id}-${o.due}`}>
-                  {dayLabel(o.due)} · {o.plan.name} ·{' '}
-                  {dollars(o.paidBy ? o.paidBy.amount : o.plan.amount)}
-                  {o.paidBy ? ' (paid)' : ''}
-                </li>
-              ))}
-              {!opened.occurrences.length && <li>No planned bills.</li>}
-            </ul>
-          </div>
-        )}
-      </div>
+      )}
     </section>
   )
 }

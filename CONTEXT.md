@@ -90,6 +90,12 @@ Due dates not yet paid, from a few days ago through the next weeks.
 A Planned Expense spread over the months between due dates: what to save
 each month so the bill is covered.
 
+**Selection**:
+A slice of the Household's spending picked on the Spending screen: a person,
+some Accounts, a search, or any mix. It is always shown inside the whole,
+per Category and against the Targets, so its part of the plan is plain
+("Blaze Apple Card is 93% of Groceries and uses 90% of its Target").
+
 **Gap**:
 An Account in regular use with nothing near the end of a month, which usually
 means the export is missing it.

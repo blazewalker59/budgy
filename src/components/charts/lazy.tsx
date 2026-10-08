@@ -11,6 +11,10 @@ import type { ForecastChart as ForecastChartType } from './ForecastChart'
 import type { MixChart as MixChartType } from './MixChart'
 import type { TrendSpark as TrendSparkType } from './TrendSpark'
 
+import type { PlanChart as PlanChartType } from './PlanChart'
+import type { SourceChart as SourceChartType } from './SourceChart'
+import type { SelectionMonths as SelectionMonthsType } from './SelectionMonths'
+
 function Placeholder({ height, bare }: { height: number; bare?: boolean }) {
   return (
     <div
@@ -56,3 +60,15 @@ export const CategoryTrend = lazyChart<
 export const ForecastChart = lazyChart<
   ComponentProps<typeof ForecastChartType>
 >(() => import('./ForecastChart').then((m) => m.ForecastChart), 210)
+
+export const PlanChart = lazyChart<ComponentProps<typeof PlanChartType>>(
+  () => import('./PlanChart').then((m) => m.PlanChart),
+  420,
+)
+export const SourceChart = lazyChart<ComponentProps<typeof SourceChartType>>(
+  () => import('./SourceChart').then((m) => m.SourceChart),
+  170,
+)
+export const SelectionMonths = lazyChart<
+  ComponentProps<typeof SelectionMonthsType>
+>(() => import('./SelectionMonths').then((m) => m.SelectionMonths), 170)

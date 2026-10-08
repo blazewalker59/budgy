@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+bun.lock
+public
+src/routeTree.gen.ts
+*.md

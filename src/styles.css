@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap');
+
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  Budgy: a quiet ledger. Light is the base; `.dark` on <html> (set before
+  paint from the Member's choice or the device) switches every token.
+  Tags have one color each, used the same everywhere.
+*/
+:root {
+  --background: #f6f5f1;
+  --surface: #ffffff;
+  --sunken: #efeee9;
+  --border: #e4e2db;
+  --foreground: #17191a;
+  --muted: #62676b;
+  --accent: #1f6f5c;
+  --accent-soft: #e3f0ec;
+  --over: #c2412d;
+  --over-soft: #fbe9e5;
+  --planned: #6a4fd1;
+  --planned-soft: #eeeafc;
+  --need: #2f6db5;
+  --nice: #b7791f;
+  --fluff: #c2417a;
+}
+
+.dark {
+  --background: #101312;
+  --surface: #171b1a;
+  --sunken: #0c0f0e;
+  --border: #262c2a;
+  --foreground: #edf0ee;
+  --muted: #95a09b;
+  --accent: #5cc4a8;
+  --accent-soft: #15302a;
+  --over: #ff8a73;
+  --over-soft: #3a1d17;
+  --planned: #a995ff;
+  --planned-soft: #241d3d;
+  --need: #7fb2f0;
+  --nice: #e9b35a;
+  --fluff: #f08bb7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-over: var(--over);
+  --color-over-soft: var(--over-soft);
+  --color-planned: var(--planned);
+  --color-planned-soft: var(--planned-soft);
+  --color-need: var(--need);
+  --color-nice: var(--nice);
+  --color-fluff: var(--fluff);
+  --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  font-family: var(--font-sans);
+  font-feature-settings: 'tnum' 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Form controls in tables: quiet until touched. */
+.field {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--foreground);
+  min-height: 32px;
+}
+.field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+.field.has-value {
+  border-color: var(--planned);
+}

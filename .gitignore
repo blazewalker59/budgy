@@ -1,0 +1,21 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.dev.vars
+.nitro
+.tanstack
+.wrangler
+.output
+coverage/*
+.claude/scheduled_tasks.lock
+
+# Household data never goes in git: CSV exports and the artifact's labels.
+seed/*
+!seed/README.md
+*.csv
+
+# Agent worktrees (local only)
+.claude/worktrees/

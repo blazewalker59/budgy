@@ -1,0 +1,17 @@
+# Lefthook git hooks configuration
+# Docs: https://lefthook.dev/configuration/
+#
+# Runs formatting, linting, and type checking before each commit.
+# Install hooks: bunx lefthook install
+#
+# Only checks staged files for faster commits. Full project check runs in CI.
+
+pre-commit:
+  no_stash: true
+  jobs:
+    - name: format
+      glob: '*.{ts,tsx,js,json,css}'
+      run: bunx prettier --check {staged_files}
+    - name: lint
+      glob: '*.{ts,tsx}'
+      run: bunx eslint {staged_files}

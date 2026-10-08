@@ -1,0 +1,51 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Single source-of-truth Wrangler config, the same shape as sportsline: the
+  // @cloudflare/vite-plugin reads this for dev + `vite build` (which requires
+  // `main` to be the source entry), and the production deploy passes the
+  // built bundle as wrangler's positional script arg, which overrides `main`:
+  //   wrangler deploy dist/server/index.js --env production
+  //
+  // There is no staging environment. Bindings and settings are NOT inherited
+  // into named environments, so the production env repeats them.
+  "name": "budgy",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./src/server.ts",
+  "workers_dev": true,
+  "observability": {
+    "logs": {
+      "enabled": true,
+    },
+  },
+  "assets": {
+    "directory": "./dist/client",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "budgy-db",
+      "database_id": "b2206e5f-72a5-4e6b-a349-21485511cae7",
+      "migrations_dir": "drizzle",
+    },
+  ],
+  "env": {
+    "production": {
+      "name": "budgy",
+      "workers_dev": true,
+      "observability": {
+        "logs": {
+          "enabled": true,
+        },
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "budgy-db",
+          "database_id": "b2206e5f-72a5-4e6b-a349-21485511cae7",
+          "migrations_dir": "drizzle",
+        },
+      ],
+    },
+  },
+}

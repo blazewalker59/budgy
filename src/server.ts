@@ -2,7 +2,8 @@
 /**
  * Custom Cloudflare Worker entry (same shape as sportsline).
  *
- * Serves Better Auth (`/api/auth/*`) and the health check directly;
+ * Serves Better Auth (`/api/auth/*`), the health check and the MCP server
+ * for Agents (`/mcp`, docs/adr/0004) directly;
  * everything else falls through to TanStack Start inside a per-request
  * context carrying the env.
  */
@@ -15,6 +16,7 @@ import type { CloudflareEnv } from '@/lib/db'
 import { getAuth } from '@/lib/auth/server'
 import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
+import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 
 const startFetch = createStartHandler(defaultStreamHandler) as (
   request: Request,
@@ -46,6 +48,9 @@ export default {
         return Response.json({ ok: false }, { status: 503 })
       }
     }
+
+    // Agents sign in with an API token, not a session (docs/adr/0004).
+    if (url.pathname === MCP_PATH) return serveMcp(request, env)
 
     if (url.pathname.startsWith('/api/auth')) {
       return getAuth(env, url.origin).handler(request)

@@ -1,26 +1,16 @@
 /**
- * The Book: the Ledger indexed once, with every Planned Expense's due dates
- * matched to payments, shared by every screen through context.
+ * The Book (src/lib/model/book.ts), built once per Ledger and shared by
+ * every screen through context.
  */
 
 import { createContext, useContext, useMemo } from 'react'
 import type { ReactNode } from 'react'
-import type { LedgerIndex } from '@/lib/model/ledger'
-import type { Occurrence } from '@/lib/model/plans'
+import type { Book } from '@/lib/model/book'
 import type { Ledger } from '@/lib/model/types'
-import { indexLedger } from '@/lib/model/ledger'
-import { plannedTxnIds, schedule } from '@/lib/model/plans'
-import { addMonths, today as todayIn } from '@/lib/model/dates'
+import { buildBook } from '@/lib/model/book'
+import { today } from '@/lib/model/dates'
 
-export interface Book {
-  ix: LedgerIndex
-  today: string
-  /** Due dates from the first Transaction through 18 months ahead. */
-  occurrences: Array<Occurrence>
-  plannedIds: Set<string>
-  /** Months that have Transactions, oldest first. */
-  months: Array<string>
-}
+export type { Book } from '@/lib/model/book'
 
 const BookContext = createContext<Book | null>(null)
 
@@ -31,20 +21,7 @@ export function BookProvider({
   ledger: Ledger
   children: ReactNode
 }) {
-  const book = useMemo((): Book => {
-    const ix = indexLedger(ledger)
-    const today = todayIn()
-    const first = ledger.txns[0]?.date ?? today
-    const occurrences = schedule(ix, first, addMonths(today, 18))
-    const months = [...new Set(ledger.txns.map((t) => t.month))].sort()
-    return {
-      ix,
-      today,
-      occurrences,
-      plannedIds: plannedTxnIds(occurrences),
-      months,
-    }
-  }, [ledger])
+  const book = useMemo(() => buildBook(ledger, today()), [ledger])
   return <BookContext.Provider value={book}>{children}</BookContext.Provider>
 }
 

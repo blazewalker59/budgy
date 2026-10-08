@@ -225,3 +225,27 @@ export const settings = sqliteTable('settings', {
     .$onUpdate(() => new Date())
     .notNull(),
 })
+
+// ─── Agents (docs/adr/0004) ─────────────────────────────────────────────────
+
+/** A Member's API token for an Agent: only its SHA-256 hash is kept. */
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: text('id').primaryKey(),
+    /** The Member who made it; the token works only while they're allowed. */
+    memberId: text('member_id').notNull(),
+    memberEmail: text('member_email').notNull(),
+    name: text('name').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    /** The first characters, to tell tokens apart on screen. */
+    prefix: text('prefix').notNull(),
+    scopes: text('scopes', { mode: 'json' })
+      .$type<Array<'read' | 'write'>>()
+      .notNull(),
+    createdAt: text('created_at').notNull(),
+    lastUsedAt: text('last_used_at'),
+    revokedAt: text('revoked_at'),
+  },
+  (t) => [index('api_tokens_member_idx').on(t.memberId)],
+)

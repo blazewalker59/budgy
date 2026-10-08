@@ -99,3 +99,21 @@ per Category and against the Targets, so its part of the plan is plain
 **Gap**:
 An Account in regular use with nothing near the end of a month, which usually
 means the export is missing it.
+
+**Agent**:
+A Member's AI assistant using Budgy over MCP with an **API Token** the
+Member made on the Agents page (docs/adr/0004). A read token sees
+everything; a write token may also import exports and Move or note
+purchases.
+
+**Budget Alert**:
+Something worth hearing about unasked: a Category over its Target or on
+pace to be, everyday spending on pace past the Budget, a Planned Expense due
+within two weeks or late, a large purchase in the last week, or an Account
+whose imports look out of date.
+
+**Daily Digest**:
+One day's purchases across every Account, by person, Account and Category,
+with the month so far and the current Budget Alerts: what a scheduled Agent
+sends each morning.
+

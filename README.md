@@ -24,6 +24,15 @@ Set `DEV_MEMBER_EMAIL` to skip Google locally (development builds only).
 
 `bun run ci` runs format, lint, typecheck, tests and the build.
 
+## Agents
+
+An MCP server at `/mcp` for AI agents (docs/adr/0004): make a token on the
+Agents page (account menu), then e.g.
+`claude mcp add --transport http budgy https://<host>/mcp --header "Authorization: Bearer bg_…"`.
+Tools cover spending summaries, breakdowns, history, the Budget, upcoming
+bills, Budget Alerts and a Daily Digest; write tokens can also import CSV
+exports and Move or note purchases.
+
 ## Deploy
 
 Merges to `main` deploy to production via GitHub Actions (no staging). By

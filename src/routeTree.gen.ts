@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as SpendingRouteImport } from './routes/spending'
@@ -18,6 +19,11 @@ import { Route as UpcomingRouteImport } from './routes/upcoming'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BudgetRoute = BudgetRouteImport.update({
@@ -43,6 +49,7 @@ const UpcomingRoute = UpcomingRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/spending': typeof SpendingRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/spending': typeof SpendingRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/spending': typeof SpendingRoute
@@ -65,14 +74,22 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/budget' | '/import' | '/spending' | '/upcoming'
+  fullPaths: '/' | '/agents' | '/budget' | '/import' | '/spending' | '/upcoming'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/budget' | '/import' | '/spending' | '/upcoming'
-  id: '__root__' | '/' | '/budget' | '/import' | '/spending' | '/upcoming'
+  to: '/' | '/agents' | '/budget' | '/import' | '/spending' | '/upcoming'
+  id:
+    | '__root__'
+    | '/'
+    | '/agents'
+    | '/budget'
+    | '/import'
+    | '/spending'
+    | '/upcoming'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsRoute: typeof AgentsRoute
   BudgetRoute: typeof BudgetRoute
   ImportRoute: typeof ImportRoute
   SpendingRoute: typeof SpendingRoute
@@ -86,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/budget': {
@@ -121,6 +145,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsRoute: AgentsRoute,
   BudgetRoute: BudgetRoute,
   ImportRoute: ImportRoute,
   SpendingRoute: SpendingRoute,

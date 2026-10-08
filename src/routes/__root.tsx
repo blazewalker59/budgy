@@ -11,6 +11,7 @@ import { useLedgerQuery, useSession } from '@/lib/ledger/useLedger'
 import { BookProvider } from '@/lib/ledger/book'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotAllowed, SignIn } from '@/components/layout/SignIn'
+import { useServiceWorker } from '@/lib/pwa'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -31,11 +32,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: 'apple-mobile-web-app-title', content: 'Budgy' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'robots', content: 'noindex' },
+      { name: 'description', content: 'Our household budget' },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },
       { rel: 'manifest', href: '/manifest.json' },
       { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
     ],
   }),
   shellComponent: RootDocument,
@@ -51,6 +54,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
  * sees sign-in, a stranger who signed in is told so, a Member gets the app.
  */
 function Gate() {
+  useServiceWorker()
   const session = useSession()
   const state = session.data
   const ledger = useLedgerQuery(state?.status === 'member')

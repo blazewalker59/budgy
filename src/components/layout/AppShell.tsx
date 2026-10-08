@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Bot,
   CalendarClock,
+  Download,
   LayoutList,
   LogOut,
   Moon,
@@ -14,6 +15,7 @@ import { useState } from 'react'
 import type { Member } from '@/lib/auth/session'
 import { signOut } from '@/lib/auth/client'
 import { currentTheme, setTheme } from '@/lib/theme'
+import { useInstall } from '@/lib/pwa'
 
 const NAV = [
   { to: '/', label: 'Month', icon: PieChart },
@@ -97,6 +99,7 @@ function ThemeButton() {
 
 function MemberMenu({ member }: { member: Member }) {
   const [open, setOpen] = useState(false)
+  const install = useInstall()
   return (
     <div className="relative">
       <button
@@ -118,6 +121,26 @@ function MemberMenu({ member }: { member: Member }) {
           <p className="truncate px-2 pb-1.5 text-xs text-muted">
             {member.email}
           </p>
+          {install.kind === 'prompt' && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                install.install()
+              }}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
+            >
+              <Download size={15} aria-hidden /> Install app
+            </button>
+          )}
+          {install.kind === 'ios' && (
+            <p className="flex gap-2 rounded-lg px-2 py-1.5 text-xs text-muted">
+              <Download size={15} className="shrink-0" aria-hidden />
+              <span>
+                Install: tap Share, then <strong>Add to Home Screen</strong>.
+              </span>
+            </p>
+          )}
           <Link
             to="/agents"
             onClick={() => setOpen(false)}

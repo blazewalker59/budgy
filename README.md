@@ -24,6 +24,14 @@ Set `DEV_MEMBER_EMAIL` to skip Google locally (development builds only).
 
 `bun run ci` runs format, lint, typecheck, tests and the build.
 
+## Install
+
+Budgy is a PWA, as sportsline: `public/manifest.json`, PNG icons (192,
+512, maskable, Apple touch) and `public/sw.js`, registered in production
+builds. Install from the account menu (Chrome, Edge, Android) or Share →
+Add to Home Screen (iOS). The service worker caches nothing; the budget
+is always read live.
+
 ## Agents
 
 An MCP server at `/mcp` for AI agents (docs/adr/0004): make a token on the

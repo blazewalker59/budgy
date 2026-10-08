@@ -6,6 +6,7 @@
 
 import { Fragment, useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Plus } from 'lucide-react'
+import { BudgetMix } from './BudgetMix'
 import type { CategoryHistory } from '@/lib/model/month'
 import type { Category, Group, Tag } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
@@ -21,6 +22,7 @@ import {
   targetFor,
 } from '@/lib/model/ledger'
 import { categoryHistory } from '@/lib/model/month'
+import { budgetMix } from '@/lib/model/mix'
 import { coverageGaps } from '@/lib/model/coverage'
 import { monthlySetAside } from '@/lib/model/plans'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
@@ -91,6 +93,13 @@ export function BudgetScreen() {
     list.reduce((s, n) => s + f(n), 0)
   const totalTarget = sum(everyday, (n) => targetFor(ix, n, from) ?? 0)
   const totalTypical = sum(everyday, (n) => history.get(n)?.typical ?? 0)
+  const mix = budgetMix(
+    everyday.map((n) => ({
+      name: n,
+      typical: history.get(n)?.typical ?? 0,
+      target: targetFor(ix, n, from) ?? 0,
+    })),
+  )
   const setAside = ix.ledger.plans
     .filter((p) => p.active)
     .reduce((s, p) => s + monthlySetAside(p), 0)
@@ -141,6 +150,8 @@ export function BudgetScreen() {
           detail="set aside / mo"
         />
       </div>
+
+      <BudgetMix slices={mix} />
 
       <p className="text-xs text-muted">
         {`Typical = ${monthLabel(window[0])}${

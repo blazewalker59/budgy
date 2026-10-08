@@ -93,10 +93,7 @@ export function MonthScreen({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-3">
           <Section title="Everyday" hint="planned bills counted separately">
-            <CategoryRows
-              rows={view.everyday}
-              pace={isCurrent ? view.elapsed : undefined}
-            />
+            <CategoryRows rows={view.everyday} />
           </Section>
           {view.housing.length > 0 && (
             <Section title="Housing">
@@ -153,6 +150,17 @@ function Headline({
             pace={isCurrent ? view.elapsed : undefined}
             className="mt-1"
           />
+        )}
+        {isCurrent && t.target > 0 && (
+          <p className="mt-0.5 text-[11px] text-muted">
+            {(() => {
+              const onPace = Math.round(t.target * view.elapsed)
+              const diff = t.spent - onPace
+              return `│ on pace: ${dollars(onPace)} by today, ${
+                diff > 0 ? `${dollars(diff)} over` : `${dollars(-diff)} under`
+              }`
+            })()}
+          </p>
         )}
       </Stat>
       <Stat
@@ -229,13 +237,7 @@ function ComingUp({
   )
 }
 
-function CategoryRows({
-  rows,
-  pace,
-}: {
-  rows: Array<CategoryMonth>
-  pace?: number
-}) {
+function CategoryRows({ rows }: { rows: Array<CategoryMonth> }) {
   const [open, setOpen] = useState<string | null>(null)
   if (!rows.length)
     return <p className="px-3 py-3 text-sm text-muted">Nothing spent.</p>
@@ -284,7 +286,6 @@ function CategoryRows({
               <Bar
                 spent={r.spent}
                 target={r.target}
-                pace={pace}
                 className="order-last col-span-2 sm:order-none sm:col-span-1"
               />
               <span className="text-right tabular-nums">

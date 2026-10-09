@@ -29,7 +29,7 @@ export function BudgetMix({ slices }: { slices: Array<MixSlice> }) {
         slices={slices}
         colors={slices.map((s, i) => color(i, s.name))}
       />
-      <ul className="grid grid-cols-1 gap-x-4 gap-y-0.5 pt-1 text-xs min-[420px]:grid-cols-2 sm:grid-cols-3">
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1 text-[11px] sm:grid-cols-3 sm:text-xs">
         {slices.map((s, i) => {
           const shift = Math.round((s.targetShare - s.typicalShare) * 100)
           return (
@@ -45,10 +45,10 @@ export function BudgetMix({ slices }: { slices: Array<MixSlice> }) {
                 {s.name}
               </span>
               <span className="shrink-0 tabular-nums text-muted">
-                {pct(s.typicalShare)} → {pct(s.targetShare)}
+                {Math.round(s.typicalShare * 100)}→{pct(s.targetShare)}
               </span>
               <span
-                className={`w-7 shrink-0 text-right tabular-nums font-semibold ${
+                className={`w-5 shrink-0 text-right tabular-nums font-semibold ${
                   shift < 0
                     ? 'text-nice'
                     : shift > 0

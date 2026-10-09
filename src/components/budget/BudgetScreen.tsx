@@ -1,37 +1,28 @@
 /**
  * The Budget: a Target per Category, set from a month on, next to what
  * recent months really cost (without Planned Expenses, which have their own
- * schedule) and how that's trending. Stores can be re-filed here for good.
+ * schedule) and how that's trending. Each Category is a compact row; tapping
+ * it opens its sheet (history, tag and group, Stores to re-file).
  */
 
-import { Fragment, useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, ChevronRight, Plus } from 'lucide-react'
 import { BudgetMix } from './BudgetMix'
 import { CategorySheet } from './CategorySheet'
+import { TagSelect } from './TagSelect'
 import type { CategoryHistory } from '@/lib/model/month'
 import type { Category, Group, Tag } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
-import {
-  useSaveCategory,
-  useSetStoreRule,
-  useSetTarget,
-} from '@/lib/ledger/useLedger'
-import {
-  categoryTag,
-  ruleKey,
-  storeCategory,
-  targetFor,
-} from '@/lib/model/ledger'
+import { useSaveCategory, useSetTarget } from '@/lib/ledger/useLedger'
+import { categoryTag, targetFor } from '@/lib/model/ledger'
 import { categoryHistory } from '@/lib/model/month'
-import { budgetMix } from '@/lib/model/mix'
 import { coverageGaps } from '@/lib/model/coverage'
+import { budgetMix } from '@/lib/model/mix'
 import { monthlySetAside } from '@/lib/model/plans'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
 import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
-import { TAGS } from '@/lib/model/types'
-import { TAG_BG, TAG_SHORT } from '@/lib/format'
+import { TAG_BG } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { CategorySelect } from '@/components/shared/CategorySelect'
 import { Segmented, Stat } from '@/components/shared/Layout'
 import { TrendSpark } from '@/components/charts/lazy'
 
@@ -42,13 +33,19 @@ const SPANS = [
   { value: '12' as const, label: '12 mo' },
 ]
 
+/**
+ * One grid for every row and the header: two lines on a phone (name and
+ * ±, then trend, typical and Target), one line from `sm` up.
+ */
+const ROW_GRID =
+  'grid items-center gap-x-2 gap-y-0.5 [grid-template-areas:"name_name_diff""spark_typ_target"] grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-y-0 sm:[grid-template-areas:"name_tag_spark_typ_target_diff"] sm:grid-cols-[minmax(0,1fr)_5rem_5.5rem_5rem_5rem_4.5rem]'
+
 export function BudgetScreen() {
   const book = useBook()
   const { ix } = book
   const thisMonth = book.today.slice(0, 7)
   const [from, setFrom] = useState(thisMonth)
   const [span, setSpan] = useState<Span>('3')
-  const [open, setOpen] = useState<string | null>(null)
   const [sheet, setSheet] = useState<string | null>(null)
   const window = useMemo(
     () => monthRange(shiftMonth(thisMonth, -1), Number(span)),
@@ -105,33 +102,42 @@ export function BudgetScreen() {
   const setAside = ix.ledger.plans
     .filter((p) => p.active)
     .reduce((s, p) => s + monthlySetAside(p), 0)
+  const windowLabel =
+    window.length > 1
+      ? `${monthLabel(window[0]).slice(0, 3)}–${monthLabel(window[window.length - 1])}`
+      : monthLabel(window[0])
+
+  const list = (title: string, rows: Array<string>) =>
+    rows.length > 0 && (
+      <CategoryList
+        title={title}
+        names={rows}
+        from={from}
+        history={history}
+        year={year}
+        span={window.length}
+        onOpen={setSheet}
+      />
+    )
 
   return (
     <div className="mx-auto max-w-4xl space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold tracking-tight">Budget</h1>
-        <div className="flex items-center gap-2">
-          <Segmented
-            label="Typical month over"
-            value={span}
-            options={SPANS}
-            onChange={setSpan}
-          />
-          <select
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            aria-label="Targets apply from"
-            className="field font-semibold"
-          >
-            {Array.from({ length: 13 }, (_, i) =>
-              shiftMonth(thisMonth, i - 1),
-            ).map((m) => (
-              <option key={m} value={m}>
-                From {monthLabel(m)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <select
+          value={from}
+          onChange={(e) => setFrom(e.target.value)}
+          aria-label="Targets apply from"
+          className="field text-xs font-semibold"
+        >
+          {Array.from({ length: 13 }, (_, i) =>
+            shiftMonth(thisMonth, i - 1),
+          ).map((m) => (
+            <option key={m} value={m}>
+              Targets from {monthLabel(m)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -155,54 +161,43 @@ export function BudgetScreen() {
 
       <BudgetMix slices={mix} />
 
-      <p className="text-xs text-muted">
-        {`Typical = ${monthLabel(window[0])}${
-          window.length > 1 ? ` – ${monthLabel(window[window.length - 1])}` : ''
-        } average without planned bills (a newer category counts from its first month). ± is Target minus typical; amber means a cut.`}
-      </p>
-      {gaps.length > 0 && (
-        <p className="flex gap-1.5 text-xs text-muted">
-          <AlertTriangle size={14} className="shrink-0 text-nice" aria-hidden />
-          <span>
-            Low because of missing imports:{' '}
-            {gaps
-              .map(
-                (g) =>
-                  `${monthLabel(g.month)} (${g.gaps.map((x) => x.account).join(', ')})`,
-              )
-              .join('; ')}
-            .
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <p className="min-w-0 text-[11px] text-muted">
+          Typical = {windowLabel} average, without planned bills
+          {gaps.length > 0 && (
+            <span
+              className="ml-1 inline-flex items-center gap-0.5 text-nice"
+              title={gaps
+                .map(
+                  (g) =>
+                    `${monthLabel(g.month)}: ${g.gaps.map((x) => x.account).join(', ')}`,
+                )
+                .join('; ')}
+            >
+              <AlertTriangle size={11} aria-hidden />
+              low: {gaps
+                .map((g) => monthLabel(g.month).slice(0, 3))
+                .join(', ')}{' '}
+              missing imports
+            </span>
+          )}
         </p>
-      )}
+        <Segmented
+          label="Typical month over"
+          value={span}
+          options={SPANS}
+          onChange={setSpan}
+        />
+      </div>
 
-      <Table
-        title="Everyday"
-        names={everyday}
-        from={from}
-        history={history}
-        year={year}
-        span={window.length}
-        onTrend={setSheet}
-        open={open}
-        setOpen={setOpen}
-      />
-      <Table
-        title="Housing"
-        names={housing}
-        from={from}
-        history={history}
-        year={year}
-        span={window.length}
-        onTrend={setSheet}
-        open={open}
-        setOpen={setOpen}
-      />
+      {list('Everyday', everyday)}
+      {list('Housing', housing)}
       <AddCategory />
       {sheet && (
         <CategorySheet
           name={sheet}
           span={window.length}
+          from={from}
           onClose={() => setSheet(null)}
         />
       )}
@@ -210,16 +205,14 @@ export function BudgetScreen() {
   )
 }
 
-function Table({
+function CategoryList({
   title,
   names,
   from,
   history,
   year,
   span,
-  onTrend,
-  open,
-  setOpen,
+  onOpen,
 }: {
   title: string
   names: Array<string>
@@ -227,100 +220,65 @@ function Table({
   history: Map<string, CategoryHistory>
   year: Map<string, CategoryHistory>
   span: number
-  onTrend: (name: string) => void
-  open: string | null
-  setOpen: (name: string | null) => void
+  onOpen: (name: string) => void
 }) {
-  if (!names.length) return null
   return (
     <section className="overflow-hidden rounded-xl border border-border bg-surface">
-      <table className="w-full table-fixed text-[13px]">
-        <thead>
-          <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted">
-            <th className="py-1.5 pl-3 font-semibold">{title}</th>
-            <th className="hidden w-20 px-1 py-1.5 font-semibold sm:table-cell">
-              Tag
-            </th>
-            <th className="hidden w-24 px-1 py-1.5 text-right font-semibold sm:table-cell">
-              Trend
-            </th>
-            <th className="w-[4.5rem] px-1 py-1.5 text-right font-semibold">
-              Typical
-            </th>
-            <th className="w-[4.25rem] px-1 py-1.5 text-right font-semibold sm:w-20">
-              Target
-            </th>
-            <th className="w-[3.75rem] py-1.5 pl-1 pr-3 text-right font-semibold sm:w-20">
-              ±
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {names.map((name) => (
-            <Row
-              key={name}
-              name={name}
-              from={from}
-              h={history.get(name)}
-              trend={year.get(name)}
-              span={span}
-              onTrend={() => onTrend(name)}
-              open={open === name}
-              toggle={() => setOpen(open === name ? null : name)}
-            />
-          ))}
-        </tbody>
-      </table>
+      <div
+        className={cn(
+          ROW_GRID,
+          'border-b border-border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted',
+        )}
+      >
+        <span className="[grid-area:name]">{title}</span>
+        <span className="hidden [grid-area:tag] sm:block">Tag</span>
+        <span className="hidden text-right [grid-area:spark] sm:block">
+          Trend
+        </span>
+        <span className="hidden text-right [grid-area:typ] sm:block">
+          Typical
+        </span>
+        <span className="hidden text-right [grid-area:target] sm:block">
+          Target
+        </span>
+        <span
+          className="text-right [grid-area:diff]"
+          title="Target minus typical; amber means a cut"
+        >
+          ±
+        </span>
+      </div>
+      <ul className="divide-y divide-border">
+        {names.map((name) => (
+          <CategoryRow
+            key={name}
+            name={name}
+            from={from}
+            h={history.get(name)}
+            trend={year.get(name)}
+            span={span}
+            onOpen={() => onOpen(name)}
+          />
+        ))}
+      </ul>
     </section>
   )
 }
 
-function TagSelect({
-  value,
-  onChange,
-  label,
-  allowInherit,
-}: {
-  value: Tag | ''
-  onChange: (tag: Tag | null) => void
-  label: string
-  allowInherit?: boolean
-}) {
-  return (
-    <select
-      value={value}
-      aria-label={label}
-      className="field"
-      onChange={(e) => onChange((e.target.value || null) as Tag | null)}
-    >
-      {allowInherit && <option value="">As category</option>}
-      {TAGS.map((t) => (
-        <option key={t} value={t}>
-          {TAG_SHORT[t]}
-        </option>
-      ))}
-    </select>
-  )
-}
-
-function Row({
+function CategoryRow({
   name,
   from,
   h,
   trend,
   span,
-  onTrend,
-  open,
-  toggle,
+  onOpen,
 }: {
   name: string
   from: string
   h?: CategoryHistory
   trend?: CategoryHistory
   span: number
-  onTrend: () => void
-  open: boolean
-  toggle: () => void
+  onOpen: () => void
 }) {
   const { ix } = useBook()
   const setTarget = useSetTarget()
@@ -333,290 +291,93 @@ function Row({
   const target = targetFor(ix, name, from)
   const typical = h?.typical ?? 0
   return (
-    <Fragment>
-      <tr className="border-b border-border last:border-0">
-        <td className="max-w-0 py-1 pl-3">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-expanded={open}
-            className="flex w-full min-w-0 items-center gap-1.5 text-left font-semibold"
-          >
-            <span
-              className={cn(
-                'size-2 shrink-0 rounded-full',
-                TAG_BG[category.tag],
-              )}
-            />
-            <span className="truncate">{name}</span>
-            <ChevronDown
-              size={13}
-              className={cn(
-                'shrink-0 text-muted transition',
-                open && 'rotate-180',
-              )}
-              aria-hidden
-            />
-          </button>
-          {trend && (
-            <button
-              type="button"
-              onClick={onTrend}
-              aria-label={`${name} by month`}
-              className="mt-0.5 block w-20 rounded hover:bg-sunken sm:hidden"
-            >
-              <TrendSpark
-                values={trend.monthly}
-                target={target}
-                highlight={span}
-              />
-            </button>
-          )}
-        </td>
-        <td className="hidden px-1 py-1 sm:table-cell">
-          <TagSelect
-            value={category.tag}
-            label={`Tag for ${name}`}
-            onChange={(tag) => tag && saveCategory.mutate({ ...category, tag })}
-          />
-        </td>
-        <td className="hidden px-1 py-1 text-right sm:table-cell">
-          {trend && (
-            <button
-              type="button"
-              onClick={onTrend}
-              aria-label={`${name} by month`}
-              title="See by month"
-              className="ml-auto block w-20 cursor-pointer rounded hover:bg-sunken"
-            >
-              <TrendSpark
-                values={trend.monthly}
-                target={target}
-                highlight={span}
-              />
-            </button>
-          )}
-        </td>
-        <td className="px-1 py-1 text-right tabular-nums">
-          {dollars(typical)}
-          {h && h.withPlanned - typical > 500 && (
-            <span className="block text-[10px] leading-none text-planned">
-              {dollars(h.withPlanned)} w/ planned
-            </span>
-          )}
-          {h && h.months < h.monthly.length && (
-            <span className="block text-[10px] leading-none text-muted">
-              {h.months} mo
-            </span>
-          )}
-        </td>
-        <td className="px-1 py-1 text-right">
-          <input
-            key={`${from}-${target}`}
-            inputMode="decimal"
-            defaultValue={target === null ? '' : String(target / 100)}
-            placeholder="—"
-            aria-label={`Target for ${name} from ${monthLabel(from)}`}
-            className="field w-14 text-right sm:w-16"
-            onBlur={(e) => {
-              const raw = e.target.value.trim()
-              const startsHere = (ix.targets.get(name) ?? []).some(
-                (t) => t.startsMonth === from,
-              )
-              if (raw === '') {
-                if (startsHere)
-                  setTarget.mutate({
-                    category: name,
-                    startsMonth: from,
-                    amount: null,
-                  })
-                return
-              }
-              const cents = parseDollars(raw)
-              if (cents === null || cents === target) return
-              setTarget.mutate({
-                category: name,
-                startsMonth: from,
-                amount: cents,
-              })
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur()
-            }}
-          />
-        </td>
-        <td
-          className={cn(
-            'py-1 pl-1 pr-3 text-right tabular-nums',
-            target === null
-              ? 'text-muted'
-              : target < typical
-                ? 'font-semibold text-nice'
-                : 'text-muted',
-          )}
-        >
-          {target === null ? '' : signedDollars(target - typical)}
-        </td>
-      </tr>
-      {open && (
-        <tr className="border-b border-border bg-background/50">
-          <td colSpan={6} className="px-3 py-2">
-            <Details category={category} h={trend} />
-          </td>
-        </tr>
-      )}
-    </Fragment>
-  )
-}
-
-/** Monthly numbers, Tag, Group, Target history, and Stores to re-file. */
-function Details({ category, h }: { category: Category; h?: CategoryHistory }) {
-  const book = useBook()
-  const { ix } = book
-  const saveCategory = useSaveCategory()
-  const setRule = useSetStoreRule()
-  const thisMonth = book.today.slice(0, 7)
-  const window = useMemo(
-    () => monthRange(shiftMonth(thisMonth, -1), 12),
-    [thisMonth],
-  )
-  const stores = useMemo(() => {
-    const months = new Set(window)
-    const map = new Map<
-      string,
-      { store: string; sourceCategory: string; amount: number; count: number }
-    >()
-    for (const t of ix.ledger.txns) {
-      if (!months.has(t.month) || t.category) continue
-      if (storeCategory(ix, t) !== category.name) continue
-      const key = ruleKey(t.sourceCategory, t.store)
-      const s = map.get(key) ?? {
-        store: t.store,
-        sourceCategory: t.sourceCategory,
-        amount: 0,
-        count: 0,
-      }
-      s.amount += t.amount
-      s.count++
-      map.set(key, s)
-    }
-    return [...map.values()].sort((a, b) => b.amount - a.amount)
-  }, [ix, category.name, window])
-  const [all, setAll] = useState(false)
-  const shown = all ? stores : stores.slice(0, 8)
-  const history = ix.targets.get(category.name) ?? []
-  const recent = h ? h.monthly.slice(-6) : []
-  const recentMonths = monthRange(
-    shiftMonth(thisMonth, -1),
-    h?.monthly.length ?? 0,
-  ).slice(-6)
-
-  return (
-    <div className="space-y-2 text-[13px]">
-      {recent.length > 0 && (
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 tabular-nums">
-          {recentMonths.map((m, i) => (
-            <span key={m}>
-              <span className="text-muted">{monthLabel(m).slice(0, 3)}</span>{' '}
-              <span className="font-semibold">{dollars(recent[i])}</span>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-wrap items-center gap-2">
+    <li className={cn(ROW_GRID, 'px-3 py-1.5 text-[13px]')}>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex min-w-0 items-center gap-1.5 text-left font-semibold [grid-area:name]"
+      >
+        <span
+          className={cn('size-2 shrink-0 rounded-full', TAG_BG[category.tag])}
+        />
+        <span className="truncate">{name}</span>
+        <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden />
+      </button>
+      <span className="hidden [grid-area:tag] sm:block">
         <TagSelect
           value={category.tag}
-          label={`Tag for ${category.name}`}
+          label={`Tag for ${name}`}
           onChange={(tag) => tag && saveCategory.mutate({ ...category, tag })}
+          className="w-full"
         />
-        <select
-          value={category.group}
-          aria-label={`Group for ${category.name}`}
-          className="field"
-          onChange={(e) =>
-            saveCategory.mutate({ ...category, group: e.target.value as Group })
-          }
-        >
-          <option value="everyday">Everyday</option>
-          <option value="housing">Housing</option>
-        </select>
-        <span className="text-xs text-muted">
-          {history.length
-            ? 'Targets: ' +
-              [...history]
-                .reverse()
-                .map(
-                  (t) =>
-                    `${dollars(t.amount)} from ${monthLabel(t.startsMonth)}`,
-                )
-                .join(' → ')
-            : 'No Target yet'}
-        </span>
-      </div>
-      {stores.length > 0 && (
-        <div className="divide-y divide-border rounded-lg border border-border bg-surface">
-          <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Stores, last 12 months · always file under · tag
-          </p>
-          {shown.map((s) => {
-            const rule = ix.rules.get(ruleKey(s.sourceCategory, s.store))
-            return (
-              <div
-                key={`${s.sourceCategory}-${s.store}`}
-                className="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-1 px-2 py-1 sm:grid-cols-[1fr_5rem_11rem_7rem]"
-              >
-                <span className="min-w-0 truncate">
-                  <span className="font-medium">{s.store}</span>
-                  <span className="text-muted"> · {s.count}×</span>
-                  {s.sourceCategory !== category.name && (
-                    <span className="ml-1 rounded bg-planned-soft px-1 text-[10px] text-planned">
-                      from {s.sourceCategory}
-                    </span>
-                  )}
-                </span>
-                <span className="text-right tabular-nums">
-                  {dollars(s.amount / window.length)}/mo
-                </span>
-                <CategorySelect
-                  label={`Category for ${s.store}`}
-                  value={category.name}
-                  defaultValue={s.sourceCategory}
-                  onChange={(c) =>
-                    setRule.mutate({
-                      sourceCategory: s.sourceCategory,
-                      store: s.store,
-                      category: c,
-                    })
-                  }
-                  className="w-full"
-                />
-                <TagSelect
-                  value={rule?.tag ?? ''}
-                  allowInherit
-                  label={`Tag for ${s.store}`}
-                  onChange={(tag) =>
-                    setRule.mutate({
-                      sourceCategory: s.sourceCategory,
-                      store: s.store,
-                      tag,
-                    })
-                  }
-                />
-              </div>
+      </span>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${name} by month`}
+        title="See by month"
+        className="w-20 rounded hover:bg-sunken [grid-area:spark] sm:ml-auto"
+      >
+        {trend && (
+          <TrendSpark values={trend.monthly} target={target} highlight={span} />
+        )}
+      </button>
+      <span className="tabular-nums [grid-area:typ] sm:text-right">
+        <span className="text-[11px] text-muted sm:hidden">Typical </span>
+        {dollars(typical)}
+        {h && h.months < h.monthly.length && (
+          <span className="ml-1 text-[10px] text-muted">{h.months} mo</span>
+        )}
+      </span>
+      <label className="flex items-center justify-end gap-1 [grid-area:target]">
+        <span className="text-[11px] text-muted sm:hidden">Target</span>
+        <input
+          key={`${from}-${target}`}
+          inputMode="decimal"
+          defaultValue={target === null ? '' : String(target / 100)}
+          placeholder="—"
+          aria-label={`Target for ${name} from ${monthLabel(from)}`}
+          className="field w-[4.5rem] text-right"
+          onBlur={(e) => {
+            const raw = e.target.value.trim()
+            const startsHere = (ix.targets.get(name) ?? []).some(
+              (t) => t.startsMonth === from,
             )
-          })}
-          {stores.length > shown.length && (
-            <button
-              type="button"
-              onClick={() => setAll(true)}
-              className="w-full px-2 py-1 text-left text-xs font-semibold text-accent"
-            >
-              Show {stores.length - shown.length} smaller stores
-            </button>
-          )}
-        </div>
-      )}
-    </div>
+            if (raw === '') {
+              if (startsHere)
+                setTarget.mutate({
+                  category: name,
+                  startsMonth: from,
+                  amount: null,
+                })
+              return
+            }
+            const cents = parseDollars(raw)
+            if (cents === null || cents === target) return
+            setTarget.mutate({
+              category: name,
+              startsMonth: from,
+              amount: cents,
+            })
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+        />
+      </label>
+      <span
+        className={cn(
+          'text-right tabular-nums [grid-area:diff]',
+          target === null
+            ? 'text-muted'
+            : target < typical
+              ? 'font-semibold text-nice'
+              : 'text-muted',
+        )}
+      >
+        {target === null ? '' : signedDollars(target - typical)}
+      </span>
+    </li>
   )
 }
 

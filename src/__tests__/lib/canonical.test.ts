@@ -26,6 +26,15 @@ describe('canonicalRedirect', () => {
     ).toBe(308)
   })
 
+  it('moves plain http to https', () => {
+    const r = canonicalRedirect(
+      new URL('http://budgy.bid/plan'),
+      'GET',
+      'budgy.bid',
+    )!
+    expect(r.headers.get('location')).toBe('https://budgy.bid/plan')
+  })
+
   it('leaves budgy.bid and local development alone', () => {
     expect(
       canonicalRedirect(new URL('https://budgy.bid/'), 'GET', 'budgy.bid'),

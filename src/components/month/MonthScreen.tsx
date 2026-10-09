@@ -7,19 +7,22 @@
 
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ChevronDown, Copy } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, Copy, X } from 'lucide-react'
 import type { CategoryMonth, MonthView, StoreMonth } from '@/lib/model/month'
 import type { Occurrence } from '@/lib/model/plans'
 import type { Lens, LensFilter } from '@/lib/model/lens'
 import type { OverviewSearch } from '@/lib/ledger/search'
+import type { Gap } from '@/lib/model/coverage'
+import type { MonthBills, MonthPay } from '@/lib/model/bills'
 import { useBook } from '@/lib/ledger/book'
 import { useLens } from '@/lib/ledger/useLens'
 import { indexLedger } from '@/lib/model/ledger'
 import { describe, filtersOf, isEmpty, matchLens } from '@/lib/model/lens'
 import { monthView, upcoming } from '@/lib/model/month'
 import { coverageGaps } from '@/lib/model/coverage'
+import { monthBills, monthPay } from '@/lib/model/bills'
 import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
-import { dollars, signedDollars } from '@/lib/model/money'
+import { dollars } from '@/lib/model/money'
 import { TAG_LABELS } from '@/lib/model/types'
 import { TAG_BG } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -78,6 +81,18 @@ export function MonthScreen({
     [book],
   )
   const isCurrent = month === thisMonth
+  const bills = useMemo(
+    () => monthBills(scope.ix, view, book.today, book.plannedIds, !filtered),
+    [scope, view, book.today, book.plannedIds, filtered],
+  )
+  // Take-home is the household's, so it shows only without a Lens.
+  const pay = useMemo(
+    () =>
+      filtered || !book.ix.ledger.pay.length
+        ? null
+        : monthPay(book.ix.ledger.pay, month, book.today),
+    [filtered, book, month],
+  )
 
   return (
     <div className="space-y-3">
@@ -94,6 +109,7 @@ export function MonthScreen({
             })
           }
         />
+        <GapChip gaps={gaps} month={month} />
       </div>
       <LensBar
         page="/"
@@ -102,26 +118,11 @@ export function MonthScreen({
         }
       />
 
-      {gaps.length > 0 && (
-        <p className="flex gap-1.5 rounded-lg border border-nice/40 bg-surface px-2.5 py-1.5 text-xs">
-          <AlertTriangle size={14} className="shrink-0 text-nice" aria-hidden />
-          <span>
-            Probably missing:{' '}
-            {gaps.map((g, i) => (
-              <span key={g.account}>
-                {i > 0 && '; '}
-                <strong>{g.account}</strong> after{' '}
-                {g.last ? dayLabel(g.last) : 'this month'}
-              </span>
-            ))}
-            . Import a newer export.
-          </span>
-        </p>
-      )}
-
       <Headline
         view={view}
         isCurrent={isCurrent}
+        bills={bills}
+        pay={pay}
         label={
           person
             ? `${person}’s everyday`
@@ -181,77 +182,259 @@ function Headline({
   view,
   isCurrent,
   label,
+  bills,
+  pay,
 }: {
   view: MonthView
   isCurrent: boolean
   label: string
+  bills: MonthBills
+  pay: MonthPay | null
 }) {
   const t = view.totals
   const left = t.target - t.spent
-  const housing = view.housing.reduce((n, r) => n + r.spent + r.plannedPaid, 0)
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-      <Stat
-        label={label}
-        value={dollars(t.spent)}
-        detail={
-          t.target
-            ? left >= 0
-              ? `${dollars(left)} left of ${dollars(t.target)}`
-              : `${dollars(-left)} over ${dollars(t.target)}`
-            : 'No Targets set'
-        }
-        tone={t.target && left < 0 ? 'over' : undefined}
-      >
-        {t.target > 0 && (
-          <Bar spent={t.spent} target={t.target} className="mt-1" />
-        )}
-        {isCurrent && t.target > 0 && (
-          <p className="mt-0.5 text-[11px] text-muted">
-            {(() => {
-              const onPace = Math.round(t.target * view.elapsed)
-              const diff = t.spent - onPace
-              return `On pace: ${dollars(onPace)} by today, ${
-                diff > 0 ? `${dollars(diff)} over` : `${dollars(-diff)} under`
-              }`
-            })()}
-          </p>
-        )}
-      </Stat>
-      <Stat
-        label="Wants"
-        value={dollars(t.flexibleSpent)}
-        detail={
-          t.flexibleTarget
-            ? `${signedDollars(t.flexibleSpent - t.flexibleTarget)} vs ${dollars(t.flexibleTarget)}`
-            : 'Nice + fluff'
-        }
-        tone={
-          t.flexibleTarget && t.flexibleSpent > t.flexibleTarget
-            ? 'over'
-            : undefined
-        }
-      />
-      <Stat
-        label="Planned bills"
-        value={dollars(t.plannedPaid + t.plannedLeft)}
-        detail={
-          t.plannedLeft
-            ? `${dollars(t.plannedLeft)} still to come`
-            : t.plannedPaid
-              ? 'All paid'
-              : 'None due'
-        }
-        tone={t.plannedLeft ? 'planned' : undefined}
-      />
-      <Stat
-        label="Housing"
-        value={dollars(housing)}
-        detail="Mortgage, utilities, upkeep"
-      />
+    <div className="space-y-2">
+      <div className="grid gap-2 sm:grid-cols-2 sm:items-start">
+        <Stat
+          label={label}
+          value={dollars(t.spent)}
+          detail={
+            t.target
+              ? left >= 0
+                ? `${dollars(left)} left of ${dollars(t.target)}`
+                : `${dollars(-left)} over ${dollars(t.target)}`
+              : 'No Targets set'
+          }
+          tone={t.target && left < 0 ? 'over' : undefined}
+        >
+          {t.target > 0 && (
+            <Bar spent={t.spent} target={t.target} className="mt-1" />
+          )}
+          {isCurrent && t.target > 0 && (
+            <p className="mt-0.5 text-[11px] text-muted">
+              {(() => {
+                const onPace = Math.round(t.target * view.elapsed)
+                const diff = t.spent - onPace
+                return `On pace: ${dollars(onPace)} by today, ${
+                  diff > 0 ? `${dollars(diff)} over` : `${dollars(-diff)} under`
+                }`
+              })()}
+            </p>
+          )}
+        </Stat>
+        <Bills bills={bills} />
+      </div>
+      {pay && pay.amount > 0 && (
+        <TakeHomeLine
+          pay={pay}
+          spent={t.spent + bills.paid}
+          coming={bills.expected - bills.paid}
+          isCurrent={isCurrent}
+        />
+      )}
     </div>
   )
 }
+
+/**
+ * Housing and Planned Expenses for the month: what's paid, and what's
+ * still coming (a bill due, or Housing that usually posts by about then).
+ */
+function Bills({ bills }: { bills: MonthBills }) {
+  const [all, setAll] = useState(false)
+  const coming = bills.expected - bills.paid
+  const shown = all ? bills.lines : bills.lines.slice(0, 6)
+  return (
+    <div className="min-w-0 space-y-1 rounded-xl border border-border bg-surface px-3 py-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted">
+          Bills this month
+        </p>
+        <p className="shrink-0 text-xs text-muted tabular-nums">
+          {coming > 0
+            ? `${dollars(bills.paid)} of ~${dollars(bills.expected)}`
+            : bills.paid
+              ? `${dollars(bills.paid)}, all in`
+              : 'None yet'}
+        </p>
+      </div>
+      {bills.expected > 0 && (
+        <div className="h-1.5 overflow-hidden rounded-full bg-sunken">
+          <div
+            className="h-full rounded-full bg-planned"
+            style={{ width: `${(bills.paid / bills.expected) * 100}%` }}
+          />
+        </div>
+      )}
+      <ul className="space-y-0.5 text-[13px] tabular-nums">
+        {shown.map((b) => (
+          <li
+            key={`${b.status}|${b.name}|${b.date}`}
+            className={cn(
+              'flex items-center justify-between gap-2',
+              b.status === 'due' && 'font-semibold text-planned',
+              b.status === 'usual' && 'text-muted',
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              {b.status === 'paid' ? (
+                <Check
+                  size={13}
+                  className="shrink-0 text-accent"
+                  aria-label="Paid"
+                />
+              ) : (
+                <span className="size-[13px] shrink-0 rounded-full border border-current opacity-60" />
+              )}
+              <span className="truncate">
+                {b.name}
+                {b.status === 'due' && b.date && ` · ${dayLabel(b.date)}`}
+                {b.status === 'usual' &&
+                  b.date &&
+                  `, usually ~${dayLabel(b.date)}`}
+              </span>
+            </span>
+            <span className="shrink-0">
+              {b.more && (
+                <span className="text-xs text-muted">
+                  ~{dollars(b.more.amount)} more by {dayLabel(b.more.date)}{' '}
+                  ·{' '}
+                </span>
+              )}
+              {b.status === 'usual' ? '~' : ''}
+              {dollars(b.amount)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {bills.lines.length > shown.length && (
+        <button
+          type="button"
+          onClick={() => setAll(true)}
+          className="text-xs font-semibold text-accent"
+        >
+          {bills.lines.length - shown.length} more
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Take-home this month, less what's gone and what's still coming. */
+function TakeHomeLine({
+  pay,
+  spent,
+  coming,
+  isCurrent,
+}: {
+  pay: MonthPay
+  spent: number
+  coming: number
+  isCurrent: boolean
+}) {
+  const left = pay.amount - spent - (isCurrent ? coming : 0)
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-1.5 rounded-xl border border-border bg-surface px-3 py-1.5 text-xs text-muted tabular-nums">
+      <span className="font-semibold uppercase tracking-wide text-[11px]">
+        Take-home
+      </span>
+      <span>
+        {dollars(pay.amount)} ({pay.paychecks} paycheck
+        {pay.paychecks === 1 ? '' : 's'})
+      </span>
+      <span>·</span>
+      <span
+        className={cn('font-semibold', left < 0 ? 'text-over' : 'text-accent')}
+      >
+        {left < 0 ? `${dollars(-left)} short` : `${dollars(left)} left`}
+      </span>
+      {isCurrent && coming > 0 && <span>after bills still due</span>}
+      {isCurrent && pay.next && (
+        <>
+          <span>·</span>
+          <span>next payday {dayLabel(pay.next)}</span>
+        </>
+      )}
+    </p>
+  )
+}
+
+/**
+ * Accounts that look behind (no purchases lately where there usually are),
+ * as a small chip by the month. Dismissed, it stays away until the list
+ * changes.
+ */
+function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
+  const key = `${month}|${gaps.map((g) => `${g.account}@${g.last}`).join(',')}`
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(GAPS_DISMISSED) === key
+    } catch {
+      return false
+    }
+  })
+  const [open, setOpen] = useState(false)
+  if (!gaps.length || dismissed) return null
+  return (
+    <div className="relative">
+      <span className="inline-flex items-center rounded-full border border-nice/40 bg-surface text-xs font-semibold text-nice">
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          className="inline-flex items-center gap-1 py-0.5 pl-2 pr-1"
+        >
+          <AlertTriangle size={12} aria-hidden />
+          {gaps.length === 1
+            ? '1 account behind'
+            : `${gaps.length} accounts behind`}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              localStorage.setItem(GAPS_DISMISSED, key)
+            } catch {
+              // Private browsing: it hides for this visit.
+            }
+            setDismissed(true)
+          }}
+          aria-label="Dismiss"
+          className="rounded-full p-1 opacity-70 hover:opacity-100"
+        >
+          <X size={12} aria-hidden />
+        </button>
+      </span>
+      {open && (
+        <div className="absolute left-0 z-20 mt-1 w-64 max-w-[calc(100vw-2rem)] sm:left-auto sm:right-0 space-y-1 rounded-xl border border-border bg-surface p-2.5 text-xs shadow-lg">
+          <p className="text-muted">
+            No purchases lately where there usually are, so this month may look
+            cheaper than it was:
+          </p>
+          <ul className="space-y-0.5">
+            {gaps.map((g) => (
+              <li key={g.account}>
+                <strong>{g.account}</strong>{' '}
+                <span className="text-muted">
+                  last {g.last ? dayLabel(g.last) : 'never'}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <Link
+            to="/accounts"
+            className="inline-block font-semibold text-accent"
+          >
+            Upload on Accounts
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const GAPS_DISMISSED = 'budgy:gaps-dismissed'
 
 function ComingUp({
   items,

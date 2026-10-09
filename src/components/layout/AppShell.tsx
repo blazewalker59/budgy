@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Bot,
   Download,
@@ -7,6 +7,7 @@ import {
   Moon,
   PieChart,
   Receipt,
+  Search,
   Sun,
   Wallet,
 } from 'lucide-react'
@@ -16,6 +17,8 @@ import { signOut } from '@/lib/auth/client'
 import { currentTheme, setTheme } from '@/lib/theme'
 import { useInstall } from '@/lib/pwa'
 import { keepLens } from '@/lib/ledger/search'
+import { openPalette } from '@/lib/ledger/useLens'
+import { cn } from '@/lib/utils'
 import { CommandPalette } from '@/components/lens/CommandPalette'
 
 /** Four places; the Lens (the filters) follows from one to the next. */
@@ -34,7 +37,7 @@ export function AppShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-dvh bg-background pb-16 sm:pb-6">
+    <div className="min-h-dvh bg-background pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
       <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-3">
           <Link
@@ -68,21 +71,67 @@ export function AppShell({
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-3 pt-3">{children}</main>
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
-        {NAV.map((n) => (
+      <BottomBar />
+    </div>
+  )
+}
+
+/**
+ * The phone's tab bar, in liquid glass: a floating capsule whose lit pill
+ * glides to the open tab, and beside it a round search button that opens
+ * the palette (where iOS puts search).
+ */
+function BottomBar() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const active = NAV.findIndex((n) =>
+    n.to === '/' ? pathname === '/' : pathname.startsWith(n.to),
+  )
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-20 flex items-end gap-2 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+      <nav
+        aria-label="Main"
+        className="glass pointer-events-auto relative flex h-[60px] flex-1 items-stretch rounded-full p-1"
+      >
+        {active >= 0 && (
+          <span
+            aria-hidden
+            className="glass-pill absolute inset-y-1 left-1 rounded-full"
+            style={{
+              width: `calc((100% - 0.5rem) / ${NAV.length})`,
+              transform: `translateX(${active * 100}%)`,
+            }}
+          />
+        )}
+        {NAV.map((n, i) => (
           <Link
             key={n.to}
             to={n.to}
             search={keepLens}
             activeOptions={{ exact: n.to === '/', includeSearch: false }}
-            className="flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium text-muted"
-            activeProps={{ className: 'text-accent' }}
+            className={cn(
+              'relative flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full text-[10px] font-semibold transition-colors',
+              i === active
+                ? 'text-accent'
+                : 'text-muted active:text-foreground',
+            )}
           >
-            <n.icon size={18} aria-hidden />
+            <n.icon
+              size={20}
+              strokeWidth={i === active ? 2.4 : 2}
+              aria-hidden
+            />
             {n.label}
           </Link>
         ))}
       </nav>
+      <button
+        type="button"
+        onClick={() => openPalette()}
+        aria-label="Search or filter"
+        className="glass pointer-events-auto flex size-[60px] shrink-0 items-center justify-center rounded-full text-foreground active:scale-95"
+      >
+        <Search size={22} aria-hidden />
+      </button>
     </div>
   )
 }

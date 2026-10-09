@@ -2,19 +2,16 @@ import { cn } from '@/lib/utils'
 
 /**
  * Spent against a Target: the bar fills toward the Target and turns red
- * past it; `pace` marks where spending "should" be by today.
+ * past it.
  */
 export function Bar({
   spent,
   target,
-  pace,
   planned = 0,
   className,
 }: {
   spent: number
   target: number | null
-  /** 0–1 share of the month gone, when it's the current month. */
-  pace?: number
   /** Still-to-come Planned Expenses, drawn after what's spent. */
   planned?: number
   className?: string
@@ -49,13 +46,6 @@ export function Bar({
           className="absolute inset-y-0 w-0.5 bg-foreground"
           style={{ left: `${(target / scale) * 100}%` }}
           title="Target"
-        />
-      )}
-      {pace !== undefined && pace > 0 && pace < 1 && target !== null && (
-        <div
-          className="absolute -inset-y-0 w-px bg-foreground/40"
-          style={{ left: `${((target * pace) / scale) * 100}%` }}
-          title="Where today's spending would be on pace"
         />
       )}
     </div>

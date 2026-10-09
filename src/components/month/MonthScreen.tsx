@@ -204,19 +204,14 @@ function Headline({
         tone={t.target && left < 0 ? 'over' : undefined}
       >
         {t.target > 0 && (
-          <Bar
-            spent={t.spent}
-            target={t.target}
-            pace={isCurrent ? view.elapsed : undefined}
-            className="mt-1"
-          />
+          <Bar spent={t.spent} target={t.target} className="mt-1" />
         )}
         {isCurrent && t.target > 0 && (
           <p className="mt-0.5 text-[11px] text-muted">
             {(() => {
               const onPace = Math.round(t.target * view.elapsed)
               const diff = t.spent - onPace
-              return `│ on pace: ${dollars(onPace)} by today, ${
+              return `On pace: ${dollars(onPace)} by today, ${
                 diff > 0 ? `${dollars(diff)} over` : `${dollars(-diff)} under`
               }`
             })()}

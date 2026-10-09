@@ -153,19 +153,11 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => setOpen('')}
-        className="hidden h-8 items-center gap-2 rounded-full border border-border bg-surface pl-3 pr-1.5 text-[13px] text-muted transition-colors hover:text-foreground md:flex"
+        className="hidden h-8 items-center gap-2 rounded-full border border-border bg-surface pl-3 pr-1.5 text-[13px] text-muted transition-colors hover:text-foreground sm:flex"
       >
         <Search size={14} aria-hidden />
         <span>Search or filter…</span>
         <Kbd>⌘K</Kbd>
-      </button>
-      <button
-        type="button"
-        onClick={() => setOpen('')}
-        aria-label="Search or filter"
-        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface md:hidden"
-      >
-        <Search size={17} aria-hidden />
       </button>
       {open !== null &&
         createPortal(

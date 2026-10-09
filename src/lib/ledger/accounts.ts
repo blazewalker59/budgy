@@ -6,9 +6,9 @@
 
 import { and, between, eq, inArray, isNull, sql } from 'drizzle-orm'
 import {
-  ROWS_PER_INSERT,
   STATEMENTS_PER_BATCH,
   loadImportRules,
+  rowsPerInsert,
 } from './importer'
 import type { Database } from '@/lib/db'
 import type { Account, Balance } from '@/lib/model/types'
@@ -91,13 +91,12 @@ export async function recordBalances(
   recordedBy: string,
 ): Promise<void> {
   const statements = []
-  for (let i = 0; i < rows.length; i += ROWS_PER_INSERT)
+  const perInsert = rowsPerInsert(balances)
+  for (let i = 0; i < rows.length; i += perInsert)
     statements.push(
       db
         .insert(balances)
-        .values(
-          rows.slice(i, i + ROWS_PER_INSERT).map((b) => ({ ...b, recordedBy })),
-        )
+        .values(rows.slice(i, i + perInsert).map((b) => ({ ...b, recordedBy })))
         .onConflictDoUpdate({
           target: [balances.account, balances.date],
           set: {
@@ -251,13 +250,14 @@ export async function postTransactions(
     statements.push(
       db.insert(categories).values(newCategory(name)).onConflictDoNothing(),
     )
-  for (let i = 0; i < prepared.fresh.length; i += ROWS_PER_INSERT)
+  const perInsert = rowsPerInsert(transactions)
+  for (let i = 0; i < prepared.fresh.length; i += perInsert)
     statements.push(
       db
         .insert(transactions)
         .values(
           prepared.fresh
-            .slice(i, i + ROWS_PER_INSERT)
+            .slice(i, i + perInsert)
             .map(({ accountSource: _s, filed: _f, ...t }) => ({
               ...t,
               importId,

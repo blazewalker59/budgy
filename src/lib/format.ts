@@ -38,3 +38,18 @@ export const MIX_COLORS = [
   '#6c9a3a',
 ]
 export const MIX_REST = '#8a8f93'
+
+/** The parts of take-home pay on the Budget (charts/IncomeChart). */
+export const SPLIT_LABELS = {
+  everyday: 'Everyday',
+  housing: 'Housing',
+  planned: 'Planned bills',
+  left: 'Left over',
+} as const
+
+export const SPLIT_COLORS = {
+  everyday: 'var(--color-accent)',
+  housing: '#8a8f93',
+  planned: 'var(--color-planned)',
+  left: 'var(--color-accent-soft)',
+} as const

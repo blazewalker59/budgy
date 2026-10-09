@@ -1,4 +1,4 @@
-import type { Ledger, Plan, Txn } from '@/lib/model/types'
+import type { Income, Ledger, Plan, Txn } from '@/lib/model/types'
 import { DEFAULT_CATEGORIES } from '@/lib/model/defaults'
 
 let n = 0
@@ -16,6 +16,20 @@ export function txn(over: Partial<Txn> = {}): Txn {
     amount: 5000,
     category: null,
     note: null,
+    ...over,
+  }
+}
+
+export function pay(over: Partial<Income> = {}): Income {
+  const date = over.date ?? '2026-09-04'
+  return {
+    id: `i${++n}`,
+    date,
+    month: date.slice(0, 7),
+    account: 'Joint Checking (0001)',
+    payer: 'PAYROLL ACME',
+    sourceCategory: 'Paycheck',
+    amount: 200_000,
     ...over,
   }
 }
@@ -43,6 +57,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
       { name: 'Joint Checking (0001)', sourceName: 'Bank', owner: 'Joint' },
     ],
     txns: [],
+    income: [],
     rules: [],
     targets: [],
     plans: [],

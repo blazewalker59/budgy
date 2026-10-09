@@ -8,6 +8,8 @@ import { Suspense, lazy } from 'react'
 import type { ComponentProps, ComponentType } from 'react'
 import type { CategoryTrend as CategoryTrendType } from './CategoryTrend'
 import type { ForecastChart as ForecastChartType } from './ForecastChart'
+import type { IncomeChart as IncomeChartType } from './IncomeChart'
+import type { IncomeMonths as IncomeMonthsType } from './IncomeMonths'
 import type { MixChart as MixChartType } from './MixChart'
 import type { TrendSpark as TrendSparkType } from './TrendSpark'
 
@@ -72,3 +74,12 @@ export const SourceChart = lazyChart<ComponentProps<typeof SourceChartType>>(
 export const SelectionMonths = lazyChart<
   ComponentProps<typeof SelectionMonthsType>
 >(() => import('./SelectionMonths').then((m) => m.SelectionMonths), 170)
+export const IncomeChart = lazyChart<ComponentProps<typeof IncomeChartType>>(
+  () => import('./IncomeChart').then((m) => m.IncomeChart),
+  66,
+  true,
+)
+export const IncomeMonths = lazyChart<ComponentProps<typeof IncomeMonthsType>>(
+  () => import('./IncomeMonths').then((m) => m.IncomeMonths),
+  200,
+)

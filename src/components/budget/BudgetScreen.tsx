@@ -1,14 +1,17 @@
 /**
  * The Budget: a Target per Category, set from a month on, next to what
  * recent months really cost (without Planned Expenses, which have their own
- * schedule) and how that's trending. Each Category is a compact row; tapping
- * it opens its sheet (history, tag and group, Stores to re-file).
+ * schedule) and how that's trending, all weighed against take-home pay.
+ * Each Category is a compact row; tapping it opens its sheet (history, tag
+ * and group, Stores to re-file).
  */
 
 import { useMemo, useState } from 'react'
 import { AlertTriangle, ChevronRight, Plus } from 'lucide-react'
 import { BudgetMix } from './BudgetMix'
 import { CategorySheet } from './CategorySheet'
+import { IncomePlan } from './IncomePlan'
+import { IncomeSheet } from './IncomeSheet'
 import { TagSelect } from './TagSelect'
 import type { CategoryHistory } from '@/lib/model/month'
 import type { Category, Group, Tag } from '@/lib/model/types'
@@ -18,6 +21,7 @@ import { categoryTag, targetFor } from '@/lib/model/ledger'
 import { categoryHistory } from '@/lib/model/month'
 import { coverageGaps } from '@/lib/model/coverage'
 import { budgetMix } from '@/lib/model/mix'
+import { incomeSplit, takeHome } from '@/lib/model/income'
 import { monthlySetAside } from '@/lib/model/plans'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
 import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
@@ -47,6 +51,7 @@ export function BudgetScreen() {
   const [from, setFrom] = useState(thisMonth)
   const [span, setSpan] = useState<Span>('3')
   const [sheet, setSheet] = useState<string | null>(null)
+  const [paySheet, setPaySheet] = useState(false)
   const window = useMemo(
     () => monthRange(shiftMonth(thisMonth, -1), Number(span)),
     [thisMonth, span],
@@ -102,6 +107,23 @@ export function BudgetScreen() {
   const setAside = ix.ledger.plans
     .filter((p) => p.active)
     .reduce((s, p) => s + monthlySetAside(p), 0)
+  const pay = useMemo(
+    () => takeHome(ix.ledger.income, window, book.today),
+    [ix, window, book.today],
+  )
+  // Against take-home, a Category without a Target counts at its typical.
+  const planned = (n: string) =>
+    targetFor(ix, n, from) ?? history.get(n)?.typical ?? 0
+  const typicalSplit = incomeSplit(pay.monthly, {
+    everyday: totalTypical,
+    housing: sum(housing, (n) => history.get(n)?.typical ?? 0),
+    planned: setAside,
+  })
+  const budgetSplit = incomeSplit(pay.monthly, {
+    everyday: sum(everyday, planned),
+    housing: sum(housing, planned),
+    planned: setAside,
+  })
   const windowLabel =
     window.length > 1
       ? `${monthLabel(window[0]).slice(0, 3)}–${monthLabel(window[window.length - 1])}`
@@ -159,6 +181,12 @@ export function BudgetScreen() {
         />
       </div>
 
+      <IncomePlan
+        pay={pay}
+        typical={typicalSplit}
+        budget={budgetSplit}
+        onOpen={() => setPaySheet(true)}
+      />
       <BudgetMix slices={mix} />
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -198,7 +226,16 @@ export function BudgetScreen() {
           name={sheet}
           span={window.length}
           from={from}
+          income={pay.monthly}
           onClose={() => setSheet(null)}
+        />
+      )}
+      {paySheet && (
+        <IncomeSheet
+          pay={pay}
+          spentTypical={typicalSplit.spent}
+          windowLabel={windowLabel}
+          onClose={() => setPaySheet(false)}
         />
       )}
     </div>

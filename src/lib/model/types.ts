@@ -69,6 +69,18 @@ export interface Txn {
   note: string | null
 }
 
+/** Money coming in (a paycheck, a deposit). */
+export interface Income {
+  id: string
+  date: string
+  month: string
+  account: string
+  payer: string
+  sourceCategory: string
+  /** Cents, positive. */
+  amount: number
+}
+
 export interface StoreRule {
   sourceCategory: string
   store: string
@@ -97,6 +109,7 @@ export interface Ledger {
   categories: Array<Category>
   accounts: Array<Account>
   txns: Array<Txn>
+  income: Array<Income>
   rules: Array<StoreRule>
   targets: Array<Target>
   plans: Array<Plan>

@@ -7,6 +7,7 @@ import {
   bucketCategory,
   defaultOwner,
   isSpending,
+  payerName,
   storeName,
 } from '@/lib/import/stores'
 
@@ -21,6 +22,15 @@ const RULES: ImportRules = {
   mortgage: 'Homeloan Servicing',
   notSpending: 'Index Fund',
 }
+
+describe('payerName', () => {
+  it('drops the bank’s ACH words so one employer is one payer', () => {
+    expect(payerName('PAYROLL ACME WIDGETS LLC PPD')).toBe('ACME WIDGETS')
+    expect(payerName('DIRECT DEP ACME WIDGETS LLC PPD')).toBe('ACME WIDGETS')
+    expect(payerName('Venmo')).toBe('Venmo')
+    expect(payerName('PAYROLL')).toBe('PAYROLL')
+  })
+})
 
 describe('storeName', () => {
   it('strips processor prefixes and reference numbers', () => {
@@ -111,11 +121,34 @@ describe('parseExport', () => {
     expect(txns.find((t) => t.amount === 121_000)?.id).toBe('a83e09d42b')
   })
 
-  it('keeps spending and refunds, skips income and investments', async () => {
-    const { txns, skipped } = await parseExport(csv, RULES)
+  it('keeps spending and refunds, and income apart, skips investments', async () => {
+    const { txns, income, skipped } = await parseExport(csv, RULES)
     expect(txns).toHaveLength(4)
     expect(txns.find((t) => t.store === 'Refund Store')?.amount).toBe(-1200)
-    expect(skipped).toEqual({ notSpending: 1, otherTypes: 1, invalid: 0 })
+    expect(skipped).toEqual({ notSpending: 1, otherTypes: 0, invalid: 0 })
+    expect(income).toEqual([
+      expect.objectContaining({
+        date: '2026-03-05',
+        payer: 'PAYROLL',
+        sourceCategory: 'Paycheck',
+        amount: 400_000,
+      }),
+    ])
+  })
+
+  it('gives identical deposits their own ids, the same on every import', async () => {
+    const twice = [
+      HEADER,
+      '2026-03-05,Venmo,,Income,Income,20,Northside Bank - Joint Checking (0001),,',
+      '2026-03-05,Venmo,,Income,Income,20,Northside Bank - Joint Checking (0001),,',
+      '2026-03-06,Index Fund,,Income,Income,9,Northside Bank - Joint Checking (0001),,',
+      '2026-03-07,Transfer In,,Transfer,Transfer,50,Northside Bank - Joint Checking (0001),,',
+    ].join('\n')
+    const a = await parseExport(twice, RULES)
+    const b = await parseExport(twice, RULES)
+    expect(a.income.map((i) => i.id)).toEqual(b.income.map((i) => i.id))
+    expect(new Set(a.income.map((i) => i.id)).size).toBe(2)
+    expect(a.skipped).toEqual({ notSpending: 1, otherTypes: 1, invalid: 0 })
   })
 
   it('refuses a file without the expected columns', async () => {

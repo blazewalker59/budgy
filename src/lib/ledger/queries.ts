@@ -10,6 +10,7 @@ import {
   accounts,
   budgetTargets,
   categories,
+  income,
   plannedExpenses,
   storeRules,
   transactions,
@@ -18,28 +19,41 @@ import { newCategory } from '@/lib/model/defaults'
 
 /** Every row of the Ledger, as the browser and the tools read it. */
 export async function loadLedger(db: Database): Promise<Ledger> {
-  const [cats, accts, txns, rules, targets, plans] = await Promise.all([
-    db.select().from(categories),
-    db.select().from(accounts),
-    db
-      .select({
-        id: transactions.id,
-        date: transactions.date,
-        month: transactions.month,
-        account: transactions.account,
-        description: transactions.description,
-        store: transactions.store,
-        sourceCategory: transactions.sourceCategory,
-        amount: transactions.amount,
-        category: transactions.category,
-        note: transactions.note,
-      })
-      .from(transactions)
-      .orderBy(transactions.date),
-    db.select().from(storeRules),
-    db.select().from(budgetTargets),
-    db.select().from(plannedExpenses).orderBy(plannedExpenses.createdAt),
-  ])
+  const [cats, accts, txns, received, rules, targets, plans] =
+    await Promise.all([
+      db.select().from(categories),
+      db.select().from(accounts),
+      db
+        .select({
+          id: transactions.id,
+          date: transactions.date,
+          month: transactions.month,
+          account: transactions.account,
+          description: transactions.description,
+          store: transactions.store,
+          sourceCategory: transactions.sourceCategory,
+          amount: transactions.amount,
+          category: transactions.category,
+          note: transactions.note,
+        })
+        .from(transactions)
+        .orderBy(transactions.date),
+      db
+        .select({
+          id: income.id,
+          date: income.date,
+          month: income.month,
+          account: income.account,
+          payer: income.payer,
+          sourceCategory: income.sourceCategory,
+          amount: income.amount,
+        })
+        .from(income)
+        .orderBy(income.date),
+      db.select().from(storeRules),
+      db.select().from(budgetTargets),
+      db.select().from(plannedExpenses).orderBy(plannedExpenses.createdAt),
+    ])
   return {
     categories: cats.map(({ name, tag, group }) => ({ name, tag, group })),
     accounts: accts.map(({ name, sourceName, owner }) => ({
@@ -48,6 +62,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       owner,
     })),
     txns,
+    income: received,
     rules,
     targets,
     plans: plans.map(

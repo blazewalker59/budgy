@@ -15,14 +15,25 @@ sees and edits everything.
 _Avoid_: user, viewer
 
 **Ledger**:
-Everything Budgy knows: Transactions, Accounts, Categories, Store Rules,
-Targets and Planned Expenses.
+Everything Budgy knows: Transactions, Income, Accounts, Categories, Store
+Rules, Targets and Planned Expenses.
 
 **Transaction**:
-One purchase (or refund) from an import. Only spending is kept: transfers,
-income, escrow payouts and investment contributions are left out. Its id is a
+One purchase (or refund) from an import. Transfers, escrow payouts and
+investment contributions are left out; deposits are kept apart as Income. Its id is a
 hash of the exported row, so importing the same rows again adds nothing.
 _Avoid_: expense, charge
+
+**Income**:
+A deposit from an import: a paycheck, a refund paid back to the bank, a gift.
+Never spending, and never counted against Targets.
+
+**Take-home pay**:
+What the Household can count on each month: each employer's usual paycheck
+times how often it comes (every 2 weeks is 26 a year), from the employers
+still paying. Bonuses and other deposits are **Other income**, shown beside it
+but not counted on. The Budget shows each part of spending as a share of it.
+_Avoid_: salary, gross income
 
 **Account**:
 The card or bank account a Transaction came from. Each has an **Owner**:

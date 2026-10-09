@@ -159,6 +159,32 @@ export const transactions = sqliteTable(
 )
 
 /**
+ * Money coming in: paychecks, refunds by deposit, gifts. Kept apart from
+ * Transactions (spending) and read for the Household's typical take-home pay
+ * (src/lib/model/income.ts).
+ */
+export const income = sqliteTable(
+  'income',
+  {
+    /** Stable hash of the exported row, like a Transaction's. */
+    id: text('id').primaryKey(),
+    date: text('date').notNull(),
+    month: text('month').notNull(),
+    account: text('account').notNull(),
+    description: text('description').notNull(),
+    /** Normalized name of who paid it (the Store name for spending). */
+    payer: text('payer').notNull(),
+    /** The finance app's Category, e.g. "Paycheck". */
+    sourceCategory: text('source_category').notNull(),
+    /** Cents, positive. */
+    amount: integer('amount').notNull(),
+    importId: text('import_id').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('income_month_idx').on(t.month)],
+)
+
+/**
  * A Store Rule moves (or re-tags) every Transaction from one Store that the
  * import put in one Category, past and future.
  */

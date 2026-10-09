@@ -18,6 +18,7 @@ import {
 import { useSaveCategory, useSetStoreRule } from '@/lib/ledger/useLedger'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { categoryHistory } from '@/lib/model/month'
+import { percentOf } from '@/lib/model/income'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
 import { dollars, signedDollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'
@@ -31,6 +32,7 @@ export function CategorySheet({
   name,
   span,
   from,
+  income,
   onClose,
 }: {
   name: string
@@ -38,6 +40,8 @@ export function CategorySheet({
   span: number
   /** The month Targets are being set from on the Budget. */
   from: string
+  /** Typical take-home pay per month. */
+  income: number
   onClose: () => void
 }) {
   const book = useBook()
@@ -70,6 +74,24 @@ export function CategorySheet({
     <Sheet title={name} onClose={onClose}>
       <CategoryTrend months={trend} target={target} typical={typical} />
 
+      {income > 0 && (
+        <p className="px-1 text-xs text-muted">
+          Typical is{' '}
+          <strong className="text-foreground">
+            {percentOf(typical, income)}%
+          </strong>{' '}
+          of take-home pay
+          {target !== null && (
+            <>
+              ; the Target,{' '}
+              <strong className="text-foreground">
+                {percentOf(target, income)}%
+              </strong>
+            </>
+          )}
+          .
+        </p>
+      )}
       <Settings name={name} />
       <Stores name={name} months={months} />
       <MonthTable name={name} trend={trend} />

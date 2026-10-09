@@ -23,6 +23,7 @@ import { budgetAlerts } from '@/lib/model/alerts'
 import { agentTxn, dailyDigest } from '@/lib/model/digest'
 import { breakdown, inSelection } from '@/lib/model/breakdown'
 import { categoryHistory, monthView, upcoming } from '@/lib/model/month'
+import { PAY_SCHEDULES, percentOf, takeHome } from '@/lib/model/income'
 import { categoryOf, ownerOf, targetFor } from '@/lib/model/ledger'
 import { monthlySetAside } from '@/lib/model/plans'
 import { suggestPlans } from '@/lib/model/detect'
@@ -348,7 +349,7 @@ export function budgyTools(
       name: 'get_budget',
       title: 'Budget',
       description:
-        'The plan: every category’s monthly Target now, its typical month over the last 3 and 12 full months (without planned bills), its tag (need, nice, fluff) and group, plus what to set aside for planned bills.',
+        'The plan: every category’s monthly Target now, its typical month over the last 3 and 12 full months (without planned bills), its tag (need, nice, fluff) and group, what to set aside for planned bills, and typical take-home pay with how much of it a typical month spends.',
       input: z.object({}),
       call: async () => {
         const b = await book()
@@ -371,17 +372,32 @@ export function budgyTools(
           }
         })
         const everyday = rows.filter((r) => r.group === 'everyday')
+        const setAside = b.ix.ledger.plans
+          .filter((p) => p.active)
+          .reduce((n, p) => n + monthlySetAside(p), 0)
+        const pay = takeHome(b.ix.ledger.income, monthRange(lastFull, 3), today)
+        const spent3 = [...h3.values()].reduce((n, h) => n + h.typical, 0)
         return {
           month: thisMonth,
           everydayTargets: everyday.reduce((n, r) => n + (r.target ?? 0), 0),
           everydayTypical3:
             Math.round(everyday.reduce((n, r) => n + r.typical3, 0) * 100) /
             100,
-          plannedSetAsidePerMonth: usd(
-            b.ix.ledger.plans
-              .filter((p) => p.active)
-              .reduce((n, p) => n + monthlySetAside(p), 0),
-          ),
+          plannedSetAsidePerMonth: usd(setAside),
+          takeHome: {
+            perMonth: usd(pay.monthly),
+            basis: pay.basis,
+            otherIncomePerMonth: usd(pay.other),
+            employers: pay.sources.map((p) => ({
+              payer: p.payer,
+              perCheck: usd(p.perCheck),
+              schedule: PAY_SCHEDULES[p.perYear],
+              perMonth: usd(p.monthly),
+              stopped: p.ended,
+            })),
+            typicalSpendingPerMonth: usd(spent3 + setAside),
+            percentSpent: percentOf(spent3 + setAside, pay.monthly),
+          },
           categories: rows.sort((x, y) => y.typical3 - x.typical3),
         }
       },

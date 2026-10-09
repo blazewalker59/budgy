@@ -43,6 +43,13 @@
       "when": 1791510422947,
       "tag": "0005_pay_schedules",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791513255687,
+      "tag": "0006_accounts_and_balances",
+      "breakpoints": true
     }
   ]
 }

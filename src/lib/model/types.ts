@@ -48,10 +48,53 @@ export interface Category {
   group: Group
 }
 
+/** What kind of Account: where it sits in net worth. */
+export type AccountKind =
+  | 'checking'
+  | 'savings'
+  | 'credit'
+  | 'brokerage'
+  | 'retirement'
+  | 'education'
+  | 'loan'
+  | 'other'
+export const ACCOUNT_KINDS: ReadonlyArray<AccountKind> = [
+  'checking',
+  'savings',
+  'credit',
+  'brokerage',
+  'retirement',
+  'education',
+  'loan',
+  'other',
+]
+export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
+  checking: 'Checking',
+  savings: 'Savings',
+  credit: 'Credit card',
+  brokerage: 'Investments',
+  retirement: 'Retirement',
+  education: 'Education (529)',
+  loan: 'Loan',
+  other: 'Other',
+}
+/** Kinds whose balance is owed, not held. */
+export const DEBT_KINDS: ReadonlySet<AccountKind> = new Set(['credit', 'loan'])
+
 export interface Account {
   name: string
   sourceName: string
   owner: Owner
+  kind: AccountKind
+  institution: string | null
+  closed: boolean
+}
+
+export interface Balance {
+  account: string
+  date: string
+  /** Cents, as the account shows it (a card's balance owed is positive). */
+  amount: number
 }
 
 export interface Txn {
@@ -132,6 +175,7 @@ export interface Ledger {
   accounts: Array<Account>
   txns: Array<Txn>
   pay: Array<PaySchedule>
+  balances: Array<Balance>
   rules: Array<StoreRule>
   targets: Array<Target>
   plans: Array<Plan>

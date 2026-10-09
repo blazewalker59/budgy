@@ -1,10 +1,10 @@
 /**
- * Bringing in a new export, and saying whose each Account is. An import
+ * Bringing in a new export (whose each Account is lives on Accounts). An import
  * only adds Transactions the Ledger doesn't have, so overlapping exports
  * are safe.
  */
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileUp } from 'lucide-react'
 import type { ImportSummary } from '@/lib/ledger/server'
@@ -14,11 +14,8 @@ import {
   listImports,
   setImportRules,
 } from '@/lib/ledger/server'
-import { useBook } from '@/lib/ledger/book'
-import { LEDGER_KEY, useSetOwner } from '@/lib/ledger/useLedger'
-import { OWNERS } from '@/lib/model/types'
+import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 import { dayLabel } from '@/lib/model/dates'
-import { ownerColor } from '@/lib/format'
 
 interface Pending {
   file: File
@@ -180,8 +177,6 @@ export function ImportScreen() {
         </div>
       ))}
 
-      <Accounts />
-
       <RulesEditor />
 
       {history.data && history.data.length > 0 && (
@@ -205,73 +200,6 @@ export function ImportScreen() {
         </section>
       )}
     </div>
-  )
-}
-
-/** Whose spending each Account is, and how far its data reaches. */
-function Accounts() {
-  const { ix } = useBook()
-  const setOwner = useSetOwner()
-  const stats = useMemo(() => {
-    const m = new Map<string, { n: number; first: string; last: string }>()
-    for (const t of ix.ledger.txns) {
-      const s = m.get(t.account) ?? { n: 0, first: t.date, last: t.date }
-      s.n++
-      if (t.date < s.first) s.first = t.date
-      if (t.date > s.last) s.last = t.date
-      m.set(t.account, s)
-    }
-    return m
-  }, [ix])
-  if (!ix.ledger.accounts.length) return null
-  return (
-    <section>
-      <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
-        Accounts
-      </h2>
-      <p className="mb-1 text-xs text-muted">
-        Whose spending each card or account is. Data that stops early means that
-        account is missing from the latest export.
-      </p>
-      <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-        {ix.ledger.accounts.map((a) => {
-          const s = stats.get(a.name)
-          return (
-            <li
-              key={a.name}
-              className="flex flex-wrap items-center justify-between gap-3 px-3 py-1.5"
-            >
-              <div className="min-w-0">
-                <p className="font-semibold">
-                  <span
-                    className="mr-2 inline-block size-2.5 rounded-full"
-                    style={{ background: ownerColor(a.owner) }}
-                  />
-                  {a.name}
-                </p>
-                <p className="text-xs text-muted">
-                  {s
-                    ? `${s.n} purchases, ${s.first} to ${s.last}`
-                    : 'No purchases'}
-                </p>
-              </div>
-              <select
-                value={a.owner}
-                aria-label={`Owner of ${a.name}`}
-                className="field"
-                onChange={(e) =>
-                  setOwner.mutate({ account: a.name, owner: e.target.value })
-                }
-              >
-                {OWNERS.map((o) => (
-                  <option key={o}>{o}</option>
-                ))}
-              </select>
-            </li>
-          )
-        })}
-      </ul>
-    </section>
   )
 }
 

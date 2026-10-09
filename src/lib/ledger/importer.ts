@@ -38,8 +38,8 @@ export interface ImportSummary {
 }
 
 /** Each statement may bind at most 100 values in D1. */
-const ROWS_PER_INSERT = 10
-const STATEMENTS_PER_BATCH = 40
+export const ROWS_PER_INSERT = 10
+export const STATEMENTS_PER_BATCH = 40
 
 export const RULES_KEY = 'import_rules'
 

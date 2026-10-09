@@ -15,8 +15,8 @@ sees and edits everything.
 _Avoid_: user, viewer
 
 **Ledger**:
-Everything Budgy knows: Transactions, Accounts, Categories, Store Rules,
-Targets, Planned Expenses and Pay Schedules.
+Everything Budgy knows: Transactions, Accounts and their Balances,
+Categories, Store Rules, Targets, Planned Expenses and Pay Schedules.
 
 **Transaction**:
 One purchase (or refund) from an import. Only spending is kept: transfers,
@@ -36,8 +36,18 @@ shows each part of spending as a share of it.
 _Avoid_: salary, gross income, income
 
 **Account**:
-The card or bank account a Transaction came from. Each has an **Owner**:
-Blaze, Alex, or Joint.
+A card, bank, investment, retirement, 529 or other account the Household
+has. Each has a **kind**, an **Owner** (Blaze, Alex, Joint, or anyone else,
+such as a child for a 529), and optionally an institution. Purchases come
+from the card and bank Accounts.
+
+**Balance**:
+What an Account held (or, for a card or loan, owed) on a day, recorded by a
+Member or an Agent, or imported as a history when the Account is added.
+
+**Net worth**:
+Every open Account's latest Balance, held minus owed. By month, each Balance
+counts until a newer one replaces it.
 
 **Store**:
 Who was paid, normalized from the bank's description ("Amazon", not

@@ -41,7 +41,7 @@ export interface ParsedExport {
 
 export class ImportError extends Error {}
 
-async function sha1Hex(text: string): Promise<string> {
+export async function sha1Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     'SHA-1',
     new TextEncoder().encode(text),
@@ -52,7 +52,7 @@ async function sha1Hex(text: string): Promise<string> {
 }
 
 /** Python's `f"{x:.2f}"` for amounts with at most two decimals. */
-function twoDecimals(dollars: number): string {
+export function twoDecimals(dollars: number): string {
   return (Object.is(dollars, -0) ? 0 : dollars).toFixed(2)
 }
 

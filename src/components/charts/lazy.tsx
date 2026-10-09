@@ -11,6 +11,7 @@ import type { ForecastChart as ForecastChartType } from './ForecastChart'
 import type { IncomeChart as IncomeChartType } from './IncomeChart'
 import type { IncomeMonths as IncomeMonthsType } from './IncomeMonths'
 import type { MixChart as MixChartType } from './MixChart'
+import type { WorthChart as WorthChartType } from './WorthChart'
 import type { TrendSpark as TrendSparkType } from './TrendSpark'
 
 import type { PlanChart as PlanChartType } from './PlanChart'
@@ -81,5 +82,9 @@ export const IncomeChart = lazyChart<ComponentProps<typeof IncomeChartType>>(
 )
 export const IncomeMonths = lazyChart<ComponentProps<typeof IncomeMonthsType>>(
   () => import('./IncomeMonths').then((m) => m.IncomeMonths),
+  200,
+)
+export const WorthChart = lazyChart<ComponentProps<typeof WorthChartType>>(
+  () => import('./WorthChart').then((m) => m.WorthChart),
   200,
 )

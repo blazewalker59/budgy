@@ -7,20 +7,25 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  deleteAccount,
+  deleteBalance,
   deletePay,
   deletePlan,
   getLedger,
   getSession,
   moveTxn,
   noteTxn,
+  recordBalances,
+  saveAccount,
   saveCategory,
   savePay,
   savePlan,
-  setAccountOwner,
   setStoreRule,
   setTarget,
 } from './server'
+import type { AccountEdit } from './server'
 import type {
+  Balance,
   Category,
   Ledger,
   PaySchedule,
@@ -179,13 +184,54 @@ export function useSaveCategory() {
   )
 }
 
-export function useSetOwner() {
+export function useSaveAccount() {
   return useEdit(
-    (v: { account: string; owner: string }) => setAccountOwner({ data: v }),
+    (v: AccountEdit) => saveAccount({ data: v }),
+    (l, { isNew: _new, ...v }) => ({
+      ...l,
+      accounts: l.accounts.some((a) => a.name === v.name)
+        ? l.accounts.map((a) => (a.name === v.name ? { ...a, ...v } : a))
+        : [...l.accounts, { ...v, sourceName: v.name }],
+    }),
+  )
+}
+
+export function useDeleteAccount() {
+  return useEdit(
+    (v: { name: string }) => deleteAccount({ data: v }),
     (l, v) => ({
       ...l,
-      accounts: l.accounts.map((a) =>
-        a.name === v.account ? { ...a, owner: v.owner } : a,
+      accounts: l.accounts.filter((a) => a.name !== v.name),
+      balances: l.balances.filter((b) => b.account !== v.name),
+    }),
+  )
+}
+
+/** Record Balances (one, or a whole history); same day replaces. */
+export function useRecordBalances() {
+  return useEdit(
+    (v: { balances: Array<Balance> }) => recordBalances({ data: v }),
+    (l, v) => {
+      const key = (b: Balance) => `${b.account}|${b.date}`
+      const fresh = new Set(v.balances.map(key))
+      return {
+        ...l,
+        balances: [
+          ...l.balances.filter((b) => !fresh.has(key(b))),
+          ...v.balances,
+        ].sort((a, b) => (a.date < b.date ? -1 : 1)),
+      }
+    },
+  )
+}
+
+export function useDeleteBalance() {
+  return useEdit(
+    (v: { account: string; date: string }) => deleteBalance({ data: v }),
+    (l, v) => ({
+      ...l,
+      balances: l.balances.filter(
+        (b) => b.account !== v.account || b.date !== v.date,
       ),
     }),
   )

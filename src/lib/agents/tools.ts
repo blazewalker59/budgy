@@ -18,6 +18,17 @@ import {
   noteTransaction,
 } from '@/lib/ledger/queries'
 import { runImport } from '@/lib/ledger/importer'
+import {
+  findAccount,
+  postTransactions,
+  recordBalances,
+} from '@/lib/ledger/accounts'
+import {
+  isDebt,
+  latestBalances,
+  netWorth,
+  netWorthByMonth,
+} from '@/lib/model/accounts'
 import { buildBook } from '@/lib/model/book'
 import { budgetAlerts } from '@/lib/model/alerts'
 import { agentTxn, dailyDigest } from '@/lib/model/digest'
@@ -30,10 +41,10 @@ import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
 import { CADENCE_LABELS, OWNERS, PAY_CADENCE_LABELS } from '@/lib/model/types'
 
-export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Data is only as fresh as the latest imported export: check freshness before calling a day quiet. For a daily report: if you have the finance app's latest CSV export, import it with import_transactions_csv (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
+export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Data is only as fresh as the latest imported export: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have the finance app's latest CSV export, import it with import_transactions_csv (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
 
 export const WRITE_INSTRUCTIONS =
-  'This token may also change the Ledger: import_transactions_csv adds new purchases (always preview with commit false first unless asked for a scheduled import), and update_transaction moves a purchase to another Category or notes it. Say what you changed.'
+  'This token may also change the Ledger: import_transactions_csv adds new purchases from the finance app’s export; add_transactions adds purchases you read yourself to one account (for a daily Apple Card upload: the day’s purchases, commit true); record_balances records account balances, one or a whole history; update_transaction moves a purchase to another Category or notes it. Preview imports with commit false first unless asked for a scheduled one. Say what you changed.'
 
 const MONTH = z.string().regex(/^\d{4}-\d{2}$/, 'A month as YYYY-MM')
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date as YYYY-MM-DD')
@@ -444,7 +455,7 @@ export function budgyTools(
       name: 'list_accounts_and_categories',
       title: 'Accounts and categories',
       description:
-        'The accounts (whose they are, how far their imported data reaches) and the categories, by the exact names the other tools take.',
+        'The accounts (whose they are, their kind and institution, latest balance, how far their purchases reach) and the categories, by the exact names the other tools take.',
       input: z.object({}),
       call: async () => {
         const b = await book()
@@ -468,6 +479,13 @@ export function budgyTools(
           accounts: b.ix.ledger.accounts.map((a) => ({
             account: a.name,
             owner: a.owner,
+            kind: a.kind,
+            institution: a.institution,
+            closed: a.closed,
+            balance: (() => {
+              const bal = latestBalances(b.ix.ledger.balances).get(a.name)
+              return bal ? { amount: usd(bal.amount), asOf: bal.date } : null
+            })(),
             firstPurchase: reach.get(a.name)?.first ?? null,
             latestPurchase: reach.get(a.name)?.last ?? null,
             purchases: reach.get(a.name)?.count ?? 0,
@@ -477,6 +495,49 @@ export function budgyTools(
             tag: c.tag,
             group: c.group,
           })),
+        }
+      },
+    }),
+    tool({
+      name: 'get_net_worth',
+      title: 'Net worth',
+      description:
+        'What the Household has and owes: every open account’s latest balance by kind and owner (cards and loans count against), net worth now, and net worth at each month’s end. Balances are recorded by hand or by an Agent, so check each one’s asOf date.',
+      input: z.object({
+        months: z.number().int().min(1).max(120).default(12),
+      }),
+      call: async ({ months }) => {
+        const b = await book()
+        const l = b.ix.ledger
+        const latest = latestBalances(l.balances)
+        const now = netWorth(l)
+        return {
+          today,
+          have: usd(now.assets),
+          owe: usd(now.debts),
+          netWorth: usd(now.net),
+          accounts: l.accounts
+            .filter((a) => !a.closed)
+            .map((a) => {
+              const bal = latest.get(a.name)
+              return {
+                account: a.name,
+                kind: a.kind,
+                owner: a.owner,
+                institution: a.institution,
+                balance: bal ? usd(bal.amount) : null,
+                countsAs: isDebt(a) ? 'owed' : 'held',
+                asOf: bal?.date ?? null,
+              }
+            }),
+          byMonth: netWorthByMonth(l, monthRange(thisMonth, months)).map(
+            (m) => ({
+              month: m.month,
+              have: usd(m.assets),
+              owe: usd(m.debts),
+              netWorth: usd(m.net),
+            }),
+          ),
         }
       },
     }),
@@ -501,6 +562,83 @@ export function budgyTools(
         const summary = await runImport(db, {
           fileName,
           text: csv,
+          commit,
+          importedBy: `${caller.memberEmail} via ${caller.agentName}`,
+        })
+        cached = null
+        return { committed: commit && summary.added > 0, ...summary }
+      },
+    }),
+    tool({
+      name: 'record_balances',
+      title: 'Record balances',
+      description:
+        'Record what accounts held (or, for cards and loans, owed) on a day: today’s balances, or a whole history when an account is first set up. A balance for the same account and day replaces the earlier one. Account names as list_accounts_and_categories gives them (any case).',
+      input: z.object({
+        balances: z
+          .array(
+            z.object({
+              account: z.string().min(1).max(60),
+              balance: z
+                .number()
+                .describe(
+                  'Dollars as the account shows it; a card’s balance owed is positive',
+                ),
+              date: DATE.optional().describe('YYYY-MM-DD; default today'),
+            }),
+          )
+          .min(1)
+          .max(5000),
+      }),
+      call: async ({ balances }) => {
+        const names = new Map<string, string>()
+        for (const n of new Set(balances.map((x) => x.account)))
+          names.set(n, (await findAccount(db, n)).name)
+        const rows = balances.map((x) => ({
+          account: names.get(x.account)!,
+          date: x.date ?? today,
+          amount: Math.round(x.balance * 100),
+        }))
+        await recordBalances(
+          db,
+          rows,
+          `${caller.memberEmail} via ${caller.agentName}`,
+        )
+        cached = null
+        const now = netWorth((await book()).ix.ledger)
+        return {
+          recorded: rows.length,
+          accounts: [...new Set(rows.map((r) => r.account))],
+          netWorthNow: usd(now.net),
+        }
+      },
+    }),
+    tool({
+      name: 'add_transactions',
+      title: 'Add purchases to an account',
+      description:
+        'Add purchases you read yourself (say, a day of Apple Card activity) to one account. Each is filed under the category given if it names one of the household’s categories, else where that store’s purchases usually go, else Uncategorized. Purchases already there are skipped, including one on the same day for the same amount under another description, so posting the same day twice is safe. Leave out card payments and transfers. With commit false (the default) it only reports what would be added.',
+      input: z.object({
+        account: z.string().min(1).max(60),
+        transactions: z
+          .array(
+            z.object({
+              date: DATE,
+              description: z.string().trim().min(1).max(200),
+              amount: z
+                .number()
+                .describe('Dollars; positive is spending, negative a refund'),
+              category: z.string().max(60).nullable().optional(),
+            }),
+          )
+          .min(1)
+          .max(2000),
+        commit: z.boolean().default(false),
+      }),
+      call: async ({ account, transactions, commit }) => {
+        const summary = await postTransactions(db, {
+          account,
+          rows: transactions,
           commit,
           importedBy: `${caller.memberEmail} via ${caller.agentName}`,
         })

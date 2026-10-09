@@ -14,12 +14,24 @@ import {
   noteTransaction,
 } from './queries'
 import { RULES_KEY, loadImportRules, runImport } from './importer'
-import type { PaySchedule, Plan, StoreRule } from '@/lib/model/types'
+import {
+  deleteAccount as deleteAccountRow,
+  deleteBalance as deleteBalanceRow,
+  recordBalances as recordBalanceRows,
+  saveAccount as saveAccountRow,
+} from './accounts'
+import type {
+  Account,
+  Balance,
+  PaySchedule,
+  Plan,
+  StoreRule,
+} from '@/lib/model/types'
 import type { SessionState } from '@/lib/auth/session'
 import type { ImportRules } from '@/lib/import/rules'
+import { accountInput, balanceInput } from '@/lib/model/accounts'
 import { sessionState, withMember } from '@/lib/auth/session'
 import {
-  accounts,
   budgetTargets,
   categories,
   imports,
@@ -180,17 +192,43 @@ export const saveCategory = createServerFn({ method: 'POST' })
     }),
   )
 
-export const setAccountOwner = createServerFn({ method: 'POST' })
-  .validator((data: { account: string; owner: string }) =>
-    z.object({ account: NAME, owner: NAME }).parse(data),
+export type AccountEdit = Omit<Account, 'sourceName'> & { isNew: boolean }
+
+/** Add an Account, or change one's owner, kind, institution or closing. */
+export const saveAccount = createServerFn({ method: 'POST' })
+  .validator((data: AccountEdit) =>
+    accountInput.extend({ isNew: z.boolean() }).parse(data),
+  )
+  .handler(({ data: { isNew, ...account } }) =>
+    withMember(({ db }) => saveAccountRow(db, account, isNew)),
+  )
+
+/** Remove an Account added by mistake (one with no purchases). */
+export const deleteAccount = createServerFn({ method: 'POST' })
+  .validator((data: { name: string }) =>
+    accountInput.pick({ name: true }).parse(data),
   )
   .handler(({ data }) =>
-    withMember(async ({ db }) => {
-      await db
-        .update(accounts)
-        .set({ owner: data.owner })
-        .where(eq(accounts.name, data.account))
-    }),
+    withMember(({ db }) => deleteAccountRow(db, data.name)),
+  )
+
+/** Record Balances for one Account: today's, or a whole imported history. */
+export const recordBalances = createServerFn({ method: 'POST' })
+  .validator((data: { balances: Array<Balance> }) =>
+    z.object({ balances: z.array(balanceInput).max(5000) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db, member }) =>
+      recordBalanceRows(db, data.balances, member.email),
+    ),
+  )
+
+export const deleteBalance = createServerFn({ method: 'POST' })
+  .validator((data: { account: string; date: string }) =>
+    balanceInput.pick({ account: true, date: true }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => deleteBalanceRow(db, data.account, data.date)),
   )
 
 const planInput = z.object({

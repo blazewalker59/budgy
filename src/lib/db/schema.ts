@@ -17,7 +17,13 @@ import {
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core'
-import type { Cadence, Group, PayCadence, Tag } from '@/lib/model/types'
+import type {
+  AccountKind,
+  Cadence,
+  Group,
+  PayCadence,
+  Tag,
+} from '@/lib/model/types'
 
 // ─── Better Auth (generated; do not hand-edit shapes) ───────────────────────
 
@@ -128,10 +134,34 @@ export const accounts = sqliteTable('accounts', {
   name: text('name').primaryKey(),
   /** The finance app's full account name, as exported. */
   sourceName: text('source_name').notNull(),
-  /** "Joint" or a Member's first name. */
+  /** "Joint", a Member's first name, or (say, for a 529) a child's. */
   owner: text('owner').notNull(),
+  kind: text('kind').$type<AccountKind>().notNull().default('other'),
+  /** The bank or brokerage, e.g. "Acme Brokerage". */
+  institution: text('institution'),
+  /** Closed Accounts keep their history but leave the totals. */
+  closed: integer('closed', { mode: 'boolean' }).notNull().default(false),
   createdAt: createdAt(),
 })
+
+/**
+ * What an Account held (or, for a card or loan, owed) on a day, as a Member
+ * or an Agent recorded it. The latest one is its balance; together they're
+ * the Household's net worth over time.
+ */
+export const balances = sqliteTable(
+  'balances',
+  {
+    account: text('account').notNull(),
+    /** YYYY-MM-DD */
+    date: text('date').notNull(),
+    /** Cents, as the account shows it: a card's balance owed is positive. */
+    amount: integer('amount').notNull(),
+    recordedBy: text('recorded_by').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.account, t.date] })],
+)
 
 export const transactions = sqliteTable(
   'transactions',

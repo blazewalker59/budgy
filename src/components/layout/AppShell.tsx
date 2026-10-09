@@ -9,7 +9,7 @@ import {
   PieChart,
   Receipt,
   Sun,
-  Upload,
+  Wallet,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { Member } from '@/lib/auth/session'
@@ -22,7 +22,7 @@ const NAV = [
   { to: '/spending', label: 'Spending', icon: Receipt },
   { to: '/budget', label: 'Budget', icon: LayoutList },
   { to: '/upcoming', label: 'Upcoming', icon: CalendarClock },
-  { to: '/import', label: 'Import', icon: Upload },
+  { to: '/accounts', label: 'Accounts', icon: Wallet },
 ] as const
 
 export function AppShell({

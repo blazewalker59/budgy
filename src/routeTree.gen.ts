@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ImportRouteImport } from './routes/import'
@@ -19,6 +20,11 @@ import { Route as UpcomingRouteImport } from './routes/upcoming'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountsRoute = AccountsRouteImport.update({
+  id: '/accounts',
+  path: '/accounts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsRoute = AgentsRouteImport.update({
@@ -49,6 +55,7 @@ const UpcomingRoute = UpcomingRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
@@ -74,12 +83,27 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/agents' | '/budget' | '/import' | '/spending' | '/upcoming'
+  fullPaths:
+    | '/'
+    | '/accounts'
+    | '/agents'
+    | '/budget'
+    | '/import'
+    | '/spending'
+    | '/upcoming'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/agents' | '/budget' | '/import' | '/spending' | '/upcoming'
+  to:
+    | '/'
+    | '/accounts'
+    | '/agents'
+    | '/budget'
+    | '/import'
+    | '/spending'
+    | '/upcoming'
   id:
     | '__root__'
     | '/'
+    | '/accounts'
     | '/agents'
     | '/budget'
     | '/import'
@@ -89,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountsRoute: typeof AccountsRoute
   AgentsRoute: typeof AgentsRoute
   BudgetRoute: typeof BudgetRoute
   ImportRoute: typeof ImportRoute
@@ -103,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/accounts': {
+      id: '/accounts'
+      path: '/accounts'
+      fullPath: '/accounts'
+      preLoaderRoute: typeof AccountsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents': {
@@ -145,6 +177,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountsRoute: AccountsRoute,
   AgentsRoute: AgentsRoute,
   BudgetRoute: BudgetRoute,
   ImportRoute: ImportRoute,

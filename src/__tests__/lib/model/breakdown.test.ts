@@ -112,3 +112,17 @@ describe('selection', () => {
     expect(isSelecting({ accounts: ['x'] })).toBe(true)
   })
 })
+
+describe('a Selection with its own test', () => {
+  it('picks what the test picks', () => {
+    const a = txn({ store: 'Kroger', amount: 5000 })
+    const b = txn({ store: 'Target', amount: 3000 })
+    const ix = indexLedger(ledger({ txns: [a, b] }))
+    const sel = { match: (t: { store: string }) => t.store === 'Target' }
+    expect(isSelecting(sel)).toBe(true)
+    expect(inSelection(ix, a, sel)).toBe(false)
+    expect(breakdown(ix, ['2026-09'], sel, new Set()).totals.selected).toBe(
+      3000,
+    )
+  })
+})

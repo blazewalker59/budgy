@@ -1,6 +1,4 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { OWNERS } from '@/lib/model/types'
 import { monthLabel, shiftMonth } from '@/lib/model/dates'
 
 export function MonthPicker({
@@ -47,43 +45,6 @@ export function MonthPicker({
       >
         <ChevronRight size={18} aria-hidden />
       </button>
-    </div>
-  )
-}
-
-export function OwnerPicker({
-  owner,
-  onChange,
-}: {
-  owner: string | undefined
-  onChange: (owner: string | undefined) => void
-}) {
-  const options = ['All', ...OWNERS]
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Whose spending"
-      className="flex rounded-full bg-sunken p-0.5"
-    >
-      {options.map((o) => {
-        const value = o === 'All' ? undefined : o
-        const on = owner === value
-        return (
-          <button
-            key={o}
-            type="button"
-            role="radio"
-            aria-checked={on}
-            onClick={() => onChange(value)}
-            className={cn(
-              'rounded-full px-2.5 py-0.5 text-xs font-semibold text-muted',
-              on && 'bg-surface text-foreground shadow-sm',
-            )}
-          >
-            {o}
-          </button>
-        )
-      })}
     </div>
   )
 }

@@ -1,11 +1,13 @@
 /**
  * Transactions you can act on: Move one to another Category, or note why.
- * Laid out as rows that stack on a phone.
+ * Laid out as rows that stack on a phone. With `onPick`, a purchase's Store
+ * and Account are filters to tap.
  */
 
 import { useState } from 'react'
 import { CategorySelect } from './CategorySelect'
 import type { Txn } from '@/lib/model/types'
+import type { LensFilter } from '@/lib/model/lens'
 import { useBook } from '@/lib/ledger/book'
 import { useMoveTxn, useNoteTxn } from '@/lib/ledger/useLedger'
 import { categoryOf, ownerOf, storeCategory } from '@/lib/model/ledger'
@@ -16,9 +18,12 @@ import { ownerColor } from '@/lib/format'
 export function TxnList({
   txns,
   limit = 200,
+  onPick,
 }: {
   txns: Array<Txn>
   limit?: number
+  /** Narrow the Lens to a purchase's Store or Account. */
+  onPick?: (f: LensFilter) => void
 }) {
   const [all, setAll] = useState(false)
   const shown = all ? txns : txns.slice(0, limit)
@@ -27,7 +32,7 @@ export function TxnList({
   return (
     <div className="@container divide-y divide-border">
       {shown.map((t) => (
-        <TxnRow key={t.id} txn={t} />
+        <TxnRow key={t.id} txn={t} onPick={onPick} />
       ))}
       {txns.length > shown.length && (
         <button
@@ -42,7 +47,13 @@ export function TxnList({
   )
 }
 
-function TxnRow({ txn }: { txn: Txn }) {
+function TxnRow({
+  txn,
+  onPick,
+}: {
+  txn: Txn
+  onPick?: (f: LensFilter) => void
+}) {
   const { ix, plannedIds } = useBook()
   const move = useMoveTxn()
   const note = useNoteTxn()
@@ -56,7 +67,18 @@ function TxnRow({ txn }: { txn: Txn }) {
       </span>
       <div className="min-w-0">
         <p className="truncate font-semibold">
-          {txn.store}
+          {onPick ? (
+            <button
+              type="button"
+              onClick={() => onPick({ type: 'store', value: txn.store })}
+              className="hover:text-accent hover:underline"
+              title={`Filter to ${txn.store}`}
+            >
+              {txn.store}
+            </button>
+          ) : (
+            txn.store
+          )}
           {txn.category && (
             <span className="ml-1.5 rounded bg-planned-soft px-1 text-[10px] font-semibold text-planned">
               moved
@@ -75,7 +97,19 @@ function TxnRow({ txn }: { txn: Txn }) {
             style={{ background: ownerColor(owner) }}
             title={owner}
           />
-          {txn.account} · {txn.description}
+          {onPick ? (
+            <button
+              type="button"
+              onClick={() => onPick({ type: 'account', value: txn.account })}
+              className="hover:text-accent hover:underline"
+              title={`Filter to ${txn.account}`}
+            >
+              {txn.account}
+            </button>
+          ) : (
+            txn.account
+          )}{' '}
+          · {txn.description}
         </p>
       </div>
       <span

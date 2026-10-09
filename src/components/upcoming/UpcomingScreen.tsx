@@ -1,6 +1,7 @@
 /**
- * What's ahead: Planned Expenses on their due dates, the months they make
- * heavy, and bills from history that look like they should be planned.
+ * What's ahead, on Plan: Planned Expenses on their due dates, the months
+ * they make heavy, and bills from history that look like they should be
+ * planned.
  */
 
 import { useMemo, useState } from 'react'
@@ -36,7 +37,9 @@ export function UpcomingScreen() {
   return (
     <div className="space-y-3">
       <div>
-        <h1 className="text-lg font-extrabold tracking-tight">Upcoming</h1>
+        <h2 className="text-base font-extrabold tracking-tight">
+          Planned bills
+        </h2>
         <p className="text-xs text-muted">
           Big known bills, budgeted on their due dates instead of inflating a
           monthly Target.

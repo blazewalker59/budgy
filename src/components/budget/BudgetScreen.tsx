@@ -44,7 +44,7 @@ const SPANS = [
 const ROW_GRID =
   'grid items-center gap-x-2 gap-y-0.5 [grid-template-areas:"name_name_diff""spark_typ_target"] grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-y-0 sm:[grid-template-areas:"name_tag_spark_typ_target_diff"] sm:grid-cols-[minmax(0,1fr)_5rem_5.5rem_5rem_5rem_4.5rem]'
 
-export function BudgetScreen() {
+export function BudgetScreen({ owner }: { owner?: string }) {
   const book = useBook()
   const { ix } = book
   const thisMonth = book.today.slice(0, 7)
@@ -57,8 +57,8 @@ export function BudgetScreen() {
     [thisMonth, span],
   )
   const history = useMemo(
-    () => categoryHistory(ix, window, book.plannedIds),
-    [ix, window, book.plannedIds],
+    () => categoryHistory(ix, window, book.plannedIds, owner ?? null),
+    [ix, window, book.plannedIds, owner],
   )
   // The trend always shows a year, with the averaged months drawn strong.
   const year = useMemo(
@@ -67,8 +67,9 @@ export function BudgetScreen() {
         ix,
         monthRange(shiftMonth(thisMonth, -1), 12),
         book.plannedIds,
+        owner ?? null,
       ),
-    [ix, thisMonth, book.plannedIds],
+    [ix, thisMonth, book.plannedIds, owner],
   )
   const gaps = useMemo(
     () =>
@@ -138,6 +139,7 @@ export function BudgetScreen() {
         history={history}
         year={year}
         span={window.length}
+        compare={!owner}
         onOpen={setSheet}
       />
     )
@@ -145,7 +147,9 @@ export function BudgetScreen() {
   return (
     <div className="mx-auto max-w-4xl space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-extrabold tracking-tight">Budget</h1>
+        <h2 className="text-base font-extrabold tracking-tight">
+          {owner ? `Budget, ${owner}’s spending` : 'Budget'}
+        </h2>
         <select
           value={from}
           onChange={(e) => setFrom(e.target.value)}
@@ -165,14 +169,18 @@ export function BudgetScreen() {
       <div className="grid grid-cols-3 gap-2">
         <Stat label="Targets" value={dollars(totalTarget)} detail="per month" />
         <Stat
-          label="Typical"
+          label={owner ? `${owner}’s typical` : 'Typical'}
           value={dollars(totalTypical)}
           detail={
-            totalTypical > totalTarget
-              ? `${dollars(totalTypical - totalTarget)} over`
-              : `${dollars(totalTarget - totalTypical)} under`
+            owner
+              ? `${totalTarget ? Math.round((totalTypical / totalTarget) * 100) : 0}% of household Targets`
+              : totalTypical > totalTarget
+                ? `${dollars(totalTypical - totalTarget)} over`
+                : `${dollars(totalTarget - totalTypical)} under`
           }
-          tone={totalTypical > totalTarget ? 'over' : 'good'}
+          tone={
+            owner ? undefined : totalTypical > totalTarget ? 'over' : 'good'
+          }
         />
         <Stat
           label="Planned"
@@ -181,12 +189,20 @@ export function BudgetScreen() {
         />
       </div>
 
-      <IncomePlan
-        pay={pay}
-        typical={typicalSplit}
-        budget={budgetSplit}
-        onOpen={() => setPaySheet(true)}
-      />
+      {owner ? (
+        <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted">
+          Typical months are {owner}’s spending; Targets and take-home are the
+          household’s. Clear the person filter to see the share of take-home
+          pay.
+        </p>
+      ) : (
+        <IncomePlan
+          pay={pay}
+          typical={typicalSplit}
+          budget={budgetSplit}
+          onOpen={() => setPaySheet(true)}
+        />
+      )}
       <BudgetMix slices={mix} />
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
@@ -248,6 +264,7 @@ function CategoryList({
   history,
   year,
   span,
+  compare,
   onOpen,
 }: {
   title: string
@@ -256,6 +273,8 @@ function CategoryList({
   history: Map<string, CategoryHistory>
   year: Map<string, CategoryHistory>
   span: number
+  /** Show Target minus typical (not for one person's spending). */
+  compare: boolean
   onOpen: (name: string) => void
 }) {
   return (
@@ -293,6 +312,7 @@ function CategoryList({
             h={history.get(name)}
             trend={year.get(name)}
             span={span}
+            compare={compare}
             onOpen={() => onOpen(name)}
           />
         ))}
@@ -307,6 +327,7 @@ function CategoryRow({
   h,
   trend,
   span,
+  compare,
   onOpen,
 }: {
   name: string
@@ -314,6 +335,7 @@ function CategoryRow({
   h?: CategoryHistory
   trend?: CategoryHistory
   span: number
+  compare: boolean
   onOpen: () => void
 }) {
   const { ix } = useBook()
@@ -411,7 +433,7 @@ function CategoryRow({
               : 'text-muted',
         )}
       >
-        {target === null ? '' : signedDollars(target - typical)}
+        {target === null || !compare ? '' : signedDollars(target - typical)}
       </span>
     </li>
   )

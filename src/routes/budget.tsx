@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { BudgetScreen } from '@/components/budget/BudgetScreen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+/** Budget is part of Plan now; old links and installed shortcuts land there. */
 export const Route = createFileRoute('/budget')({
-  component: BudgetScreen,
+  beforeLoad: () => {
+    throw redirect({ to: '/plan' })
+  },
 })

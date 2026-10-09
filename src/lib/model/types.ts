@@ -3,6 +3,8 @@
  * language). Money is integer cents; dates are YYYY-MM-DD, months YYYY-MM.
  */
 
+import type { Lens } from './lens'
+
 /** How much a Category matters: Need, Nice to have, or Fluff. */
 export type Tag = 'need' | 'nice' | 'fluff'
 export const TAGS: ReadonlyArray<Tag> = ['need', 'nice', 'fluff']
@@ -175,12 +177,20 @@ export interface Plan {
   active: boolean
 }
 
+/** A Lens kept under a name (its filters: src/lib/model/lens.ts). */
+export interface SavedLens {
+  id: string
+  name: string
+  lens: Lens
+}
+
 export interface Ledger {
   categories: Array<Category>
   accounts: Array<Account>
   txns: Array<Txn>
   pay: Array<PaySchedule>
   balances: Array<Balance>
+  lenses: Array<SavedLens>
   rules: Array<StoreRule>
   targets: Array<Target>
   plans: Array<Plan>

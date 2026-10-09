@@ -92,7 +92,7 @@ export function AccountSheet({
           {reach.first.slice(2, 4)} to {dayLabel(reach.last)}.{' '}
           <Link
             to="/spending"
-            search={{ acct: name }}
+            search={{ accounts: [name] }}
             className="font-semibold text-accent"
           >
             See them in Spending

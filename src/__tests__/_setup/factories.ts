@@ -81,6 +81,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
     txns: [],
     pay: [],
     balances: [],
+    lenses: [],
     rules: [],
     targets: [],
     plans: [],

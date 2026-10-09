@@ -16,8 +16,8 @@
   ],
   "shortcuts": [
     { "name": "Spending", "url": "/spending", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Budget", "url": "/budget", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
-    { "name": "Upcoming", "url": "/upcoming", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
+    { "name": "Plan", "url": "/plan", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Accounts", "url": "/accounts", "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }] }
   ],
   "categories": ["finance"]
 }

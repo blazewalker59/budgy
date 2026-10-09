@@ -22,13 +22,18 @@ export interface Selection {
   accounts?: ReadonlyArray<string>
   /** Store, description or note contains this (any case). */
   q?: string
+  /** Any other test, such as a Lens. */
+  match?: (t: Txn) => boolean
 }
 
 export function isSelecting(sel: Selection): boolean {
-  return Boolean(sel.owner || sel.accounts?.length || sel.q?.trim())
+  return Boolean(
+    sel.owner || sel.accounts?.length || sel.q?.trim() || sel.match,
+  )
 }
 
 export function inSelection(ix: LedgerIndex, t: Txn, sel: Selection): boolean {
+  if (sel.match && !sel.match(t)) return false
   if (sel.owner && ownerOf(ix, t) !== sel.owner) return false
   if (sel.accounts?.length && !sel.accounts.includes(t.account)) return false
   const q = sel.q?.trim().toLowerCase()

@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import {
   Bot,
-  CalendarClock,
   Download,
   LayoutList,
   LogOut,
@@ -16,12 +15,14 @@ import type { Member } from '@/lib/auth/session'
 import { signOut } from '@/lib/auth/client'
 import { currentTheme, setTheme } from '@/lib/theme'
 import { useInstall } from '@/lib/pwa'
+import { keepLens } from '@/lib/ledger/search'
+import { CommandPalette } from '@/components/lens/CommandPalette'
 
+/** Four places; the Lens (the filters) follows from one to the next. */
 const NAV = [
-  { to: '/', label: 'Month', icon: PieChart },
+  { to: '/', label: 'Overview', icon: PieChart },
   { to: '/spending', label: 'Spending', icon: Receipt },
-  { to: '/budget', label: 'Budget', icon: LayoutList },
-  { to: '/upcoming', label: 'Upcoming', icon: CalendarClock },
+  { to: '/plan', label: 'Plan', icon: LayoutList },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
 ] as const
 
@@ -48,6 +49,7 @@ export function AppShell({
               <Link
                 key={n.to}
                 to={n.to}
+                search={keepLens}
                 activeOptions={{ exact: n.to === '/', includeSearch: false }}
                 className="rounded-full px-2.5 py-1 text-[13px] font-medium text-muted hover:text-foreground"
                 activeProps={{
@@ -58,7 +60,8 @@ export function AppShell({
               </Link>
             ))}
           </nav>
-          <div className="ml-auto flex items-center gap-0.5">
+          <div className="ml-auto flex items-center gap-1">
+            <CommandPalette />
             <ThemeButton />
             <MemberMenu member={member} />
           </div>
@@ -70,6 +73,7 @@ export function AppShell({
           <Link
             key={n.to}
             to={n.to}
+            search={keepLens}
             activeOptions={{ exact: n.to === '/', includeSearch: false }}
             className="flex flex-1 flex-col items-center gap-0.5 py-1.5 text-[10px] font-medium text-muted"
             activeProps={{ className: 'text-accent' }}

@@ -17,6 +17,7 @@ import {
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core'
+import type { Lens } from '@/lib/model/lens'
 import type {
   AccountKind,
   Cadence,
@@ -255,6 +256,19 @@ export const paySchedules = sqliteTable('pay_schedules', {
   anchor: text('anchor').notNull(),
   /** Twice a month only: the other payday's day of the month (31 = last). */
   secondDay: integer('second_day'),
+  createdAt: createdAt(),
+})
+
+/**
+ * A Lens saved under a name ("Alex fun money"), shared by the Household and
+ * found again through the palette.
+ */
+export const savedLenses = sqliteTable('saved_lenses', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  /** The Lens (src/lib/model/lens.ts) as JSON. */
+  lens: text('lens', { mode: 'json' }).$type<Lens>().notNull(),
+  createdBy: text('created_by').notNull(),
   createdAt: createdAt(),
 })
 

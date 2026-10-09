@@ -13,14 +13,16 @@ import {
   categories,
   paySchedules,
   plannedExpenses,
+  savedLenses,
   storeRules,
   transactions,
 } from '@/lib/db/schema'
 import { newCategory } from '@/lib/model/defaults'
+import { readLens } from '@/lib/model/lens'
 
 /** Every row of the Ledger, as the browser and the tools read it. */
 export async function loadLedger(db: Database): Promise<Ledger> {
-  const [cats, accts, txns, pay, rules, targets, plans, held] =
+  const [cats, accts, txns, pay, rules, targets, plans, held, lenses] =
     await Promise.all([
       db.select().from(categories),
       db.select().from(accounts),
@@ -51,6 +53,14 @@ export async function loadLedger(db: Database): Promise<Ledger> {
         })
         .from(balances)
         .orderBy(balances.date),
+      db
+        .select({
+          id: savedLenses.id,
+          name: savedLenses.name,
+          lens: savedLenses.lens,
+        })
+        .from(savedLenses)
+        .orderBy(savedLenses.name),
     ])
   return {
     categories: cats.map(({ name, tag, group }) => ({ name, tag, group })),
@@ -66,6 +76,10 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       }),
     ),
     balances: held,
+    lenses: lenses.map((l) => ({
+      ...l,
+      lens: readLens(l.lens as Record<string, unknown>),
+    })),
     txns,
     pay: pay.map(({ id, name, amount, cadence, anchor, secondDay }) => ({
       id,

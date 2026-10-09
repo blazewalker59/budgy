@@ -116,10 +116,21 @@ A Planned Expense spread over the months between due dates: what to save
 each month so the bill is covered.
 
 **Selection**:
-A slice of the Household's spending picked on the Spending screen: a person,
-some Accounts, a search, or any mix. It is always shown inside the whole,
+What the Lens picks out on Spending. It is always shown inside the whole,
 per Category and against the Targets, so its part of the plan is plain
 ("Blaze Apple Card is 93% of Groceries and uses 90% of its Target").
+
+**Lens**:
+The filters a Member is looking through: people, accounts, account types,
+Stores, Categories, Tags, kinds of purchase, an amount range, dates and
+text. It follows them between Overview, Spending, Plan and Accounts, each of
+which uses what makes sense (docs/adr/0006). Built by tapping, or by typing
+in the ⌘K palette.
+_Avoid_: filter set, query
+
+**Saved Lens**:
+A Lens kept under a name ("Alex fun money"), shared by the Household and
+found again in the palette.
 
 **Gap**:
 An Account in regular use with nothing near the end of a month, which usually

@@ -26,10 +26,12 @@ import type {
   Balance,
   PaySchedule,
   Plan,
+  SavedLens,
   StoreRule,
 } from '@/lib/model/types'
 import type { SessionState } from '@/lib/auth/session'
 import type { ImportRules } from '@/lib/import/rules'
+import { savedLensInput } from '@/lib/model/lens'
 import { accountInput, balanceInput } from '@/lib/model/accounts'
 import { sessionState, withMember } from '@/lib/auth/session'
 import {
@@ -38,6 +40,7 @@ import {
   imports,
   paySchedules,
   plannedExpenses,
+  savedLenses,
   settings,
   storeRules,
 } from '@/lib/db/schema'
@@ -202,6 +205,31 @@ export const saveAccount = createServerFn({ method: 'POST' })
   )
   .handler(({ data: { isNew, ...account } }) =>
     withMember(({ db }) => saveAccountRow(db, account, isNew)),
+  )
+
+/** Save the Lens under a name (or rename one), for the whole Household. */
+export const saveLens = createServerFn({ method: 'POST' })
+  .validator((data: SavedLens) => savedLensInput.parse(data))
+  .handler(({ data }) =>
+    withMember(async ({ db, member }) => {
+      await db
+        .insert(savedLenses)
+        .values({ ...data, createdBy: member.email })
+        .onConflictDoUpdate({
+          target: savedLenses.id,
+          set: { name: data.name, lens: data.lens },
+        })
+    }),
+  )
+
+export const deleteLens = createServerFn({ method: 'POST' })
+  .validator((data: { id: string }) =>
+    z.object({ id: z.string().max(32) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(async ({ db }) => {
+      await db.delete(savedLenses).where(eq(savedLenses.id, data.id))
+    }),
   )
 
 /** Remove an Account added by mistake (one with no purchases). */

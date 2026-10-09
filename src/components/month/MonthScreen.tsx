@@ -1,14 +1,21 @@
 /**
- * The Month: what we spent against the Budget, what Planned Expenses are
- * due, and where the money went, plainly enough to talk through together.
+ * Overview: the month against the Budget, what Planned Expenses are due,
+ * and where the money went, plainly enough to talk through together. The
+ * Lens narrows it (Alex's, the cards, a store) against the household's
+ * Targets; its dates are Spending's, since this is one month.
  */
 
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Copy } from 'lucide-react'
 import type { CategoryMonth, MonthView, StoreMonth } from '@/lib/model/month'
 import type { Occurrence } from '@/lib/model/plans'
+import type { Lens, LensFilter } from '@/lib/model/lens'
+import type { OverviewSearch } from '@/lib/ledger/search'
 import { useBook } from '@/lib/ledger/book'
+import { useLens } from '@/lib/ledger/useLens'
+import { indexLedger } from '@/lib/model/ledger'
+import { describe, filtersOf, isEmpty, matchLens } from '@/lib/model/lens'
 import { monthView, upcoming } from '@/lib/model/month'
 import { coverageGaps } from '@/lib/model/coverage'
 import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
@@ -17,18 +24,40 @@ import { TAG_LABELS } from '@/lib/model/types'
 import { TAG_BG } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Bar } from '@/components/shared/Bar'
-import { MonthPicker, OwnerPicker } from '@/components/shared/Pickers'
+import { MonthPicker } from '@/components/shared/Pickers'
+import { LensBar } from '@/components/lens/LensBar'
 import { Section, Stat } from '@/components/shared/Layout'
 import { TxnList } from '@/components/shared/TxnList'
 
 export function MonthScreen({
   month: monthParam,
-  owner,
+  lens,
 }: {
   month?: string
-  owner?: string
+  lens: Lens
 }) {
   const book = useBook()
+  const { add } = useLens()
+  const scope = useMemo(() => {
+    const l: Lens = { ...lens, from: undefined, to: undefined }
+    if (isEmpty(l)) return { ix: book.ix, occurrences: book.occurrences }
+    const txns = book.ix.ledger.txns.filter((t) =>
+      matchLens(book.ix, t, l, book.plannedIds),
+    )
+    const ids = new Set(txns.map((t) => t.id))
+    return {
+      ix: indexLedger({ ...book.ix.ledger, txns }),
+      // Under a Lens, only the planned bills it caught.
+      occurrences: book.occurrences.filter(
+        (o) => o.paidBy && ids.has(o.paidBy.id),
+      ),
+    }
+  }, [book, lens])
+  const filtered = scope.ix !== book.ix
+  const person =
+    lens.people?.length === 1 && filtersOf(lens).length === 1
+      ? lens.people[0]
+      : undefined
   const navigate = useNavigate({ from: '/' })
   const thisMonth = book.today.slice(0, 7)
   const month = monthParam ?? thisMonth
@@ -37,9 +66,8 @@ export function MonthScreen({
     [book.months, thisMonth, month],
   )
   const view = useMemo(
-    () =>
-      monthView(book.ix, month, book.today, owner ?? null, book.occurrences),
-    [book, month, owner],
+    () => monthView(scope.ix, month, book.today, null, scope.occurrences),
+    [scope, month, book.today],
   )
   const gaps = useMemo(
     () => coverageGaps(book.ix.ledger, month, book.today),
@@ -59,17 +87,20 @@ export function MonthScreen({
           months={months}
           onChange={(m) =>
             void navigate({
-              search: (s) => ({ ...s, month: m === thisMonth ? undefined : m }),
+              search: (s: OverviewSearch) => ({
+                ...s,
+                month: m === thisMonth ? undefined : m,
+              }),
             })
           }
         />
-        <OwnerPicker
-          owner={owner}
-          onChange={(o) =>
-            void navigate({ search: (s) => ({ ...s, owner: o }) })
-          }
-        />
       </div>
+      <LensBar
+        page="/"
+        note={
+          lens.from ? 'Dates apply on Spending; this is one month.' : undefined
+        }
+      />
 
       {gaps.length > 0 && (
         <p className="flex gap-1.5 rounded-lg border border-nice/40 bg-surface px-2.5 py-1.5 text-xs">
@@ -88,43 +119,72 @@ export function MonthScreen({
         </p>
       )}
 
-      <Headline view={view} isCurrent={isCurrent} owner={owner} />
+      <Headline
+        view={view}
+        isCurrent={isCurrent}
+        label={
+          person
+            ? `${person}’s everyday`
+            : filtered
+              ? 'Everyday, in the lens'
+              : 'Everyday'
+        }
+      />
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
         <div className="space-y-3">
           <Section title="Everyday" hint="planned bills counted separately">
-            <CategoryRows rows={view.everyday} />
+            <CategoryRows
+              rows={filtered ? spentIn(view.everyday) : view.everyday}
+              lens={lens}
+              month={month}
+              onPick={add}
+            />
           </Section>
-          {view.housing.length > 0 && (
+          {(filtered ? spentIn(view.housing) : view.housing).length > 0 && (
             <Section title="Housing">
-              <CategoryRows rows={view.housing} />
+              <CategoryRows
+                rows={filtered ? spentIn(view.housing) : view.housing}
+                lens={lens}
+                month={month}
+                onPick={add}
+              />
             </Section>
           )}
         </div>
         <div className="space-y-3">
-          {isCurrent && !owner && soon.length > 0 && (
+          {isCurrent && !filtered && soon.length > 0 && (
             <ComingUp items={soon} today={book.today} />
           )}
           <Stores
             stores={view.stores}
             total={view.totals.spent}
             month={month}
+            onPick={add}
           />
-          <CopySummary view={view} owner={owner} />
+          <CopySummary
+            view={view}
+            owner={filtered ? describe(lens) : undefined}
+          />
         </div>
       </div>
     </div>
   )
 }
 
+/** Under a Lens, only the Categories it touched. */
+function spentIn(rows: Array<CategoryMonth>): Array<CategoryMonth> {
+  return rows.filter((r) => r.spent !== 0 || r.plannedPaid !== 0)
+}
+
 function Headline({
   view,
   isCurrent,
-  owner,
+  label,
 }: {
   view: MonthView
   isCurrent: boolean
-  owner?: string
+  label: string
 }) {
   const t = view.totals
   const left = t.target - t.spent
@@ -132,7 +192,7 @@ function Headline({
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       <Stat
-        label={owner ? `${owner}’s everyday` : 'Everyday'}
+        label={label}
         value={dollars(t.spent)}
         detail={
           t.target
@@ -237,10 +297,26 @@ function ComingUp({
   )
 }
 
-function CategoryRows({ rows }: { rows: Array<CategoryMonth> }) {
+function CategoryRows({
+  rows,
+  lens,
+  month,
+  onPick,
+}: {
+  rows: Array<CategoryMonth>
+  lens: Lens
+  month: string
+  onPick: (f: LensFilter) => void
+}) {
   const [open, setOpen] = useState<string | null>(null)
   if (!rows.length)
-    return <p className="px-3 py-3 text-sm text-muted">Nothing spent.</p>
+    return (
+      <p className="px-3 py-3 text-sm text-muted">
+        {isEmpty(lens)
+          ? 'Nothing spent.'
+          : 'Nothing this month in the lens. Spending shows it over more months.'}
+      </p>
+    )
   return (
     <ul className="divide-y divide-border">
       {rows.map((r) => {
@@ -317,7 +393,21 @@ function CategoryRows({ rows }: { rows: Array<CategoryMonth> }) {
                     </span>
                   </p>
                 ))}
-                <TxnList txns={r.txns} />
+                <TxnList txns={r.txns} onPick={onPick} />
+                <Link
+                  to="/spending"
+                  search={{
+                    ...lens,
+                    from: undefined,
+                    to: undefined,
+                    categories: [r.name],
+                    period: 'month',
+                    month,
+                  }}
+                  className="block border-t border-border px-3 py-1.5 text-xs font-semibold text-accent"
+                >
+                  {r.name} in Spending →
+                </Link>
               </div>
             )}
           </li>
@@ -331,10 +421,12 @@ function Stores({
   stores,
   total,
   month,
+  onPick,
 }: {
   stores: Array<StoreMonth>
   total: number
   month: string
+  onPick: (f: LensFilter) => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
   if (!stores.length) return null
@@ -371,7 +463,7 @@ function Stores({
       </div>
       {opened && (
         <div className="mt-2 overflow-hidden rounded-xl border border-border bg-surface">
-          <TxnList txns={opened.txns} />
+          <TxnList txns={opened.txns} onPick={onPick} />
         </div>
       )}
       {rest.length > 0 && (
@@ -392,7 +484,7 @@ function Stores({
               </button>
               {open === s.store && (
                 <div className="border-t border-border bg-background/50">
-                  <TxnList txns={s.txns} />
+                  <TxnList txns={s.txns} onPick={onPick} />
                 </div>
               )}
             </li>

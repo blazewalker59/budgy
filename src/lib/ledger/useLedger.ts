@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteAccount,
   deleteBalance,
+  deleteLens,
   deletePay,
   deletePlan,
   getLedger,
@@ -18,6 +19,7 @@ import {
   recordBalances,
   saveAccount,
   saveCategory,
+  saveLens,
   savePay,
   savePlan,
   setStoreRule,
@@ -30,6 +32,7 @@ import type {
   Ledger,
   PaySchedule,
   Plan,
+  SavedLens,
   StoreRule,
   Tag,
 } from '@/lib/model/types'
@@ -291,4 +294,27 @@ export function useDeletePay() {
 
 export function newPayId(): string {
   return `ps_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+}
+
+export function useSaveLens() {
+  return useEdit(
+    (v: SavedLens) => saveLens({ data: v }),
+    (l, v) => ({
+      ...l,
+      lenses: [...l.lenses.filter((x) => x.id !== v.id), v].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    }),
+  )
+}
+
+export function useDeleteLens() {
+  return useEdit(
+    (v: { id: string }) => deleteLens({ data: v }),
+    (l, v) => ({ ...l, lenses: l.lenses.filter((x) => x.id !== v.id) }),
+  )
+}
+
+export function newLensId(): string {
+  return `ln_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
 }

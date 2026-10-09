@@ -115,3 +115,40 @@ body {
   font-variant-numeric: tabular-nums;
   white-space: pre-line;
 }
+
+/* ⌘K palette (after t4-pulse-dashboard's): the scrim fades, the panel
+   springs in with a slight overshoot, rows rise in staggered (delay set per
+   row). Still under reduced motion. */
+.palette-scrim {
+  animation: palette-fade 140ms ease-out both;
+}
+.palette-pop {
+  animation: palette-pop 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+.palette-item {
+  animation: palette-row 180ms ease-out both;
+}
+@keyframes palette-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes palette-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+}
+@keyframes palette-row {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .palette-scrim,
+  .palette-pop,
+  .palette-item {
+    animation: none;
+  }
+}

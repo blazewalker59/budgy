@@ -10,7 +10,10 @@ import { Link } from '@tanstack/react-router'
 import { ChevronRight, Plus, Upload } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import type { Account, AccountKind } from '@/lib/model/types'
+import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
+import { filtersOf } from '@/lib/model/lens'
+import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
 import { useSaveAccount } from '@/lib/ledger/useLedger'
 import {
@@ -44,9 +47,24 @@ const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
 /** A Balance older than this is worth updating. */
 const STALE_DAYS = 35
 
-export function AccountsScreen() {
+export function AccountsScreen({ lens }: { lens: Lens }) {
   const book = useBook()
-  const ledger = book.ix.ledger
+  // Of the Lens, Accounts uses the people and the account types.
+  const ledger = useMemo(() => {
+    const all = book.ix.ledger
+    if (!lens.people?.length && !lens.kinds?.length) return all
+    return {
+      ...all,
+      accounts: all.accounts.filter(
+        (a) =>
+          (!lens.people?.length || lens.people.includes(a.owner)) &&
+          (!lens.kinds?.length || lens.kinds.includes(a.kind)),
+      ),
+    }
+  }, [book.ix.ledger, lens.people, lens.kinds])
+  const others = filtersOf(lens).filter(
+    (f) => f.type !== 'person' && f.type !== 'kind',
+  ).length
   const [sheet, setSheet] = useState<string | null>(null)
   const [showClosed, setShowClosed] = useState(false)
   const latest = useMemo(
@@ -95,6 +113,12 @@ export function AccountsScreen() {
           <Upload size={13} aria-hidden /> Import purchases
         </Link>
       </div>
+      <LensBar
+        page="/accounts"
+        note={
+          others ? 'Accounts uses only people and account types.' : undefined
+        }
+      />
 
       <div className="grid grid-cols-3 gap-2">
         <Stat label="Have" value={dollars(worth.assets)} />

@@ -57,6 +57,13 @@
       "when": 1791516443004,
       "tag": "0007_secured_by",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791517999765,
+      "tag": "0008_saved_lenses",
+      "breakpoints": true
     }
   ]
 }

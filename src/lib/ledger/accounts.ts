@@ -62,6 +62,7 @@ export async function saveAccount(
       kind: a.kind,
       institution: a.institution,
       closed: a.closed,
+      securedBy: a.kind === 'loan' ? a.securedBy : null,
     })
     .where(eq(accounts.name, a.name))
 }

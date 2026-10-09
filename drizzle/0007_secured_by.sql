@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD `secured_by` text;

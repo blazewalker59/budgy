@@ -22,6 +22,12 @@ export const accountInput = z.object({
     .nullable()
     .transform((s) => s || null),
   closed: z.boolean(),
+  securedBy: z
+    .string()
+    .trim()
+    .max(60)
+    .nullish()
+    .transform((s) => s || null),
 })
 
 export const balanceInput = z.object({
@@ -143,4 +149,38 @@ export function ownerNames(
   base: ReadonlyArray<string>,
 ): Array<string> {
   return [...new Set([...base, ...accounts.map((a) => a.owner)])]
+}
+
+export interface Equity {
+  property: string
+  /** The property's latest estimated value, in cents. */
+  value: number
+  /** Every open loan against it, at its latest balance. */
+  owed: number
+  equity: number
+  loans: Array<string>
+}
+
+/** Each open property's value, the loans against it, and what's left. */
+export function equity(ledger: Ledger): Array<Equity> {
+  const latest = latestBalances(ledger.balances)
+  return ledger.accounts
+    .filter((a) => a.kind === 'property' && !a.closed)
+    .map((p) => {
+      const loans = ledger.accounts.filter(
+        (a) => a.kind === 'loan' && !a.closed && a.securedBy === p.name,
+      )
+      const value = latest.get(p.name)?.amount ?? 0
+      const owed = loans.reduce(
+        (n, l) => n + (latest.get(l.name)?.amount ?? 0),
+        0,
+      )
+      return {
+        property: p.name,
+        value,
+        owed,
+        equity: value - owed,
+        loans: loans.map((l) => l.name),
+      }
+    })
 }

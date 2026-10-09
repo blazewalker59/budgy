@@ -45,6 +45,10 @@ from the card and bank Accounts.
 What an Account held (or, for a card or loan, owed) on a day, recorded by a
 Member or an Agent, or imported as a history when the Account is added.
 
+**Home equity**:
+A property Account (a home, at its estimated value) minus the loans marked as
+against it, such as the mortgage.
+
 **Net worth**:
 Every open Account's latest Balance, held minus owed. By month, each Balance
 counts until a newer one replaces it.

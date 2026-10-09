@@ -57,6 +57,7 @@ export type AccountKind =
   | 'retirement'
   | 'education'
   | 'loan'
+  | 'property'
   | 'other'
 export const ACCOUNT_KINDS: ReadonlyArray<AccountKind> = [
   'checking',
@@ -66,6 +67,7 @@ export const ACCOUNT_KINDS: ReadonlyArray<AccountKind> = [
   'retirement',
   'education',
   'loan',
+  'property',
   'other',
 ]
 export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
@@ -76,6 +78,7 @@ export const ACCOUNT_KIND_LABELS: Record<AccountKind, string> = {
   retirement: 'Retirement',
   education: 'Education (529)',
   loan: 'Loan',
+  property: 'Home & property',
   other: 'Other',
 }
 /** Kinds whose balance is owed, not held. */
@@ -88,6 +91,8 @@ export interface Account {
   kind: AccountKind
   institution: string | null
   closed: boolean
+  /** A loan's property (a mortgage's home), for that property's equity. */
+  securedBy: string | null
 }
 
 export interface Balance {

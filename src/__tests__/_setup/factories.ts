@@ -57,6 +57,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
         kind: 'credit',
         institution: null,
         closed: false,
+        securedBy: null,
       },
       {
         name: 'Alex Apple Card',
@@ -65,6 +66,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
         kind: 'credit',
         institution: null,
         closed: false,
+        securedBy: null,
       },
       {
         name: 'Joint Checking (0001)',
@@ -73,6 +75,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
         kind: 'checking',
         institution: null,
         closed: false,
+        securedBy: null,
       },
     ],
     txns: [],

@@ -15,9 +15,10 @@ is a large, credential-heavy step before knowing which accounts it serves.
 ## Decision
 
 - Members add Accounts themselves: a name, a kind (checking, savings, credit,
-  brokerage, retirement, education, loan, other), an owner (a Member, Joint,
+  brokerage, retirement, education, loan, property, other), an owner (a Member, Joint,
   or anyone else, such as a child) and an institution. Closing one records a
-  final zero and keeps its history.
+  final zero and keeps its history. A property's Balance is its estimated
+  value; a loan can be marked as against a property, for its equity.
 - A Balance is what an Account held, or owed for a card or loan, on a day.
   Members record them by hand or import a history (a date and a balance per
   line, from any CSV or spreadsheet) when first adding an Account, so trends

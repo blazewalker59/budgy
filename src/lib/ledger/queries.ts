@@ -55,13 +55,14 @@ export async function loadLedger(db: Database): Promise<Ledger> {
   return {
     categories: cats.map(({ name, tag, group }) => ({ name, tag, group })),
     accounts: accts.map(
-      ({ name, sourceName, owner, kind, institution, closed }) => ({
+      ({ name, sourceName, owner, kind, institution, closed, securedBy }) => ({
         name,
         sourceName,
         owner,
         kind,
         institution,
         closed,
+        securedBy,
       }),
     ),
     balances: held,

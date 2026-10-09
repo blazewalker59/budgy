@@ -141,6 +141,8 @@ export const accounts = sqliteTable('accounts', {
   institution: text('institution'),
   /** Closed Accounts keep their history but leave the totals. */
   closed: integer('closed', { mode: 'boolean' }).notNull().default(false),
+  /** A loan's property (a mortgage's home), for that property's equity. */
+  securedBy: text('secured_by'),
   createdAt: createdAt(),
 })
 

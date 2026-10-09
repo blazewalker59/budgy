@@ -24,6 +24,7 @@ import {
   recordBalances,
 } from '@/lib/ledger/accounts'
 import {
+  equity,
   isDebt,
   latestBalances,
   netWorth,
@@ -482,6 +483,7 @@ export function budgyTools(
             kind: a.kind,
             institution: a.institution,
             closed: a.closed,
+            ...(a.securedBy ? { securedBy: a.securedBy } : {}),
             balance: (() => {
               const bal = latestBalances(b.ix.ledger.balances).get(a.name)
               return bal ? { amount: usd(bal.amount), asOf: bal.date } : null
@@ -502,7 +504,7 @@ export function budgyTools(
       name: 'get_net_worth',
       title: 'Net worth',
       description:
-        'What the Household has and owes: every open account’s latest balance by kind and owner (cards and loans count against), net worth now, and net worth at each month’s end. Balances are recorded by hand or by an Agent, so check each one’s asOf date.',
+        'What the Household has and owes: every open account’s latest balance by kind and owner (cards and loans count against; a home counts at its estimated value), home equity (value minus the loans against it), net worth now, and net worth at each month’s end. Balances are recorded by hand or by an Agent, so check each one’s asOf date.',
       input: z.object({
         months: z.number().int().min(1).max(120).default(12),
       }),
@@ -530,6 +532,13 @@ export function budgyTools(
                 asOf: bal?.date ?? null,
               }
             }),
+          homeEquity: equity(l).map((e) => ({
+            property: e.property,
+            estimatedValue: usd(e.value),
+            owed: usd(e.owed),
+            loans: e.loans,
+            equity: usd(e.equity),
+          })),
           byMonth: netWorthByMonth(l, monthRange(thisMonth, months)).map(
             (m) => ({
               month: m.month,

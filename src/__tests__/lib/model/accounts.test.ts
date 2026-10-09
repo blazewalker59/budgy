@@ -5,6 +5,7 @@ import {
   accountInput,
   activity,
   balanceByMonth,
+  equity,
   latestBalances,
   netWorth,
   netWorthByMonth,
@@ -23,6 +24,7 @@ const acct = (
   kind,
   institution: null,
   closed: false,
+  securedBy: null,
   ...over,
 })
 
@@ -153,6 +155,7 @@ describe('accountInput and ownerNames', () => {
       kind: 'education',
       institution: null,
       closed: false,
+      securedBy: null,
     })
     expect(() =>
       accountInput.parse({
@@ -171,5 +174,40 @@ describe('accountInput and ownerNames', () => {
       'Blaze',
       'Kid',
     ])
+  })
+})
+
+describe('equity', () => {
+  it('takes the loans against a home from its estimated value', () => {
+    const l = ledger({
+      accounts: [
+        acct('Home', 'property'),
+        acct('Mortgage', 'loan', { securedBy: 'Home' }),
+        acct('HELOC', 'loan', { securedBy: 'Home' }),
+        acct('Car loan', 'loan'),
+      ],
+      balances: [
+        { account: 'Home', date: '2026-01-01', amount: 45_000_000 },
+        { account: 'Home', date: '2026-09-01', amount: 48_000_000 },
+        { account: 'Mortgage', date: '2026-09-30', amount: 30_000_000 },
+        { account: 'HELOC', date: '2026-09-30', amount: 1_000_000 },
+        { account: 'Car loan', date: '2026-09-30', amount: 2_000_000 },
+      ],
+    })
+    expect(equity(l)).toEqual([
+      {
+        property: 'Home',
+        value: 48_000_000,
+        owed: 31_000_000,
+        equity: 17_000_000,
+        loans: ['Mortgage', 'HELOC'],
+      },
+    ])
+    // Net worth counts the home as held and every loan as owed.
+    expect(netWorth(l)).toEqual({
+      assets: 48_000_000,
+      debts: 33_000_000,
+      net: 15_000_000,
+    })
   })
 })

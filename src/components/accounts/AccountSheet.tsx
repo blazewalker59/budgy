@@ -17,7 +17,7 @@ import {
   useRecordBalances,
   useSaveAccount,
 } from '@/lib/ledger/useLedger'
-import { activity, balanceByMonth, isDebt } from '@/lib/model/accounts'
+import { activity, balanceByMonth, equity, isDebt } from '@/lib/model/accounts'
 import {
   guessDirection,
   parseBalanceHistory,
@@ -71,6 +71,7 @@ export function AccountSheet({
               }
         }
       />
+      {account.kind === 'property' && <EquityLine name={name} />}
       <UpdateBalance account={account} today={book.today} />
       {points.length > 1 && (
         <WorthChart
@@ -112,8 +113,12 @@ function Details({
   onDelete?: () => void
 }) {
   const { today } = useBook()
+  const { ix } = useBook()
   const saveAccount = useSaveAccount()
   const recordBalances = useRecordBalances()
+  const properties = ix.ledger.accounts.filter(
+    (a) => a.kind === 'property' && !a.closed,
+  )
   const [owner, setOwner] = useState(account.owner)
   const [institution, setInstitution] = useState(account.institution ?? '')
   const save = (patch: Partial<Account>) => {
@@ -156,6 +161,24 @@ function Details({
         aria-label="Institution"
         className="field min-w-24 flex-1"
       />
+      {account.kind === 'loan' && properties.length > 0 && (
+        <label className="flex items-center gap-1 text-muted">
+          Against
+          <select
+            value={account.securedBy ?? ''}
+            onChange={(e) => save({ securedBy: e.target.value || null })}
+            aria-label="The property this loan is against"
+            className="field text-foreground"
+          >
+            <option value="">Nothing</option>
+            {properties.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <label className="flex items-center gap-1 text-muted">
         <input
           type="checkbox"
@@ -183,6 +206,33 @@ function Details({
   )
 }
 
+function balanceLabel(account: Account): string {
+  if (account.kind === 'property') return 'Estimated value'
+  return isDebt(account) ? 'Balance owed' : 'Balance'
+}
+
+/** A property's value, the loans against it, and the equity left. */
+function EquityLine({ name }: { name: string }) {
+  const { ix } = useBook()
+  const e = equity(ix.ledger).find((x) => x.property === name)
+  if (!e) return null
+  return (
+    <p className="px-1 text-xs text-muted">
+      {e.loans.length ? (
+        <>
+          Value {dollars(e.value)} − owed {dollars(e.owed)} (
+          {e.loans.join(', ')}) ={' '}
+          <strong className="text-foreground">
+            equity {dollars(e.equity)}
+          </strong>
+        </>
+      ) : (
+        'Add the loan against it as a Loan account, then pick this property as what it’s against.'
+      )}
+    </p>
+  )
+}
+
 function UpdateBalance({
   account,
   today,
@@ -206,9 +256,7 @@ function UpdateBalance({
         setAmount('')
       }}
     >
-      <span className="font-semibold">
-        {isDebt(account) ? 'Balance owed' : 'Balance'}
-      </span>
+      <span className="font-semibold">{balanceLabel(account)}</span>
       <input
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
@@ -360,9 +408,7 @@ function ImportHistory({
             the rest are worked back from it.
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-semibold">
-              {debt ? 'Balance owed' : 'Balance'}
-            </span>
+            <span className="font-semibold">{balanceLabel(account)}</span>
             <input
               value={known}
               onChange={(e) => setKnown(e.target.value)}

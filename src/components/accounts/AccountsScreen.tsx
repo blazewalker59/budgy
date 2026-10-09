@@ -10,10 +10,12 @@ import { Link } from '@tanstack/react-router'
 import { ChevronRight, Plus, Upload } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import type { Account, AccountKind } from '@/lib/model/types'
+import type { Equity } from '@/lib/model/accounts'
 import { useBook } from '@/lib/ledger/book'
 import { useSaveAccount } from '@/lib/ledger/useLedger'
 import {
   activity,
+  equity,
   isDebt,
   latestBalances,
   netWorth,
@@ -34,6 +36,7 @@ const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
   { title: 'Investments', kinds: ['brokerage'] },
   { title: 'Retirement', kinds: ['retirement'] },
   { title: 'Education', kinds: ['education'] },
+  { title: 'Home & property', kinds: ['property'] },
   { title: 'Loans', kinds: ['loan'] },
   { title: 'Other', kinds: ['other'] },
 ]
@@ -52,6 +55,10 @@ export function AccountsScreen() {
   )
   const reach = useMemo(() => activity(ledger), [ledger])
   const worth = useMemo(() => netWorth(ledger), [ledger])
+  const equities = useMemo(
+    () => new Map(equity(ledger).map((e) => [e.property, e])),
+    [ledger],
+  )
   const history = useMemo(() => {
     const first = ledger.balances[0]?.date.slice(0, 7)
     if (!first) return []
@@ -71,6 +78,7 @@ export function AccountsScreen() {
       account={a}
       balance={latest.get(a.name)}
       lastPurchase={reach.get(a.name)?.last}
+      equity={equities.get(a.name)}
       today={book.today}
       onOpen={() => setSheet(a.name)}
     />
@@ -114,8 +122,9 @@ export function AccountsScreen() {
             <div className="flex items-baseline justify-between border-b border-border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
               <span>{g.title}</span>
               <span className="tabular-nums">
-                {isDebt(list[0]) ? 'owed ' : ''}
-                {dollars(total)}
+                {g.kinds.includes('property')
+                  ? `equity ${dollars(list.reduce((n, a) => n + (equities.get(a.name)?.equity ?? 0), 0))}`
+                  : `${isDebt(list[0]) ? 'owed ' : ''}${dollars(total)}`}
               </span>
             </div>
             <ul className="divide-y divide-border">{list.map(row)}</ul>
@@ -150,12 +159,14 @@ function AccountRow({
   account: a,
   balance,
   lastPurchase,
+  equity: e,
   today,
   onOpen,
 }: {
   account: Account
   balance?: { date: string; amount: number }
   lastPurchase?: string
+  equity?: Equity
   today: string
   onOpen: () => void
 }) {
@@ -180,8 +191,11 @@ function AccountRow({
         </span>
         <span className="truncate text-[11px] text-muted">
           {[
-            a.owner,
+            e && e.loans.length
+              ? `owe ${dollars(e.owed)} · equity ${dollars(e.equity)}`
+              : a.owner,
             a.institution,
+            a.securedBy && `against ${a.securedBy}`,
             lastPurchase && `last purchase ${dayLabel(lastPurchase)}`,
           ]
             .filter(Boolean)
@@ -227,6 +241,7 @@ function AddAccount({ onAdded }: { onAdded: (name: string) => void }) {
           owner: owner.trim() || 'Joint',
           institution: institution.trim() || null,
           closed: false,
+          securedBy: null,
           isNew: true,
         })
         setName('')

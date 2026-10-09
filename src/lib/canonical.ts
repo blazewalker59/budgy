@@ -1,5 +1,5 @@
 /**
- * Production has one address (CANONICAL_HOST, e.g. sportsline.dev): a
+ * Production has one address (CANONICAL_HOST, budgy.bid): a
  * request on any other host (www, workers.dev) gets a permanent redirect to
  * the same path there, so there is one sign-in and one cache. Unset in
  * local development, where nothing redirects.

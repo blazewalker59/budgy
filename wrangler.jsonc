@@ -32,7 +32,24 @@
   "env": {
     "production": {
       "name": "budgy",
+      // Production is budgy.bid (a Custom Domain, declared here so every
+      // deploy keeps it, as sportsline does). www and workers.dev stay on but
+      // redirect to it (src/server.ts, CANONICAL_HOST).
       "workers_dev": true,
+      "routes": [
+        {
+          "pattern": "budgy.bid",
+          "custom_domain": true,
+        },
+        {
+          "pattern": "www.budgy.bid",
+          "custom_domain": true,
+        },
+      ],
+      // Requests on any other host (www, workers.dev) redirect here.
+      "vars": {
+        "CANONICAL_HOST": "budgy.bid",
+      },
       "observability": {
         "logs": {
           "enabled": true,

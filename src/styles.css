@@ -138,6 +138,26 @@ body {
   }
 }
 
+/*
+ * iOS zooms into any field set under 16px when it's focused, which throws
+ * the layout off. On touch screens every text field is 16px. Unlayered, so
+ * it wins over size utilities (text-xs) on any one field; desktop keeps its
+ * compact fields.
+ */
+@media (pointer: coarse) {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color']
+  ),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
 /* TanStack Charts: tooltips (portaled anywhere) follow the app's theme. */
 :root {
   --ts-chart-tooltip-background: var(--surface);

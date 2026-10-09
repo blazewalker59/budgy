@@ -14,8 +14,16 @@ import type {
   Txn,
 } from './types'
 
+/**
+ * A Store Rule for this `sourceCategory` covers the Store whatever Category
+ * its purchases came in with: the rule a Member makes from a Move, so
+ * purchases uploaded later are filed the same way.
+ */
+export const ANY_SOURCE = '*'
+
+/** Store names match in any case ("KROGER" is "Kroger"). */
 export function ruleKey(sourceCategory: string, store: string): string {
-  return `${sourceCategory}\u0000${store}`
+  return `${sourceCategory}\u0000${store.toLowerCase()}`
 }
 
 export interface LedgerIndex {
@@ -47,8 +55,15 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   }
 }
 
-function ruleFor(ix: LedgerIndex, t: Txn): StoreRule | undefined {
-  return ix.rules.get(ruleKey(t.sourceCategory, t.store))
+/** The Store Rule for a purchase: one for its own import Category first. */
+export function ruleFor(
+  ix: LedgerIndex,
+  t: Pick<Txn, 'sourceCategory' | 'store'>,
+): StoreRule | undefined {
+  return (
+    ix.rules.get(ruleKey(t.sourceCategory, t.store)) ??
+    ix.rules.get(ruleKey(ANY_SOURCE, t.store))
+  )
 }
 
 /** Where the Store's Transactions go: the Store Rule, else the import's. */

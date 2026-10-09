@@ -26,6 +26,7 @@ import {
   FilterX,
   Folder,
   LayoutList,
+  ListChecks,
   Loader2,
   PieChart,
   Receipt,
@@ -302,6 +303,13 @@ function Palette({
         '/accounts',
         <Wallet size={I} />,
         'net worth balances equity home loans upload export csv import',
+      ),
+      go(
+        'rules',
+        'Filing rules',
+        '/rules',
+        <ListChecks size={I} />,
+        'store rules categorize recategorize always file move categories',
       ),
       go('agents', 'Agents', '/agents', <Bot size={I} />, 'mcp api token'),
       {

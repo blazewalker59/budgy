@@ -13,6 +13,11 @@ export interface OverviewSearch extends Lens {
   month?: string
 }
 
+export interface AccountsSearch extends Lens {
+  /** The Rules tab, instead of the Accounts. */
+  tab?: 'rules'
+}
+
 export interface SpendingSearch extends Lens {
   period?: Period
   month?: string
@@ -37,6 +42,14 @@ export function validateOverviewSearch(
 ): OverviewSearch {
   const out: OverviewSearch = validateLensSearch(s)
   if (typeof s.month === 'string' && MONTH.test(s.month)) out.month = s.month
+  return out
+}
+
+export function validateAccountsSearch(
+  s: Record<string, unknown>,
+): AccountsSearch {
+  const out: AccountsSearch = validateLensSearch(s)
+  if (s.tab === 'rules') out.tab = 'rules'
   return out
 }
 

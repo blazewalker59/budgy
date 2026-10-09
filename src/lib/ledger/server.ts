@@ -5,7 +5,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   ensureCategory,
@@ -34,6 +34,7 @@ import type {
 import type { SessionState } from '@/lib/auth/session'
 import type { ImportRules } from '@/lib/import/rules'
 import { savedLensInput } from '@/lib/model/lens'
+import { ANY_SOURCE } from '@/lib/model/ledger'
 import { accountInput, balanceInput } from '@/lib/model/accounts'
 import { sessionState, withMember } from '@/lib/auth/session'
 import {
@@ -44,6 +45,7 @@ import {
   savedLenses,
   settings,
   storeRules,
+  transactions,
 } from '@/lib/db/schema'
 import { CADENCES, TAGS } from '@/lib/model/types'
 import { payInput } from '@/lib/model/pay'
@@ -92,7 +94,10 @@ export const noteTxn = createServerFn({ method: 'POST' })
     withMember(({ db }) => noteTransaction(db, data.id, data.note)),
   )
 
-/** Change a Store Rule; a field left out keeps its value, null clears it. */
+/**
+ * Change a Store Rule; a field left out keeps its value, null clears it.
+ * `sourceCategory` ANY_SOURCE makes it store-wide.
+ */
 export const setStoreRule = createServerFn({ method: 'POST' })
   .validator(
     (data: {
@@ -139,6 +144,18 @@ export const setStoreRule = createServerFn({ method: 'POST' })
           target: [storeRules.sourceCategory, storeRules.store],
           set: { category: next.category, tag: next.tag },
         })
+      // A store-wide rule makes Moves of that Store to the same place
+      // redundant; Moves elsewhere stay as the exceptions they are.
+      if (data.sourceCategory === ANY_SOURCE && next.category)
+        await db
+          .update(transactions)
+          .set({ category: null })
+          .where(
+            and(
+              sql`lower(${transactions.store}) = lower(${data.store})`,
+              eq(transactions.category, next.category),
+            ),
+          )
     }),
   )
 

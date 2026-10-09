@@ -11,6 +11,7 @@ import type { TrendMonth } from '@/components/charts/CategoryTrend'
 import { useBook } from '@/lib/ledger/book'
 import {
   categoryTag,
+  ruleFor,
   ruleKey,
   storeCategory,
   targetFor,
@@ -212,7 +213,7 @@ function Stores({ name, months }: { name: string; months: Array<string> }) {
       </h3>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface text-[13px]">
         {shown.map((s) => {
-          const rule = ix.rules.get(s.key)
+          const rule = ruleFor(ix, s)
           const open = editing === s.key
           return (
             <li key={s.key}>

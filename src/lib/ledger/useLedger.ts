@@ -38,6 +38,7 @@ import type {
   Tag,
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
+import { ANY_SOURCE } from '@/lib/model/ledger'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -139,10 +140,19 @@ export function useSetStoreRule() {
       }
       if (next.category === v.sourceCategory) next.category = null
       const rest = l.rules.filter((r) => !same(r))
+      // A store-wide rule clears Moves of the Store to the same place.
+      const redundant = (t: Ledger['txns'][number]) =>
+        v.sourceCategory === ANY_SOURCE &&
+        next.category !== null &&
+        t.category === next.category &&
+        t.store.toLowerCase() === v.store.toLowerCase()
       return withCategory(
         {
           ...l,
           rules: next.category || next.tag ? [...rest, next] : rest,
+          txns: l.txns.some(redundant)
+            ? l.txns.map((t) => (redundant(t) ? { ...t, category: null } : t))
+            : l.txns,
         },
         next.category,
       )

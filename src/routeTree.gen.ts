@@ -15,6 +15,7 @@ import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as BudgetRouteImport } from './routes/budget'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as PlanRouteImport } from './routes/plan'
+import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SpendingRouteImport } from './routes/spending'
 import { Route as UpcomingRouteImport } from './routes/upcoming'
 
@@ -48,6 +49,11 @@ const PlanRoute = PlanRouteImport.update({
   path: '/plan',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RulesRoute = RulesRouteImport.update({
+  id: '/rules',
+  path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SpendingRoute = SpendingRouteImport.update({
   id: '/spending',
   path: '/spending',
@@ -66,6 +72,7 @@ export interface FileRoutesByFullPath {
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
+  '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
 }
@@ -76,6 +83,7 @@ export interface FileRoutesByTo {
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
+  '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
 }
@@ -87,6 +95,7 @@ export interface FileRoutesById {
   '/budget': typeof BudgetRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
+  '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
 }
@@ -99,6 +108,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/import'
     | '/plan'
+    | '/rules'
     | '/spending'
     | '/upcoming'
   fileRoutesByTo: FileRoutesByTo
@@ -109,6 +119,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/import'
     | '/plan'
+    | '/rules'
     | '/spending'
     | '/upcoming'
   id:
@@ -119,6 +130,7 @@ export interface FileRouteTypes {
     | '/budget'
     | '/import'
     | '/plan'
+    | '/rules'
     | '/spending'
     | '/upcoming'
   fileRoutesById: FileRoutesById
@@ -130,6 +142,7 @@ export interface RootRouteChildren {
   BudgetRoute: typeof BudgetRoute
   ImportRoute: typeof ImportRoute
   PlanRoute: typeof PlanRoute
+  RulesRoute: typeof RulesRoute
   SpendingRoute: typeof SpendingRoute
   UpcomingRoute: typeof UpcomingRoute
 }
@@ -178,6 +191,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/rules': {
+      id: '/rules'
+      path: '/rules'
+      fullPath: '/rules'
+      preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/spending': {
       id: '/spending'
       path: '/spending'
@@ -202,6 +222,7 @@ const rootRouteChildren: RootRouteChildren = {
   BudgetRoute: BudgetRoute,
   ImportRoute: ImportRoute,
   PlanRoute: PlanRoute,
+  RulesRoute: RulesRoute,
   SpendingRoute: SpendingRoute,
   UpcomingRoute: UpcomingRoute,
 }

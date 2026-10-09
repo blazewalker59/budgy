@@ -1,7 +1,8 @@
 /**
- * Transactions you can act on: Move one to another Category, or note why.
- * Laid out as rows that stack on a phone. With `onPick`, a purchase's Store
- * and Account are filters to tap.
+ * Transactions you can act on: Move one to another Category (then, if it
+ * should always go there, make that the Store's rule), or note why. Laid
+ * out as rows that stack on a phone. With `onPick`, a purchase's Store and
+ * Account are filters to tap.
  */
 
 import { useState } from 'react'
@@ -9,8 +10,14 @@ import { CategorySelect } from './CategorySelect'
 import type { Txn } from '@/lib/model/types'
 import type { LensFilter } from '@/lib/model/lens'
 import { useBook } from '@/lib/ledger/book'
-import { useMoveTxn, useNoteTxn } from '@/lib/ledger/useLedger'
-import { categoryOf, ownerOf, storeCategory } from '@/lib/model/ledger'
+import { useMoveTxn, useNoteTxn, useSetStoreRule } from '@/lib/ledger/useLedger'
+import {
+  ANY_SOURCE,
+  categoryOf,
+  ownerOf,
+  ruleKey,
+  storeCategory,
+} from '@/lib/model/ledger'
 import { dayLabel } from '@/lib/model/dates'
 import { money } from '@/lib/model/money'
 import { ownerColor } from '@/lib/format'
@@ -57,6 +64,9 @@ function TxnRow({
   const { ix, plannedIds } = useBook()
   const move = useMoveTxn()
   const note = useNoteTxn()
+  const setRule = useSetStoreRule()
+  // After a Move: offer to file the Store there every time.
+  const [offer, setOffer] = useState<string | null>(null)
   const usual = storeCategory(ix, txn)
   const category = categoryOf(ix, txn)
   const owner = ownerOf(ix, txn)
@@ -121,9 +131,11 @@ function TxnRow({
         label={`Category for ${txn.store} on ${dayLabel(txn.date)}`}
         value={category}
         defaultValue={usual}
-        onChange={(c) =>
+        onChange={(c) => {
           move.mutate({ id: txn.id, category: c === usual ? null : c })
-        }
+          const always = ix.rules.get(ruleKey(ANY_SOURCE, txn.store))?.category
+          setOffer(c !== usual && c !== always ? c : null)
+        }}
         className="w-full min-w-0"
       />
       <input
@@ -143,6 +155,71 @@ function TxnRow({
           if (e.key === 'Enter') e.currentTarget.blur()
         }}
       />
+      {offer && (
+        <AlwaysFile
+          store={txn.store}
+          category={offer}
+          onAlways={() => {
+            setRule.mutate({
+              sourceCategory: ANY_SOURCE,
+              store: txn.store,
+              category: offer,
+            })
+            setOffer(null)
+          }}
+          onDismiss={() => setOffer(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+/** "Always file this Store here?", under a purchase just Moved. */
+function AlwaysFile({
+  store,
+  category,
+  onAlways,
+  onDismiss,
+}: {
+  store: string
+  category: string
+  onAlways: () => void
+  onDismiss: () => void
+}) {
+  const { ix } = useBook()
+  const others = ix.ledger.txns.filter(
+    (t) =>
+      t.store.toLowerCase() === store.toLowerCase() &&
+      !t.category &&
+      categoryOf(ix, t) !== category,
+  ).length
+  return (
+    <div className="col-span-full flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-accent-soft px-2 py-1 text-xs">
+      <span>
+        Always file <strong>{store}</strong> under <strong>{category}</strong>?
+        <span className="text-muted">
+          {' '}
+          {others
+            ? `Moves ${others} more ${others === 1 ? 'purchase' : 'purchases'} there, and future uploads.`
+            : 'Future uploads too.'}
+        </span>
+      </span>
+      <span className="ml-auto flex gap-1">
+        <button
+          type="button"
+          onClick={onAlways}
+          className="rounded-full bg-foreground px-2 py-0.5 font-semibold text-background"
+        >
+          Always
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="rounded-full px-2 py-0.5 font-semibold text-muted hover:text-foreground"
+        >
+          Just this one
+        </button>
+      </span>
     </div>
   )
 }

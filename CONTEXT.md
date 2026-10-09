@@ -82,8 +82,12 @@ Putting one Transaction in a different Category than its Store's (the Best
 Buy thermostat goes to Household). A Move wins over a Store Rule.
 
 **Store Rule**:
-Filing every Transaction from a Store (that the import put in a given
-Category) somewhere else, past and future; it can also re-Tag that Store.
+Filing every Transaction from a Store somewhere else, past and future
+(every upload too); it can also re-Tag that Store. A store-wide rule covers
+the Store whatever Category its purchases came in with, and is what Moving a
+purchase and choosing "Always" makes; a rule for one import Category wins
+over it. Store names match in any case. Members manage them on Filing rules,
+where Stores Moved to one Category again and again are suggested as rules.
 
 **Note**:
 A Member's few words on a Transaction, usually why it was Moved.

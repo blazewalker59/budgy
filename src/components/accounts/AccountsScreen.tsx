@@ -2,13 +2,15 @@
  * Accounts: every card, bank, investment, retirement and 529 account the
  * Household has, each with its latest Balance, grouped by kind, and net
  * worth over time. Tapping one opens its sheet: details, today's balance,
- * its history and purchases (uploaded from its export) and its purchases.
+ * its history and purchases (uploaded from its export). The Rules tab
+ * says where each Store's purchases are filed.
  */
 
 import { useMemo, useState } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import { ChevronRight, Plus } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
-import { ImportRules } from './ImportRules'
+import { RulesTab } from './RulesTab'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
@@ -30,7 +32,7 @@ import { dayLabel, daysBetween, monthRange } from '@/lib/model/dates'
 import { dollars } from '@/lib/model/money'
 import { ownerColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { Stat } from '@/components/shared/Layout'
+import { Segmented, Stat } from '@/components/shared/Layout'
 import { WorthChart } from '@/components/charts/lazy'
 
 const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
@@ -47,7 +49,41 @@ const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
 /** A Balance older than this is worth updating. */
 const STALE_DAYS = 35
 
-export function AccountsScreen({ lens }: { lens: Lens }) {
+type Tab = 'accounts' | 'rules'
+
+const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
+  { value: 'accounts', label: 'Accounts' },
+  { value: 'rules', label: 'Rules' },
+]
+
+export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
+  const navigate = useNavigate({ from: '/accounts' })
+  return (
+    <div className="mx-auto max-w-3xl space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-lg font-extrabold tracking-tight">
+          {tab === 'rules' ? 'Filing rules' : 'Accounts'}
+        </h1>
+        <Segmented
+          label="Accounts or rules"
+          value={tab}
+          options={TABS}
+          onChange={(t) =>
+            void navigate({
+              search: (s) => ({
+                ...s,
+                tab: t === 'rules' ? 'rules' : undefined,
+              }),
+            })
+          }
+        />
+      </div>
+      {tab === 'rules' ? <RulesTab /> : <AccountsList lens={lens} />}
+    </div>
+  )
+}
+
+function AccountsList({ lens }: { lens: Lens }) {
   const book = useBook()
   // Of the Lens, Accounts uses the people and the account types.
   const ledger = useMemo(() => {
@@ -103,8 +139,7 @@ export function AccountsScreen({ lens }: { lens: Lens }) {
   )
 
   return (
-    <div className="mx-auto max-w-3xl space-y-3">
-      <h1 className="text-lg font-extrabold tracking-tight">Accounts</h1>
+    <>
       <LensBar
         page="/accounts"
         note={
@@ -167,9 +202,8 @@ export function AccountsScreen({ lens }: { lens: Lens }) {
 
       <AddAccount onAdded={setSheet} />
       <StartingPurchases onOpen={setSheet} />
-      <ImportRules />
       {sheet && <AccountSheet name={sheet} onClose={() => setSheet(null)} />}
-    </div>
+    </>
   )
 }
 

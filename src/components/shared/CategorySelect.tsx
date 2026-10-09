@@ -55,6 +55,11 @@ export function CategorySelect({
         e.target.value === NEW ? setAdding(true) : onChange(e.target.value)
       }
     >
+      {!value && (
+        <option value="" disabled>
+          Choose a category
+        </option>
+      )}
       {names.map((n) => (
         <option key={n} value={n}>
           {n}

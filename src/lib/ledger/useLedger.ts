@@ -207,17 +207,23 @@ export function useDeleteAccount() {
   )
 }
 
-/** Record Balances (one, or a whole history); same day replaces. */
+/**
+ * Record Balances (one, or a whole history); same day replaces. With
+ * `replace` (an Account), its earlier Balances go first.
+ */
 export function useRecordBalances() {
   return useEdit(
-    (v: { balances: Array<Balance> }) => recordBalances({ data: v }),
+    (v: { balances: Array<Balance>; replace?: string }) =>
+      recordBalances({ data: v }),
     (l, v) => {
       const key = (b: Balance) => `${b.account}|${b.date}`
       const fresh = new Set(v.balances.map(key))
       return {
         ...l,
         balances: [
-          ...l.balances.filter((b) => !fresh.has(key(b))),
+          ...l.balances.filter(
+            (b) => b.account !== v.replace && !fresh.has(key(b)),
+          ),
           ...v.balances,
         ].sort((a, b) => (a.date < b.date ? -1 : 1)),
       }

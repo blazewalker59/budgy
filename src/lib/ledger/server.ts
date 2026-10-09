@@ -15,6 +15,7 @@ import {
 } from './queries'
 import { RULES_KEY, loadImportRules, runImport } from './importer'
 import {
+  clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
   deleteBalance as deleteBalanceRow,
   recordBalances as recordBalanceRows,
@@ -212,15 +213,24 @@ export const deleteAccount = createServerFn({ method: 'POST' })
     withMember(({ db }) => deleteAccountRow(db, data.name)),
   )
 
-/** Record Balances for one Account: today's, or a whole imported history. */
+/**
+ * Record Balances for one Account: today's, or a whole imported history,
+ * which with `replace` takes the place of the Account's earlier ones.
+ */
 export const recordBalances = createServerFn({ method: 'POST' })
-  .validator((data: { balances: Array<Balance> }) =>
-    z.object({ balances: z.array(balanceInput).max(5000) }).parse(data),
+  .validator((data: { balances: Array<Balance>; replace?: string }) =>
+    z
+      .object({
+        balances: z.array(balanceInput).max(5000),
+        replace: z.string().trim().min(1).max(60).optional(),
+      })
+      .parse(data),
   )
   .handler(({ data }) =>
-    withMember(({ db, member }) =>
-      recordBalanceRows(db, data.balances, member.email),
-    ),
+    withMember(async ({ db, member }) => {
+      if (data.replace) await clearBalanceRows(db, data.replace)
+      await recordBalanceRows(db, data.balances, member.email)
+    }),
   )
 
 export const deleteBalance = createServerFn({ method: 'POST' })

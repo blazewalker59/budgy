@@ -18,7 +18,11 @@ import {
   useSaveAccount,
 } from '@/lib/ledger/useLedger'
 import { activity, balanceByMonth, isDebt } from '@/lib/model/accounts'
-import { parseBalanceHistory } from '@/lib/import/history'
+import {
+  guessDirection,
+  parseBalanceHistory,
+  rebuildBalances,
+} from '@/lib/import/history'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
 import { dayLabel, monthLabel, monthRange } from '@/lib/model/dates'
 import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
@@ -75,7 +79,11 @@ export function AccountSheet({
           color={debt ? 'var(--color-over)' : undefined}
         />
       )}
-      <ImportHistory account={account} hasHistory={own.length > 0} />
+      <ImportHistory
+        account={account}
+        hasHistory={own.length > 0}
+        today={book.today}
+      />
       {own.length > 0 && <BalanceList account={account} rows={own} />}
       {reach && (
         <p className="px-1 text-xs text-muted">
@@ -232,25 +240,48 @@ function UpdateBalance({
 }
 
 /**
- * A history to start from: a CSV from the institution, or two columns
- * (date, balance) pasted from a spreadsheet. Shown before it's saved;
- * a day already recorded is replaced.
+ * A history to start from: the institution's balance history (a CSV, or
+ * two columns pasted from a spreadsheet), or its transactions export, whose
+ * balances are worked back from one balance the Member knows. Shown before
+ * it's saved; it can replace the Account's earlier balances.
  */
 function ImportHistory({
   account,
   hasHistory,
+  today,
 }: {
   account: Account
   hasHistory: boolean
+  today: string
 }) {
   const recordBalances = useRecordBalances()
   const [open, setOpen] = useState(!hasHistory)
   const [text, setText] = useState('')
   const [done, setDone] = useState<number | null>(null)
+  const [replace, setReplace] = useState(true)
+  const [knownDate, setKnownDate] = useState(today)
+  const [known, setKnown] = useState('')
+  const [flip, setFlip] = useState(false)
   const parsed: ParsedHistory | null = useMemo(
     () => (text.trim() ? parseBalanceHistory(text) : null),
     [text],
   )
+  const debt = isDebt(account)
+  const knownCents = parseDollars(known)
+  const direction =
+    parsed?.kind === 'transactions'
+      ? ((guessDirection(parsed, debt) * (flip ? -1 : 1)) as 1 | -1)
+      : 1
+  const rows = useMemo(() => {
+    if (!parsed) return []
+    if (parsed.kind === 'balances') return parsed.rows
+    if (knownCents === null) return []
+    return rebuildBalances(parsed.changes, direction, {
+      date: knownDate,
+      amount: knownCents,
+    })
+  }, [parsed, knownCents, knownDate, direction])
+
   if (!open)
     return (
       <button
@@ -261,7 +292,8 @@ function ImportHistory({
         <FileUp size={13} aria-hidden /> Import balance history
       </button>
     )
-  const rows = parsed?.rows ?? []
+  const span = (r: Array<{ date: string }>) =>
+    `${monthLabel(r[0].date.slice(0, 7))} to ${monthLabel(r[r.length - 1].date.slice(0, 7))}`
   return (
     <section className="space-y-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
@@ -274,15 +306,19 @@ function ImportHistory({
             className="sr-only"
             onChange={async (e) => {
               const f = e.target.files?.[0]
-              if (f) setText(await f.text())
+              if (f) {
+                setText(await f.text())
+                setDone(null)
+              }
               e.target.value = ''
             }}
           />
         </label>
       </div>
       <p className="text-muted">
-        A date and a balance on each line: the institution’s CSV, or two columns
-        pasted from a spreadsheet. Monthly is plenty.
+        A balance history (a date and a balance on each line), or the
+        institution’s transactions export: Budgy works the balances out from one
+        you know.
       </p>
       <textarea
         value={text}
@@ -290,15 +326,16 @@ function ImportHistory({
           setText(e.target.value)
           setDone(null)
         }}
-        rows={4}
+        rows={3}
         placeholder={'2024-01-31, 41,250.00\n2024-02-29, 42,010.55\n…'}
         aria-label="Balance history"
         className="field w-full font-mono text-[11px]"
       />
-      {parsed && (
+
+      {parsed?.kind === 'balances' && (
         <p className={cn(rows.length ? 'text-foreground' : 'text-over')}>
           {rows.length
-            ? `${rows.length} balances, ${monthLabel(rows[0].date.slice(0, 7))} to ${monthLabel(rows[rows.length - 1].date.slice(0, 7))}: ${dollars(rows[0].amount)} → ${dollars(rows[rows.length - 1].amount)}`
+            ? `${rows.length} balances, ${span(rows)}: ${dollars(rows[0].amount)} → ${dollars(rows[rows.length - 1].amount)}`
             : 'No dates and balances found.'}
           {parsed.column && (
             <span className="text-muted"> (from “{parsed.column}”)</span>
@@ -311,7 +348,92 @@ function ImportHistory({
           )}
         </p>
       )}
-      <div className="flex items-center justify-end gap-2">
+
+      {parsed?.kind === 'transactions' && (
+        <div className="space-y-1.5 rounded-lg bg-sunken px-2 py-1.5">
+          <p>
+            <strong>
+              {parsed.changes.length} transactions, {span(parsed.changes)}
+            </strong>{' '}
+            <span className="text-muted">(from “{parsed.column}”)</span>. A
+            transactions export, not balances: enter one balance you know and
+            the rest are worked back from it.
+          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="font-semibold">
+              {debt ? 'Balance owed' : 'Balance'}
+            </span>
+            <input
+              value={known}
+              onChange={(e) => setKnown(e.target.value)}
+              inputMode="decimal"
+              placeholder="$0.00"
+              aria-label="A balance you know"
+              className="field w-28 text-right tabular-nums"
+            />
+            <label className="flex items-center gap-1 text-muted">
+              on
+              <input
+                type="date"
+                value={knownDate}
+                max={today}
+                onChange={(e) => e.target.value && setKnownDate(e.target.value)}
+                aria-label="Known balance date"
+                className="field text-foreground"
+              />
+            </label>
+          </div>
+          <p className="text-muted">
+            Reading{' '}
+            {parsed.split
+              ? 'credits as money in'
+              : `${direction === 1 ? 'positive' : 'negative'} amounts as ${debt ? 'adding to what’s owed' : 'money in'}`}
+            .{' '}
+            {!parsed.split && (
+              <button
+                type="button"
+                onClick={() => setFlip(!flip)}
+                className="font-semibold text-accent"
+              >
+                Backwards? Flip it
+              </button>
+            )}
+          </p>
+          {rows.length > 1 && (
+            <ul className="grid grid-cols-2 gap-x-3 tabular-nums sm:grid-cols-3">
+              {rows
+                .slice(-6)
+                .reverse()
+                .map((r) => (
+                  <li key={r.date} className="flex justify-between gap-2">
+                    <span className="text-muted">
+                      {dayLabel(r.date)} ’{r.date.slice(2, 4)}
+                    </span>
+                    <span>{dollars(r.amount)}</span>
+                  </li>
+                ))}
+            </ul>
+          )}
+          {rows.length > 1 && (
+            <p className="text-muted">
+              Check one against a statement: if it’s off, the export may be
+              missing transactions or the direction is backwards.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {hasHistory && rows.length > 0 && (
+          <label className="mr-auto flex items-center gap-1 text-muted">
+            <input
+              type="checkbox"
+              checked={replace}
+              onChange={(e) => setReplace(e.target.checked)}
+            />
+            Replace the balances already here
+          </label>
+        )}
         {done !== null && (
           <span className="font-semibold text-accent">Saved {done}.</span>
         )}
@@ -321,9 +443,11 @@ function ImportHistory({
           onClick={() => {
             recordBalances.mutate({
               balances: rows.map((r) => ({ account: account.name, ...r })),
+              replace: hasHistory && replace ? account.name : undefined,
             })
             setDone(rows.length)
             setText('')
+            setKnown('')
           }}
           className="rounded-full bg-foreground px-3 py-1 font-semibold text-background disabled:opacity-40"
         >
@@ -342,7 +466,9 @@ function BalanceList({
   rows: Array<{ date: string; amount: number }>
 }) {
   const deleteBalance = useDeleteBalance()
+  const recordBalances = useRecordBalances()
   const [all, setAll] = useState(false)
+  const [confirm, setConfirm] = useState(false)
   const newest = [...rows].reverse()
   const shown = all ? newest : newest.slice(0, 6)
   return (
@@ -381,15 +507,34 @@ function BalanceList({
           )
         })}
       </ul>
-      {newest.length > 6 && (
+      <div className="flex border-t border-border text-xs font-semibold">
+        {newest.length > 6 && (
+          <button
+            type="button"
+            onClick={() => setAll(!all)}
+            className="flex-1 py-1.5 text-accent"
+          >
+            {all ? 'Show fewer' : `Show all ${newest.length}`}
+          </button>
+        )}
         <button
           type="button"
-          onClick={() => setAll(!all)}
-          className="w-full border-t border-border py-1.5 text-xs font-semibold text-accent"
+          onClick={() => {
+            if (!confirm) return setConfirm(true)
+            recordBalances.mutate({ balances: [], replace: account.name })
+            setConfirm(false)
+          }}
+          onBlur={() => setConfirm(false)}
+          className={cn(
+            'flex-1 py-1.5',
+            confirm ? 'text-over' : 'text-muted hover:text-over',
+          )}
         >
-          {all ? 'Show fewer' : `Show all ${newest.length}`}
+          {confirm
+            ? `Tap again to clear all ${newest.length}`
+            : 'Clear history'}
         </button>
-      )}
+      </div>
     </section>
   )
 }

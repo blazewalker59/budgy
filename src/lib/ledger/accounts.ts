@@ -111,6 +111,14 @@ export async function recordBalances(
   }
 }
 
+/** Forget every Balance of an Account (a wrong history, before a new one). */
+export async function clearBalances(
+  db: Database,
+  account: string,
+): Promise<void> {
+  await db.delete(balances).where(eq(balances.account, account))
+}
+
 export async function deleteBalance(
   db: Database,
   account: string,

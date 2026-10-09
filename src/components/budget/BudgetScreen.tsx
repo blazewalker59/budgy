@@ -11,7 +11,7 @@ import { AlertTriangle, ChevronRight, Plus } from 'lucide-react'
 import { BudgetMix } from './BudgetMix'
 import { CategorySheet } from './CategorySheet'
 import { IncomePlan } from './IncomePlan'
-import { IncomeSheet } from './IncomeSheet'
+import { PaySheet } from './PaySheet'
 import { TagSelect } from './TagSelect'
 import type { CategoryHistory } from '@/lib/model/month'
 import type { Category, Group, Tag } from '@/lib/model/types'
@@ -21,7 +21,7 @@ import { categoryTag, targetFor } from '@/lib/model/ledger'
 import { categoryHistory } from '@/lib/model/month'
 import { coverageGaps } from '@/lib/model/coverage'
 import { budgetMix } from '@/lib/model/mix'
-import { incomeSplit, takeHome } from '@/lib/model/income'
+import { incomeSplit, takeHome } from '@/lib/model/pay'
 import { monthlySetAside } from '@/lib/model/plans'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
 import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
@@ -108,8 +108,8 @@ export function BudgetScreen() {
     .filter((p) => p.active)
     .reduce((s, p) => s + monthlySetAside(p), 0)
   const pay = useMemo(
-    () => takeHome(ix.ledger.income, window, book.today),
-    [ix, window, book.today],
+    () => takeHome(ix.ledger.pay, book.today),
+    [ix, book.today],
   )
   // Against take-home, a Category without a Target counts at its typical.
   const planned = (n: string) =>
@@ -231,10 +231,9 @@ export function BudgetScreen() {
         />
       )}
       {paySheet && (
-        <IncomeSheet
+        <PaySheet
           pay={pay}
           spentTypical={typicalSplit.spent}
-          windowLabel={windowLabel}
           onClose={() => setPaySheet(false)}
         />
       )}

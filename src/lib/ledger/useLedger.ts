@@ -7,18 +7,27 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  deletePay,
   deletePlan,
   getLedger,
   getSession,
   moveTxn,
   noteTxn,
   saveCategory,
+  savePay,
   savePlan,
   setAccountOwner,
   setStoreRule,
   setTarget,
 } from './server'
-import type { Category, Ledger, Plan, StoreRule, Tag } from '@/lib/model/types'
+import type {
+  Category,
+  Ledger,
+  PaySchedule,
+  Plan,
+  StoreRule,
+  Tag,
+} from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
 
 export const SESSION_KEY = ['session'] as const
@@ -207,4 +216,27 @@ export function useDeletePlan() {
 
 export function newPlanId(): string {
   return `pe_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
+}
+
+export function useSavePay() {
+  return useEdit(
+    (v: PaySchedule) => savePay({ data: v }),
+    (l, v) => ({
+      ...l,
+      pay: l.pay.some((p) => p.id === v.id)
+        ? l.pay.map((p) => (p.id === v.id ? v : p))
+        : [...l.pay, v],
+    }),
+  )
+}
+
+export function useDeletePay() {
+  return useEdit(
+    (v: { id: string }) => deletePay({ data: v }),
+    (l, v) => ({ ...l, pay: l.pay.filter((p) => p.id !== v.id) }),
+  )
+}
+
+export function newPayId(): string {
+  return `ps_${crypto.randomUUID().replace(/-/g, '').slice(0, 12)}`
 }

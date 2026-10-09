@@ -69,16 +69,38 @@ export interface Txn {
   note: string | null
 }
 
-/** Money coming in (a paycheck, a deposit). */
-export interface Income {
+/** How often a paycheck comes. */
+export type PayCadence = 'weekly' | 'biweekly' | 'semimonthly' | 'monthly'
+export const PAY_CADENCES: ReadonlyArray<PayCadence> = [
+  'biweekly',
+  'semimonthly',
+  'weekly',
+  'monthly',
+]
+export const PAY_CADENCE_LABELS: Record<PayCadence, string> = {
+  weekly: 'Every week',
+  biweekly: 'Every 2 weeks',
+  semimonthly: 'Twice a month',
+  monthly: 'Every month',
+}
+export const PAYCHECKS_PER_YEAR: Record<PayCadence, number> = {
+  weekly: 52,
+  biweekly: 26,
+  semimonthly: 24,
+  monthly: 12,
+}
+
+/** A paycheck the Household counts on, as a Member entered it. */
+export interface PaySchedule {
   id: string
-  date: string
-  month: string
-  account: string
-  payer: string
-  sourceCategory: string
-  /** Cents, positive. */
+  name: string
+  /** Take-home per paycheck, in cents. */
   amount: number
+  cadence: PayCadence
+  /** Any one payday (YYYY-MM-DD). */
+  anchor: string
+  /** Twice a month only: the other payday's day of the month (31 = last). */
+  secondDay: number | null
 }
 
 export interface StoreRule {
@@ -109,7 +131,7 @@ export interface Ledger {
   categories: Array<Category>
   accounts: Array<Account>
   txns: Array<Txn>
-  income: Array<Income>
+  pay: Array<PaySchedule>
   rules: Array<StoreRule>
   targets: Array<Target>
   plans: Array<Plan>

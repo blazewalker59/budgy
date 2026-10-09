@@ -23,12 +23,12 @@ import { budgetAlerts } from '@/lib/model/alerts'
 import { agentTxn, dailyDigest } from '@/lib/model/digest'
 import { breakdown, inSelection } from '@/lib/model/breakdown'
 import { categoryHistory, monthView, upcoming } from '@/lib/model/month'
-import { PAY_SCHEDULES, percentOf, takeHome } from '@/lib/model/income'
+import { percentOf, takeHome } from '@/lib/model/pay'
 import { categoryOf, ownerOf, targetFor } from '@/lib/model/ledger'
 import { monthlySetAside } from '@/lib/model/plans'
 import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
-import { CADENCE_LABELS, OWNERS } from '@/lib/model/types'
+import { CADENCE_LABELS, OWNERS, PAY_CADENCE_LABELS } from '@/lib/model/types'
 
 export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Data is only as fresh as the latest imported export: check freshness before calling a day quiet. For a daily report: if you have the finance app's latest CSV export, import it with import_transactions_csv (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
 
@@ -349,7 +349,7 @@ export function budgyTools(
       name: 'get_budget',
       title: 'Budget',
       description:
-        'The plan: every category’s monthly Target now, its typical month over the last 3 and 12 full months (without planned bills), its tag (need, nice, fluff) and group, what to set aside for planned bills, and typical take-home pay with how much of it a typical month spends.',
+        'The plan: every category’s monthly Target now, its typical month over the last 3 and 12 full months (without planned bills), its tag (need, nice, fluff) and group, what to set aside for planned bills, and take-home pay (as the Household entered it) with how much of it a typical month spends.',
       input: z.object({}),
       call: async () => {
         const b = await book()
@@ -375,7 +375,7 @@ export function budgyTools(
         const setAside = b.ix.ledger.plans
           .filter((p) => p.active)
           .reduce((n, p) => n + monthlySetAside(p), 0)
-        const pay = takeHome(b.ix.ledger.income, monthRange(lastFull, 3), today)
+        const pay = takeHome(b.ix.ledger.pay, today)
         const spent3 = [...h3.values()].reduce((n, h) => n + h.typical, 0)
         return {
           month: thisMonth,
@@ -386,14 +386,12 @@ export function budgyTools(
           plannedSetAsidePerMonth: usd(setAside),
           takeHome: {
             perMonth: usd(pay.monthly),
-            basis: pay.basis,
-            otherIncomePerMonth: usd(pay.other),
-            employers: pay.sources.map((p) => ({
-              payer: p.payer,
-              perCheck: usd(p.perCheck),
-              schedule: PAY_SCHEDULES[p.perYear],
-              perMonth: usd(p.monthly),
-              stopped: p.ended,
+            paychecks: pay.schedules.map((r) => ({
+              name: r.schedule.name,
+              perCheck: usd(r.schedule.amount),
+              schedule: PAY_CADENCE_LABELS[r.schedule.cadence],
+              perMonth: usd(r.monthly),
+              nextPayday: r.next,
             })),
             typicalSpendingPerMonth: usd(spent3 + setAside),
             percentSpent: percentOf(spent3 + setAside, pay.monthly),

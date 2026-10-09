@@ -42,21 +42,6 @@ export function storeName(
   return d.slice(0, 40)
 }
 
-const ACH =
-  /^(PAYROLL|DIRECT DEP(OSIT)?|DIR DEP|ACH (CREDIT|DEPOSIT))\s+|\s+(PPD|CCD|PAYROLL)$/gi
-
-/**
- * Who paid a deposit: its Store name without the bank's ACH words, so
- * "PAYROLL ACME LLC PPD" and "DIRECT DEP ACME LLC PPD" are both "ACME".
- */
-export function payerName(
-  description: string,
-  rules: ImportRules = EMPTY_RULES,
-): string {
-  const bare = description.replace(ACH, '').replace(ACH, '').trim()
-  return storeName(bare || description, rules)
-}
-
 /** "Bank - Card Name (1234)" → the Household's name for it, else "Card Name (1234)". */
 export function accountName(
   sourceName: string,

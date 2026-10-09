@@ -14,7 +14,7 @@ import {
   noteTransaction,
 } from './queries'
 import { RULES_KEY, loadImportRules, runImport } from './importer'
-import type { Plan, StoreRule } from '@/lib/model/types'
+import type { PaySchedule, Plan, StoreRule } from '@/lib/model/types'
 import type { SessionState } from '@/lib/auth/session'
 import type { ImportRules } from '@/lib/import/rules'
 import { sessionState, withMember } from '@/lib/auth/session'
@@ -23,11 +23,13 @@ import {
   budgetTargets,
   categories,
   imports,
+  paySchedules,
   plannedExpenses,
   settings,
   storeRules,
 } from '@/lib/db/schema'
 import { CADENCES, TAGS } from '@/lib/model/types'
+import { payInput } from '@/lib/model/pay'
 import { importRulesSchema } from '@/lib/import/rules'
 
 export type { ImportSummary } from './importer'
@@ -224,6 +226,29 @@ export const deletePlan = createServerFn({ method: 'POST' })
   .handler(({ data }) =>
     withMember(async ({ db }) => {
       await db.delete(plannedExpenses).where(eq(plannedExpenses.id, data.id))
+    }),
+  )
+
+/** Add or change a Pay Schedule: take-home pay comes only from these. */
+export const savePay = createServerFn({ method: 'POST' })
+  .validator((data: PaySchedule) => payInput.parse(data))
+  .handler(({ data }) =>
+    withMember(async ({ db }) => {
+      const { id, ...rest } = data
+      await db
+        .insert(paySchedules)
+        .values(data)
+        .onConflictDoUpdate({ target: paySchedules.id, set: rest })
+    }),
+  )
+
+export const deletePay = createServerFn({ method: 'POST' })
+  .validator((data: { id: string }) =>
+    z.object({ id: z.string().max(32) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(async ({ db }) => {
+      await db.delete(paySchedules).where(eq(paySchedules.id, data.id))
     }),
   )
 

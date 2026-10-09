@@ -4,8 +4,8 @@
  * left (charts/IncomeChart), with each part as a percent below.
  */
 
-import { ChevronRight } from 'lucide-react'
-import type { IncomeSplit, TakeHome } from '@/lib/model/income'
+import { ChevronRight, Plus } from 'lucide-react'
+import type { IncomeSplit, TakeHome } from '@/lib/model/pay'
 import { dollars, signedDollars } from '@/lib/model/money'
 import { SPLIT_COLORS, SPLIT_LABELS } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -27,12 +27,18 @@ export function IncomePlan({
   budget: IncomeSplit
   onOpen: () => void
 }) {
-  if (pay.basis === 'none')
+  if (pay.monthly === 0)
     return (
-      <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted">
-        No income imported yet. Import an export that includes paychecks to see
-        the Budget as a share of take-home pay.
-      </p>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full items-center justify-between gap-2 rounded-xl border border-dashed border-border px-3 py-2 text-left text-xs text-muted hover:border-accent"
+      >
+        Enter your pay to see the Budget as a share of take-home.
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-foreground px-3 py-1 font-semibold text-background">
+          <Plus size={13} aria-hidden /> Add pay
+        </span>
+      </button>
     )
   const row = (label: string, s: IncomeSplit) => (
     <div className={cn(GRID, 'text-[13px] tabular-nums')}>
@@ -67,7 +73,6 @@ export function IncomePlan({
           Of take-home pay
           <span className="ml-1.5 font-normal normal-case tracking-normal">
             {dollars(pay.monthly)}/mo
-            {pay.basis === 'deposits' && ' (all deposits)'}
           </span>
         </h2>
         <span className="flex items-center text-[11px] font-semibold text-accent">

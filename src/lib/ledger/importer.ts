@@ -10,7 +10,6 @@ import {
   accounts,
   categories,
   imports,
-  income,
   settings,
   transactions,
 } from '@/lib/db/schema'
@@ -26,8 +25,6 @@ export interface ImportSummary {
   added: number
   alreadyHad: number
   skipped: { notSpending: number; otherTypes: number; invalid: number }
-  /** Deposits (paychecks and the like) in the file, and how many were new. */
-  income: { rows: number; added: number }
   from: string | null
   to: string | null
   newAccounts: Array<string>
@@ -89,26 +86,7 @@ export async function runImport(
   }
   const fresh = txns.filter((t) => !have.has(t.id))
 
-  const deposits = parsed.income
-  const haveIncome = new Set<string>()
-  if (deposits.length) {
-    const rows = await db
-      .select({ id: income.id })
-      .from(income)
-      .where(
-        between(
-          income.month,
-          deposits[0].month,
-          deposits[deposits.length - 1].month,
-        ),
-      )
-    for (const r of rows) haveIncome.add(r.id)
-  }
-  const freshIncome = deposits.filter((i) => !haveIncome.has(i.id))
-
-  const sourceAccounts = new Map(
-    [...txns, ...deposits].map((t) => [t.account, t.accountSource]),
-  )
+  const sourceAccounts = new Map(txns.map((t) => [t.account, t.accountSource]))
   const known = new Set(
     sourceAccounts.size
       ? (
@@ -144,13 +122,12 @@ export async function runImport(
     added: fresh.length,
     alreadyHad: txns.length - fresh.length,
     skipped,
-    income: { rows: deposits.length, added: freshIncome.length },
     from,
     to,
     newAccounts,
     byAccount: [...byAccount.values()].sort((a, b) => b.added - a.added),
   }
-  if (!input.commit || fresh.length + freshIncome.length === 0) return summary
+  if (!input.commit || fresh.length === 0) return summary
 
   const importId = `im_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
   const statements = []
@@ -185,20 +162,6 @@ export async function runImport(
             .slice(i, i + ROWS_PER_INSERT)
             .map(({ accountSource: _source, ...t }) => ({
               ...t,
-              importId,
-            })),
-        )
-        .onConflictDoNothing(),
-    )
-  for (let i = 0; i < freshIncome.length; i += ROWS_PER_INSERT)
-    statements.push(
-      db
-        .insert(income)
-        .values(
-          freshIncome
-            .slice(i, i + ROWS_PER_INSERT)
-            .map(({ accountSource: _source, ...row }) => ({
-              ...row,
               importId,
             })),
         )

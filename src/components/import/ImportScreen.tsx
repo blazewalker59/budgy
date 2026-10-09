@@ -92,8 +92,8 @@ export function ImportScreen() {
         <h1 className="text-lg font-extrabold tracking-tight">Import</h1>
         <p className="text-xs text-muted">
           Export transactions from the finance app as CSV and drop them here.
-          Spending and income (for take-home pay) are kept; transfers are
-          skipped, and anything already imported is never added twice.
+          Only spending is kept; transfers and income are skipped, and anything
+          already imported is never added twice.
         </p>
       </div>
 
@@ -130,11 +130,7 @@ export function ImportScreen() {
               <p>
                 {p.done ? (
                   <strong className="text-accent">
-                    Added {p.summary.added} purchases
-                    {p.summary.income.added
-                      ? ` and ${p.summary.income.added} deposits`
-                      : ''}
-                    .
+                    Added {p.summary.added} purchases.
                   </strong>
                 ) : (
                   <>
@@ -143,13 +139,11 @@ export function ImportScreen() {
                     {p.summary.alreadyHad
                       ? ` (${p.summary.alreadyHad} already here)`
                       : ''}
-                    {p.summary.income.rows > 0 &&
-                      `, ${p.summary.income.added} new of ${p.summary.income.rows} deposits`}
                     .
                   </>
                 )}{' '}
                 <span className="text-muted">
-                  Skipped {p.summary.skipped.otherTypes} transfers
+                  Skipped {p.summary.skipped.otherTypes} transfers and income
                   {p.summary.skipped.notSpending
                     ? `, ${p.summary.skipped.notSpending} escrow and investment rows`
                     : ''}
@@ -171,7 +165,7 @@ export function ImportScreen() {
                   ))}
                 </ul>
               )}
-              {!p.done && p.summary.added + p.summary.income.added > 0 && (
+              {!p.done && p.summary.added > 0 && (
                 <button
                   type="button"
                   disabled={p.busy}
@@ -179,8 +173,6 @@ export function ImportScreen() {
                   className="rounded-full bg-foreground px-4 py-1.5 font-semibold text-background disabled:opacity-40"
                 >
                   Add {p.summary.added} purchases
-                  {p.summary.income.added > 0 &&
-                    ` and ${p.summary.income.added} deposits`}
                 </button>
               )}
             </div>

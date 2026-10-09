@@ -18,7 +18,7 @@ import {
 import { useSaveCategory, useSetStoreRule } from '@/lib/ledger/useLedger'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { categoryHistory } from '@/lib/model/month'
-import { percentOf } from '@/lib/model/income'
+import { percentOf } from '@/lib/model/pay'
 import { monthLabel, monthRange, shiftMonth } from '@/lib/model/dates'
 import { dollars, signedDollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'

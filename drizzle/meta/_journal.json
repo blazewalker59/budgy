@@ -29,6 +29,20 @@
       "when": 1791508522208,
       "tag": "0003_income",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791510422658,
+      "tag": "0004_drop_income",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791510422947,
+      "tag": "0005_pay_schedules",
+      "breakpoints": true
     }
   ]
 }

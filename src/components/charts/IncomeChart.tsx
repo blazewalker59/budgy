@@ -12,7 +12,7 @@ import { scaleLinear } from '@tanstack/charts/scales/linear'
 import { tooltip } from '@tanstack/charts/tooltip'
 import { useMemo } from 'react'
 import { CHART_COLORS } from './ChartCard'
-import type { IncomeSplit, SplitPart } from '@/lib/model/income'
+import type { IncomeSplit, SplitPart } from '@/lib/model/pay'
 import { SPLIT_COLORS, SPLIT_LABELS } from '@/lib/format'
 import { dollars } from '@/lib/model/money'
 

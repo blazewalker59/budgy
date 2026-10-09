@@ -1,5 +1,6 @@
 /**
- * Each month's take-home against everything spent: what was left over (or
+ * Each month's pay (as entered: a month with a third paycheck shows it)
+ * against everything spent: what was left over (or
  * how far spending ran past what came in). Hover or tap a bar.
  */
 
@@ -77,7 +78,7 @@ export function IncomeMonths({
             const m = point.datum as IncomeMonth
             return [
               monthLabel(m.month, true),
-              `${dollars(m.received)} came in`,
+              `${dollars(m.received)} pay`,
               `${dollars(m.spent)} spent`,
               `${signedDollars(m.received - m.spent)} left`,
             ].join('\n')
@@ -90,7 +91,7 @@ export function IncomeMonths({
     <ChartCard
       legend={[
         { label: 'Left over', color: CHART_COLORS.accent },
-        { label: 'Spent more than came in', color: CHART_COLORS.over },
+        { label: 'Spent more than pay', color: CHART_COLORS.over },
       ]}
       headline={
         <span className="tabular-nums">

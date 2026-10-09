@@ -17,7 +17,7 @@ import {
   sqliteTable,
   text,
 } from 'drizzle-orm/sqlite-core'
-import type { Cadence, Group, Tag } from '@/lib/model/types'
+import type { Cadence, Group, PayCadence, Tag } from '@/lib/model/types'
 
 // ─── Better Auth (generated; do not hand-edit shapes) ───────────────────────
 
@@ -159,32 +159,6 @@ export const transactions = sqliteTable(
 )
 
 /**
- * Money coming in: paychecks, refunds by deposit, gifts. Kept apart from
- * Transactions (spending) and read for the Household's typical take-home pay
- * (src/lib/model/income.ts).
- */
-export const income = sqliteTable(
-  'income',
-  {
-    /** Stable hash of the exported row, like a Transaction's. */
-    id: text('id').primaryKey(),
-    date: text('date').notNull(),
-    month: text('month').notNull(),
-    account: text('account').notNull(),
-    description: text('description').notNull(),
-    /** Normalized name of who paid it (the Store name for spending). */
-    payer: text('payer').notNull(),
-    /** The finance app's Category, e.g. "Paycheck". */
-    sourceCategory: text('source_category').notNull(),
-    /** Cents, positive. */
-    amount: integer('amount').notNull(),
-    importId: text('import_id').notNull(),
-    createdAt: createdAt(),
-  },
-  (t) => [index('income_month_idx').on(t.month)],
-)
-
-/**
  * A Store Rule moves (or re-tags) every Transaction from one Store that the
  * import put in one Category, past and future.
  */
@@ -230,6 +204,25 @@ export const plannedExpenses = sqliteTable('planned_expenses', {
   /** Any one due date (YYYY-MM-DD); the others step from it by cadence. */
   anchor: text('anchor').notNull(),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: createdAt(),
+})
+
+/**
+ * A paycheck the Household counts on, entered by a Member: who, how much
+ * lands in the bank, how often, and one payday to step from. Take-home pay
+ * comes only from these (src/lib/model/pay.ts), never from imported deposits.
+ */
+export const paySchedules = sqliteTable('pay_schedules', {
+  id: text('id').primaryKey(),
+  /** Whose pay, e.g. "Blaze" or "Alex's bonus". */
+  name: text('name').notNull(),
+  /** Take-home per paycheck, in cents. */
+  amount: integer('amount').notNull(),
+  cadence: text('cadence').$type<PayCadence>().notNull(),
+  /** Any one payday (YYYY-MM-DD); the others step from it. */
+  anchor: text('anchor').notNull(),
+  /** Twice a month only: the other payday's day of the month (31 = last). */
+  secondDay: integer('second_day'),
   createdAt: createdAt(),
 })
 

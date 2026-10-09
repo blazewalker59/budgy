@@ -7,8 +7,6 @@
  *   bun scripts/seed.ts --remote --env production
  *
  * Safe to run again: rows already there are kept, labels are re-applied.
- * With --income-only, only adds Income rows (backfilling a Ledger imported
- * before Income was kept) and touches nothing else.
  * seed/ is git-ignored; household data never goes in the repository.
  */
 
@@ -44,7 +42,6 @@ const csvs = readdirSync(SEED)
   .sort()
 if (!csvs.length) throw new Error(`No CSV files in ${SEED}`)
 
-const incomeOnly = process.argv.includes('--income-only')
 const sql: Array<string> = []
 
 // The Household's Import Rules (account names, local vendors) are kept in
@@ -71,7 +68,7 @@ for (const c of DEFAULT_CATEGORIES) addCategory(c.name)
 let firstMonth = '9999-99'
 let total = 0
 for (const file of csvs) {
-  const { txns, income } = await parseExport(
+  const { txns } = await parseExport(
     readFileSync(join(SEED, file), 'utf8'),
     rules,
   )
@@ -80,10 +77,6 @@ for (const file of csvs) {
   for (const [name, source] of accounts)
     sql.push(
       `INSERT OR IGNORE INTO accounts (name, source_name, owner) VALUES (${q(name)}, ${q(source)}, ${q(defaultOwner(name))});`,
-    )
-  for (const i of income)
-    sql.push(
-      `INSERT OR IGNORE INTO income (id, date, month, account, description, payer, source_category, amount, import_id) VALUES (${[i.id, i.date, i.month, i.account, i.description, i.payer, i.sourceCategory, i.amount, importId].map(q).join(', ')});`,
     )
   for (const t of txns) {
     addCategory(t.sourceCategory)
@@ -96,11 +89,11 @@ for (const file of csvs) {
     `INSERT OR IGNORE INTO imports (id, file_name, imported_by, added, skipped) VALUES (${q(importId)}, ${q(file)}, 'seed', ${txns.length}, 0);`,
   )
   total += txns.length
-  console.log(`${file}: ${txns.length} purchases, ${income.length} deposits`)
+  console.log(`${file}: ${txns.length} purchases`)
 }
 
 const statePath = join(SEED, 'artifact-state.json')
-if (existsSync(statePath) && !incomeOnly) {
+if (existsSync(statePath)) {
   const labels: ArtifactLabels =
     JSON.parse(readFileSync(statePath, 'utf8')).labels ?? {}
   const unkey = (k: string) => {
@@ -158,12 +151,10 @@ if (existsSync(statePath) && !incomeOnly) {
 }
 
 // Categories first, so every reference lands on an existing one.
-const categoriesFirst = incomeOnly
-  ? sql.filter((s) => s.startsWith('INSERT OR IGNORE INTO income'))
-  : [
-      ...sql.filter((s) => s.startsWith('INSERT OR IGNORE INTO categories')),
-      ...sql.filter((s) => !s.startsWith('INSERT OR IGNORE INTO categories')),
-    ]
+const categoriesFirst = [
+  ...sql.filter((s) => s.startsWith('INSERT OR IGNORE INTO categories')),
+  ...sql.filter((s) => !s.startsWith('INSERT OR IGNORE INTO categories')),
+]
 const out = join(SEED, 'seed.sql')
 writeFileSync(out, categoriesFirst.join('\n') + '\n')
 console.log(`${total} purchases → ${out}`)
@@ -175,7 +166,7 @@ const args = [
   'budgy-db',
   '--file',
   out,
-  ...process.argv.slice(2).filter((a) => a !== '--income-only'),
+  ...process.argv.slice(2),
 ]
 console.log(`bunx ${args.join(' ')}`)
 const run = spawnSync('bunx', args, { stdio: 'inherit' })

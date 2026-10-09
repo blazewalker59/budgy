@@ -13,8 +13,7 @@ coverage/*
 .claude/scheduled_tasks.lock
 
 # Household data never goes in git: CSV exports and the artifact's labels.
-seed/*
-!seed/README.md
+seed/
 *.csv
 
 # Agent worktrees (local only)

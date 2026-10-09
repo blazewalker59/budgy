@@ -4,23 +4,29 @@
  * growth shows from day one), every recorded balance, and its purchases.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { FileUp, Trash2 } from 'lucide-react'
 import { OwnerInput } from './AccountsScreen'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { ParsedHistory } from '@/lib/import/history'
+import type { PostSummary } from '@/lib/ledger/server'
+import { uploadPurchases } from '@/lib/ledger/server'
 import { useBook } from '@/lib/ledger/book'
 import {
+  LEDGER_KEY,
   useDeleteAccount,
   useDeleteBalance,
   useRecordBalances,
+  useRemoveStarting,
   useSaveAccount,
 } from '@/lib/ledger/useLedger'
 import { activity, balanceByMonth, equity, isDebt } from '@/lib/model/accounts'
 import {
   guessDirection,
   parseBalanceHistory,
+  purchasesFrom,
   rebuildBalances,
 } from '@/lib/import/history'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
@@ -99,6 +105,7 @@ export function AccountSheet({
           </Link>
         </p>
       )}
+      <StartingHere name={name} />
     </Sheet>
   )
 }
@@ -288,10 +295,11 @@ function UpdateBalance({
 }
 
 /**
- * A history to start from: the institution's balance history (a CSV, or
- * two columns pasted from a spreadsheet), or its transactions export, whose
- * balances are worked back from one balance the Member knows. Shown before
- * it's saved; it can replace the Account's earlier balances.
+ * The Account's export: its balance history (a CSV, or two columns pasted
+ * from a spreadsheet), or its transactions export, whose balances are
+ * worked back from one balance the Member knows and whose spending becomes
+ * the Account's purchases. Shown before it's saved; it can replace the
+ * Account's earlier balances, and the starting purchases over its dates.
  */
 function ImportHistory({
   account,
@@ -302,24 +310,33 @@ function ImportHistory({
   hasHistory: boolean
   today: string
 }) {
+  const { ix } = useBook()
+  const queryClient = useQueryClient()
   const recordBalances = useRecordBalances()
   const [open, setOpen] = useState(!hasHistory)
   const [text, setText] = useState('')
-  const [done, setDone] = useState<number | null>(null)
+  const [done, setDone] = useState<string | null>(null)
   const [replace, setReplace] = useState(true)
   const [knownDate, setKnownDate] = useState(today)
   const [known, setKnown] = useState('')
   const [flip, setFlip] = useState(false)
+  const [addPurchases, setAddPurchases] = useState(true)
+  const [replaceStarting, setReplaceStarting] = useState(true)
+  const [preview, setPreview] = useState<PostSummary | null>(null)
+  const [problem, setProblem] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const parsed: ParsedHistory | null = useMemo(
     () => (text.trim() ? parseBalanceHistory(text) : null),
     [text],
   )
   const debt = isDebt(account)
   const knownCents = parseDollars(known)
-  const direction =
-    parsed?.kind === 'transactions'
-      ? ((guessDirection(parsed, debt) * (flip ? -1 : 1)) as 1 | -1)
-      : 1
+  // The transactions in it: the whole export, or alongside its balances.
+  const txnPart =
+    parsed?.kind === 'transactions' ? parsed : (parsed?.changes ?? null)
+  const direction = txnPart
+    ? ((guessDirection(txnPart, debt) * (flip ? -1 : 1)) as 1 | -1)
+    : 1
   const rows = useMemo(() => {
     if (!parsed) return []
     if (parsed.kind === 'balances') return parsed.rows
@@ -329,6 +346,91 @@ function ImportHistory({
       amount: knownCents,
     })
   }, [parsed, knownCents, knownDate, direction])
+  const purchases = useMemo(
+    () => (txnPart ? purchasesFrom(txnPart, direction, debt) : null),
+    [txnPart, direction, debt],
+  )
+  const bought = useMemo(() => purchases?.rows ?? [], [purchases])
+  // Starting purchases over the export's dates, which it can replace.
+  const startingHere = useMemo(() => {
+    if (!bought.length) return 0
+    const dates = bought.map((r) => r.date).sort()
+    return ix.ledger.txns.filter(
+      (t) =>
+        t.starting &&
+        t.account === account.name &&
+        t.date >= dates[0] &&
+        t.date <= dates[dates.length - 1],
+    ).length
+  }, [bought, ix, account.name])
+  const replacing = startingHere > 0 && replaceStarting
+  const uncategorized =
+    preview?.filed.filter((f) => f.how === 'uncategorized').length ?? 0
+
+  // What adding them would do, asked of the server as the export changes.
+  useEffect(() => {
+    setPreview(null)
+    setProblem(null)
+    if (!bought.length) return
+    let current = true
+    uploadPurchases({
+      data: {
+        account: account.name,
+        rows: bought,
+        commit: false,
+        replaceStarting: replacing,
+      },
+    }).then(
+      (summary) => current && setPreview(summary),
+      (error: unknown) =>
+        current &&
+        setProblem(
+          error instanceof Error ? error.message : 'Could not read it.',
+        ),
+    )
+    return () => {
+      current = false
+    }
+  }, [bought, replacing, account.name])
+
+  const posting =
+    addPurchases &&
+    preview !== null &&
+    (preview.added > 0 || (replacing && preview.replaced > 0))
+  const save = async () => {
+    setSaving(true)
+    const said: Array<string> = []
+    try {
+      if (rows.length) {
+        recordBalances.mutate({
+          balances: rows.map((r) => ({ account: account.name, ...r })),
+          replace: hasHistory && replace ? account.name : undefined,
+        })
+        said.push(`${rows.length} balances`)
+      }
+      if (posting) {
+        const summary = await uploadPurchases({
+          data: {
+            account: account.name,
+            rows: bought,
+            commit: true,
+            replaceStarting: replacing,
+          },
+        })
+        await queryClient.invalidateQueries({ queryKey: LEDGER_KEY })
+        said.push(
+          `${summary.added} purchases${summary.replaced ? ` (in place of ${summary.replaced} starting ones)` : ''}`,
+        )
+      }
+      setDone(`Saved ${said.join(' and ')}.`)
+      setText('')
+      setKnown('')
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : 'Could not save it.')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   if (!open)
     return (
@@ -337,7 +439,7 @@ function ImportHistory({
         onClick={() => setOpen(true)}
         className="inline-flex items-center gap-1 px-1 text-xs font-semibold text-accent"
       >
-        <FileUp size={13} aria-hidden /> Import balance history
+        <FileUp size={13} aria-hidden /> Upload an export
       </button>
     )
   const span = (r: Array<{ date: string }>) =>
@@ -345,7 +447,7 @@ function ImportHistory({
   return (
     <section className="space-y-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-semibold">Import balance history</h2>
+        <h2 className="font-semibold">Upload an export</h2>
         <label className="inline-flex cursor-pointer items-center gap-1 font-semibold text-accent">
           <FileUp size={13} aria-hidden /> Choose CSV
           <input
@@ -364,9 +466,9 @@ function ImportHistory({
         </label>
       </div>
       <p className="text-muted">
-        A balance history (a date and a balance on each line), or the
-        institution’s transactions export: Budgy works the balances out from one
-        you know.
+        The institution’s transactions export: its spending becomes this
+        account’s purchases, and its balances are worked out from one you know.
+        Or a balance history: a date and a balance on each line.
       </p>
       <textarea
         value={text}
@@ -469,6 +571,82 @@ function ImportHistory({
         </div>
       )}
 
+      {purchases && (
+        <div className="space-y-1 rounded-lg bg-sunken px-2 py-1.5">
+          <label className="flex items-center gap-1.5 font-semibold">
+            <input
+              type="checkbox"
+              checked={addPurchases}
+              onChange={(e) => setAddPurchases(e.target.checked)}
+            />
+            Add its purchases
+          </label>
+          <p className="text-muted">
+            {bought.length} spending rows
+            {[
+              purchases.moving && `${purchases.moving} payments and transfers`,
+              purchases.moneyIn && `${purchases.moneyIn} deposits`,
+              purchases.unnamed && `${purchases.unnamed} without a description`,
+            ]
+              .filter(Boolean)
+              .map((x) => `, ${x} left out`)
+              .join('')}
+            .
+          </p>
+          {parsed?.kind === 'balances' && txnPart && !txnPart.split && (
+            <p className="text-muted">
+              Reading {debt === (direction === 1) ? 'positive' : 'negative'}{' '}
+              amounts as spending.{' '}
+              <button
+                type="button"
+                onClick={() => setFlip(!flip)}
+                className="font-semibold text-accent"
+              >
+                Backwards? Flip it
+              </button>
+            </p>
+          )}
+          {addPurchases && preview && (
+            <p>
+              <strong>{preview.added} new</strong>
+              {[
+                preview.alreadyHad && `${preview.alreadyHad} already here`,
+                preview.duplicates.length &&
+                  `${preview.duplicates.length} match one already here that day`,
+                preview.notSpending && `${preview.notSpending} not spending`,
+              ]
+                .filter(Boolean)
+                .map((x) => `, ${x}`)
+                .join('')}
+              .{' '}
+              {uncategorized > 0 && (
+                <span className="text-muted">
+                  {uncategorized === 1 ? '1 goes' : `${uncategorized} go`} to
+                  Uncategorized, to Move later.
+                </span>
+              )}
+            </p>
+          )}
+          {addPurchases && startingHere > 0 && (
+            <label className="flex items-start gap-1.5 text-muted">
+              <input
+                type="checkbox"
+                checked={replaceStarting}
+                onChange={(e) => setReplaceStarting(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Replace the {startingHere} starting purchases over these dates
+                (from the first bulk import). Their stores, categories, Moves
+                and notes carry over
+                {preview?.carried ? ` (${preview.carried})` : ''}.
+              </span>
+            </label>
+          )}
+        </div>
+      )}
+      {problem && <p className="font-medium text-over">{problem}</p>}
+
       <div className="flex flex-wrap items-center justify-end gap-2">
         {hasHistory && rows.length > 0 && (
           <label className="mr-auto flex items-center gap-1 text-muted">
@@ -481,26 +659,55 @@ function ImportHistory({
           </label>
         )}
         {done !== null && (
-          <span className="font-semibold text-accent">Saved {done}.</span>
+          <span className="font-semibold text-accent">{done}</span>
         )}
         <button
           type="button"
-          disabled={!rows.length}
-          onClick={() => {
-            recordBalances.mutate({
-              balances: rows.map((r) => ({ account: account.name, ...r })),
-              replace: hasHistory && replace ? account.name : undefined,
-            })
-            setDone(rows.length)
-            setText('')
-            setKnown('')
-          }}
+          disabled={saving || (!rows.length && !posting)}
+          onClick={() => void save()}
           className="rounded-full bg-foreground px-3 py-1 font-semibold text-background disabled:opacity-40"
         >
-          Save {rows.length || ''} balances
+          {saving
+            ? 'Saving…'
+            : `Save ${[
+                rows.length && `${rows.length} balances`,
+                posting && `${preview.added} purchases`,
+              ]
+                .filter(Boolean)
+                .join(' and ')}`}
         </button>
       </div>
     </section>
+  )
+}
+
+/** This Account's starting purchases still here, and taking them out. */
+function StartingHere({ name }: { name: string }) {
+  const { ix } = useBook()
+  const removeStarting = useRemoveStarting()
+  const [confirm, setConfirm] = useState(false)
+  const n = useMemo(
+    () => ix.ledger.txns.filter((t) => t.starting && t.account === name).length,
+    [ix, name],
+  )
+  if (!n) return null
+  return (
+    <p className="px-1 text-xs text-muted">
+      {n} of them are still from the first bulk import; uploading this account’s
+      export replaces those over its dates.{' '}
+      <button
+        type="button"
+        onClick={() => {
+          if (!confirm) return setConfirm(true)
+          removeStarting.mutate({ account: name })
+          setConfirm(false)
+        }}
+        onBlur={() => setConfirm(false)}
+        className="font-semibold text-over"
+      >
+        {confirm ? `Remove ${n}? Tap again` : `Remove them`}
+      </button>
+    </p>
   )
 }
 

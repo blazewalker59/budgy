@@ -1,7 +1,7 @@
 /**
- * The Household's own import rules: what its Accounts are called, which
- * Stores go by another name, which local vendors are home upkeep, and which
- * rows aren't spending (investment contributions). Kept in the database,
+ * The Household's own import rules: which Stores go by another name, which
+ * local vendors are home upkeep, and which rows aren't spending (investment
+ * contributions). Kept in the database,
  * never in the repository, since they name real accounts and places
  * (docs/adr/0003).
  */
@@ -9,8 +9,6 @@
 import { z } from 'zod'
 
 export interface ImportRules {
-  /** Exported account name → short Account name. */
-  accounts: Record<string, string>
   /** [needle, Store]: a description containing needle (any case) is Store. */
   stores: Array<[string, string]>
   /** Regular expression (case-insensitive) for home upkeep vendors. */
@@ -22,7 +20,6 @@ export interface ImportRules {
 }
 
 export const EMPTY_RULES: ImportRules = {
-  accounts: {},
   stores: [],
   upkeep: '',
   mortgage: '',
@@ -42,7 +39,6 @@ const pattern = z
   }, 'Not a valid regular expression')
 
 export const importRulesSchema = z.object({
-  accounts: z.record(z.string().max(200), z.string().min(1).max(60)),
   stores: z
     .array(z.tuple([z.string().min(1).max(80), z.string().min(1).max(80)]))
     .max(500),

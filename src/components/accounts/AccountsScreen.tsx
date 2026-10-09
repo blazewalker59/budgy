@@ -2,20 +2,20 @@
  * Accounts: every card, bank, investment, retirement and 529 account the
  * Household has, each with its latest Balance, grouped by kind, and net
  * worth over time. Tapping one opens its sheet: details, today's balance,
- * its history (importable on first setup) and its purchases.
+ * its history and purchases (uploaded from its export) and its purchases.
  */
 
 import { useMemo, useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { ChevronRight, Plus, Upload } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
+import { ImportRules } from './ImportRules'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
 import { filtersOf } from '@/lib/model/lens'
 import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
-import { useSaveAccount } from '@/lib/ledger/useLedger'
+import { useRemoveStarting, useSaveAccount } from '@/lib/ledger/useLedger'
 import {
   activity,
   equity,
@@ -104,15 +104,7 @@ export function AccountsScreen({ lens }: { lens: Lens }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-extrabold tracking-tight">Accounts</h1>
-        <Link
-          to="/import"
-          className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold"
-        >
-          <Upload size={13} aria-hidden /> Import purchases
-        </Link>
-      </div>
+      <h1 className="text-lg font-extrabold tracking-tight">Accounts</h1>
       <LensBar
         page="/accounts"
         note={
@@ -174,8 +166,71 @@ export function AccountsScreen({ lens }: { lens: Lens }) {
       )}
 
       <AddAccount onAdded={setSheet} />
+      <StartingPurchases onOpen={setSheet} />
+      <ImportRules />
       {sheet && <AccountSheet name={sheet} onClose={() => setSheet(null)} />}
     </div>
+  )
+}
+
+/**
+ * The starting purchases still here (from the whole-household export Budgy
+ * started from), by Account: each Account's own upload replaces them over
+ * its dates, and whatever's left can go.
+ */
+function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
+  const { ix } = useBook()
+  const removeStarting = useRemoveStarting()
+  const [confirm, setConfirm] = useState(false)
+  const byAccount = useMemo(() => {
+    const by = new Map<string, number>()
+    for (const t of ix.ledger.txns)
+      if (t.starting) by.set(t.account, (by.get(t.account) ?? 0) + 1)
+    return [...by].sort((a, b) => b[1] - a[1])
+  }, [ix])
+  if (!byAccount.length) return null
+  const total = byAccount.reduce((n, [, c]) => n + c, 0)
+  return (
+    <section className="space-y-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+        Starting purchases
+      </h2>
+      <p className="text-muted">
+        {total} purchases are still from the first bulk import. Upload each
+        account’s export on its sheet to replace them over its dates (Moves and
+        notes carry over), then remove whatever’s left.
+      </p>
+      <ul className="flex flex-wrap gap-1.5">
+        {byAccount.map(([name, n]) => (
+          <li key={name}>
+            <button
+              type="button"
+              onClick={() => onOpen(name)}
+              className="rounded-full border border-border bg-sunken px-2 py-0.5 font-semibold hover:border-accent"
+            >
+              {name} <span className="font-normal text-muted">{n}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        onClick={() => {
+          if (!confirm) return setConfirm(true)
+          removeStarting.mutate({})
+          setConfirm(false)
+        }}
+        onBlur={() => setConfirm(false)}
+        className={cn(
+          'rounded-full px-2 py-0.5 font-semibold',
+          confirm ? 'bg-over text-background' : 'text-over',
+        )}
+      >
+        {confirm
+          ? `Remove all ${total}? Tap again`
+          : `Remove all ${total} starting purchases`}
+      </button>
+    </section>
   )
 }
 

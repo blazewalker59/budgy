@@ -19,10 +19,17 @@ Everything Budgy knows: Transactions, Accounts and their Balances,
 Categories, Store Rules, Targets, Planned Expenses and Pay Schedules.
 
 **Transaction**:
-One purchase (or refund) from an import. Only spending is kept: transfers,
-income, escrow payouts and investment contributions are left out. Its id is a
-hash of the exported row, so importing the same rows again adds nothing.
+One purchase (or refund) on one Account, from that Account's uploaded export
+or posted by an Agent. Only spending is kept: card payments, transfers,
+deposits, escrow payouts and investment contributions are left out. Its id is
+a hash of the row, so uploading the same rows again adds nothing.
 _Avoid_: expense, charge
+
+**Starting purchase**:
+A Transaction from the whole-household export Budgy started from. An
+Account's own upload can replace the ones over its dates (each handing its
+Move and note to the new purchase that day for that amount); any left can
+be removed from Accounts.
 
 **Pay Schedule**:
 A paycheck the Household counts on, entered by hand: whose, how much lands in
@@ -43,7 +50,7 @@ from the card and bank Accounts.
 
 **Balance**:
 What an Account held (or, for a card or loan, owed) on a day, recorded by a
-Member or an Agent, or imported as a history when the Account is added.
+Member or an Agent, or uploaded as a history when the Account is added.
 
 **Home equity**:
 A property Account (a home, at its estimated value) minus the loans marked as
@@ -139,8 +146,8 @@ means the export is missing it.
 **Agent**:
 A Member's AI assistant using Budgy over MCP with an **API Token** the
 Member made on the Agents page (docs/adr/0004). A read token sees
-everything; a write token may also import exports and Move or note
-purchases.
+everything; a write token may also add an Account's purchases, record
+Balances, and Move or note purchases.
 
 **Budget Alert**:
 Something worth hearing about unasked: a Category over its Target or on

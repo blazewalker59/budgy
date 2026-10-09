@@ -33,7 +33,6 @@ import {
   Star,
   Store,
   SunMoon,
-  Upload,
   User,
   Wallet,
 } from 'lucide-react'
@@ -302,14 +301,7 @@ function Palette({
         'Accounts',
         '/accounts',
         <Wallet size={I} />,
-        'net worth balances equity home loans',
-      ),
-      go(
-        'import',
-        'Import purchases',
-        '/import',
-        <Upload size={I} />,
-        'csv upload export',
+        'net worth balances equity home loans upload export csv import',
       ),
       go('agents', 'Agents', '/agents', <Bot size={I} />, 'mcp api token'),
       {

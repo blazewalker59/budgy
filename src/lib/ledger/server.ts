@@ -5,7 +5,7 @@
  */
 
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import {
   ensureCategory,
@@ -13,12 +13,14 @@ import {
   moveTransaction,
   noteTransaction,
 } from './queries'
-import { RULES_KEY, loadImportRules, runImport } from './importer'
+import { RULES_KEY, loadImportRules } from './importer'
 import {
   clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
   deleteBalance as deleteBalanceRow,
+  postTransactions,
   recordBalances as recordBalanceRows,
+  removeStarting,
   saveAccount as saveAccountRow,
 } from './accounts'
 import type {
@@ -37,7 +39,6 @@ import { sessionState, withMember } from '@/lib/auth/session'
 import {
   budgetTargets,
   categories,
-  imports,
   paySchedules,
   plannedExpenses,
   savedLenses,
@@ -47,8 +48,9 @@ import {
 import { CADENCES, TAGS } from '@/lib/model/types'
 import { payInput } from '@/lib/model/pay'
 import { importRulesSchema } from '@/lib/import/rules'
+import { postedRowInput } from '@/lib/import/posted'
 
-export type { ImportSummary } from './importer'
+export type { PostSummary } from './accounts'
 
 export type { SessionState } from '@/lib/auth/session'
 
@@ -329,44 +331,47 @@ export const deletePay = createServerFn({ method: 'POST' })
   )
 
 /**
- * Read an export and, with `commit`, add the Transactions the Ledger doesn't
- * have yet. Without it, only say what would happen.
+ * One Account's purchases from its uploaded export. Without `commit`, only
+ * say what would happen.
  */
-export const importCsv = createServerFn({ method: 'POST' })
-  .validator((data: { fileName: string; text: string; commit: boolean }) =>
-    z
-      .object({
-        fileName: z.string().max(200),
-        text: z.string().max(8_000_000),
-        commit: z.boolean(),
-      })
-      .parse(data),
+export const uploadPurchases = createServerFn({ method: 'POST' })
+  .validator(
+    (data: {
+      account: string
+      rows: Array<z.input<typeof postedRowInput>>
+      commit: boolean
+      replaceStarting: boolean
+    }) =>
+      z
+        .object({
+          account: z.string().min(1).max(60),
+          rows: z.array(postedRowInput).max(20_000),
+          commit: z.boolean(),
+          replaceStarting: z.boolean(),
+        })
+        .parse(data),
   )
   .handler(({ data }) =>
     withMember(({ db, member }) =>
-      runImport(db, { ...data, importedBy: member.email }),
+      postTransactions(db, {
+        ...data,
+        importedBy: member.email,
+        via: 'uploaded',
+      }),
     ),
   )
 
-export interface ImportRecord {
-  id: string
-  fileName: string
-  importedBy: string
-  added: number
-  skipped: number
-  createdAt: string
-}
-
-export const listImports = createServerFn({ method: 'GET' }).handler(() =>
-  withMember(async ({ db }): Promise<Array<ImportRecord>> => {
-    const rows = await db
-      .select()
-      .from(imports)
-      .orderBy(sql`${imports.createdAt} desc`)
-      .limit(20)
-    return rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() }))
-  }),
-)
+/**
+ * Take out the starting purchases (the whole-household export Budgy began
+ * with) still here: one Account's, or every one.
+ */
+export const removeStartingPurchases = createServerFn({ method: 'POST' })
+  .validator((data: { account?: string }) =>
+    z.object({ account: z.string().min(1).max(60).optional() }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => removeStarting(db, data.account)),
+  )
 
 export const getImportRules = createServerFn({ method: 'GET' }).handler(() =>
   withMember(({ db }) => loadImportRules(db)),

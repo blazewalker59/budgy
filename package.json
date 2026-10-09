@@ -20,8 +20,6 @@
     "db:check": "drizzle-kit check && drizzle-kit generate --name=ci-drift-check | grep -q \"No schema changes\"",
     "db:migrate:local": "wrangler d1 migrations apply budgy-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply budgy-db --remote",
-    "seed:local": "bun scripts/seed.ts --local",
-    "seed:remote": "bun scripts/seed.ts --remote --env production",
     "postinstall": "lefthook install --force"
   },
   "dependencies": {

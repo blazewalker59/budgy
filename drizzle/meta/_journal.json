@@ -64,6 +64,13 @@
       "when": 1791517999765,
       "tag": "0008_saved_lenses",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791543881809,
+      "tag": "0009_import_account",
+      "breakpoints": true
     }
   ]
 }

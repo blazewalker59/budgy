@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { ImportScreen } from '@/components/import/ImportScreen'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 
+/** Purchases come in per Account now; old links land on Accounts. */
 export const Route = createFileRoute('/import')({
-  component: ImportScreen,
+  beforeLoad: () => {
+    throw redirect({ to: '/accounts' })
+  },
 })

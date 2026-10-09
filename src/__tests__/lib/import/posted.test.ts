@@ -3,16 +3,20 @@ import { UNCATEGORIZED, preparePosted, storeHistory } from '@/lib/import/posted'
 
 const ACCOUNT = 'Blaze Apple Card'
 
+type Input = Parameters<typeof preparePosted>[0]
+
 const prep = (
-  rows: Parameters<typeof preparePosted>[0]['rows'],
-  existing: Parameters<typeof preparePosted>[0]['existing'] = [],
+  rows: Input['rows'],
+  existing: Input['existing'] = [],
+  more: Partial<Input> = {},
 ) =>
   preparePosted({
     account: ACCOUNT,
     rows,
     categories: ['Groceries', 'Drinks & dining'],
-    history: new Map([['Kroger', 'Groceries']]),
+    history: storeHistory([{ store: 'Kroger', sourceCategory: 'Groceries' }]),
     existing,
+    ...more,
   })
 
 describe('storeHistory', () => {
@@ -22,7 +26,7 @@ describe('storeHistory', () => {
       { store: 'Target', sourceCategory: 'Groceries' },
       { store: 'Target', sourceCategory: 'Shopping' },
     ])
-    expect(h.get('Target')).toBe('Shopping')
+    expect(h.get('target')).toEqual({ store: 'Target', category: 'Shopping' })
   })
 })
 
@@ -35,7 +39,7 @@ describe('preparePosted', () => {
         amount: 12.5,
         category: 'drinks & dining',
       },
-      { date: '2026-10-07', description: 'KROGER #123', amount: 80 },
+      { date: '2026-10-07', description: 'KROGER', amount: 80 },
       { date: '2026-10-07', description: 'New Place', amount: 9 },
     ])
     expect(p.fresh.map((t) => [t.store, t.sourceCategory, t.filed])).toEqual([
@@ -113,5 +117,92 @@ describe('preparePosted', () => {
     expect(p.duplicates).toEqual([
       expect.objectContaining({ existing: 'Starbucks', amount: 6.25 }),
     ])
+  })
+
+  it('leaves out rows that aren’t spending, and files upkeep by the rules', async () => {
+    const p = await prep(
+      [
+        { date: '2026-10-07', description: 'Escrow Disbursement', amount: 900 },
+        { date: '2026-10-07', description: 'Index Fund Buy', amount: 500 },
+        { date: '2026-10-07', description: 'Green Lawn 555', amount: 75 },
+      ],
+      [],
+      {
+        rules: {
+          stores: [],
+          upkeep: 'Green Lawn',
+          mortgage: '',
+          notSpending: 'Index Fund',
+        },
+      },
+    )
+    expect(p.notSpending).toBe(2)
+    expect(p.fresh.map((t) => t.sourceCategory)).toEqual(['Home upkeep'])
+  })
+
+  it('carries a replaced starting purchase’s Move and note to its match', async () => {
+    const p = await prep(
+      [
+        { date: '2026-10-07', description: 'KROGER #123', amount: 80 },
+        { date: '2026-10-08', description: 'Corner Cafe', amount: 12.5 },
+      ],
+      [],
+      {
+        replacing: [
+          {
+            id: 'old1',
+            date: '2026-10-07',
+            amount: 8000,
+            description: 'Kroger',
+            store: 'Kroger Marketplace',
+            sourceCategory: 'Groceries',
+            category: 'Hosting',
+            note: 'party',
+          },
+          {
+            id: 'old2',
+            date: '2026-10-08',
+            amount: 999,
+            description: 'Elsewhere',
+            store: 'Elsewhere',
+            sourceCategory: 'Gifts',
+            category: 'Gifts',
+            note: null,
+          },
+        ],
+      },
+    )
+    expect(p.carried).toBe(1)
+    expect(
+      p.fresh.map((t) => [
+        t.store,
+        t.sourceCategory,
+        t.category,
+        t.note,
+        t.filed,
+      ]),
+    ).toEqual([
+      ['Kroger Marketplace', 'Groceries', 'Hosting', 'party', 'replaced'],
+      ['Corner Cafe', UNCATEGORIZED, null, null, 'uncategorized'],
+    ])
+  })
+
+  it('knows a Store already here by its name in any case', async () => {
+    const p = await prep(
+      [{ date: '2026-10-07', description: 'BLUE DOOR GYM', amount: 40 }],
+      [],
+      {
+        history: storeHistory([
+          { store: 'Blue Door Gym', sourceCategory: 'Kids' },
+          { store: 'Blue Door Gym', sourceCategory: 'Kids' },
+          { store: 'BLUE DOOR GYM', sourceCategory: 'Fitness' },
+        ]),
+      },
+    )
+    expect(p.fresh[0]).toMatchObject({
+      store: 'Blue Door Gym',
+      sourceCategory: 'Kids',
+      filed: 'store history',
+    })
   })
 })

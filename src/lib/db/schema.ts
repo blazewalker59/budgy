@@ -275,6 +275,11 @@ export const savedLenses = sqliteTable('saved_lenses', {
 export const imports = sqliteTable('imports', {
   id: text('id').primaryKey(),
   fileName: text('file_name').notNull(),
+  /**
+   * The one Account an upload or an Agent's post was for. Null for the
+   * whole-household exports Budgy started from (the starting purchases).
+   */
+  account: text('account'),
   importedBy: text('imported_by').notNull(),
   added: integer('added').notNull(),
   skipped: integer('skipped').notNull(),

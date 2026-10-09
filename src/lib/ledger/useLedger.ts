@@ -17,6 +17,7 @@ import {
   moveTxn,
   noteTxn,
   recordBalances,
+  removeStartingPurchases,
   saveAccount,
   saveCategory,
   saveLens,
@@ -231,6 +232,20 @@ export function useRecordBalances() {
         ].sort((a, b) => (a.date < b.date ? -1 : 1)),
       }
     },
+  )
+}
+
+/** Take out the starting purchases still here (one Account's, or all). */
+export function useRemoveStarting() {
+  return useEdit(
+    (v: { account?: string }) => removeStartingPurchases({ data: v }),
+    (l, v) => ({
+      ...l,
+      txns: l.txns.filter(
+        (t) =>
+          !t.starting || (v.account !== undefined && t.account !== v.account),
+      ),
+    }),
   )
 }
 

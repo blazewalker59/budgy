@@ -42,20 +42,6 @@ export function storeName(
   return d.slice(0, 40)
 }
 
-/** "Bank - Card Name (1234)" → the Household's name for it, else "Card Name (1234)". */
-export function accountName(
-  sourceName: string,
-  rules: ImportRules = EMPTY_RULES,
-): string {
-  return rules.accounts[sourceName] ?? sourceName.replace(/^[^-]+? - /, '')
-}
-
-/** Whose spending an Account is, until a Member says otherwise. */
-export function defaultOwner(account: string): string {
-  const first = account.split(' ')[0]
-  return OWNERS.find((o) => o !== 'Joint' && o === first) ?? 'Joint'
-}
-
 /** Escrow payouts (and the Household's investments) aren't spending. */
 export function isSpending(
   description: string,

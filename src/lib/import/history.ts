@@ -7,10 +7,12 @@
  * A transactions export (an "Amount" column, or Debit and Credit, but no
  * balance) isn't a balance history: it's read as changes instead, and the
  * balances are worked out backwards from one balance the Member knows
- * (rebuildBalances).
+ * (rebuildBalances), and its spending becomes the Account's purchases
+ * (purchasesFrom).
  */
 
 import { parseCsv } from './csv'
+import type { PostedRow } from './posted'
 
 export interface HistoryRow {
   date: string
@@ -25,12 +27,23 @@ export interface BalanceHistory {
   skipped: number
   /** The header the balances came from, when there was one. */
   column: string | null
+  /** A bank export with a running balance has its transactions too. */
+  changes?: TransactionHistory
+}
+
+/** One row of a transactions export. */
+export interface Change extends HistoryRow {
+  description?: string
+  /** The institution's category ("Restaurants"), when it gives one. */
+  category?: string
+  /** The institution's type ("Purchase", "Payment"), when it gives one. */
+  type?: string
 }
 
 export interface TransactionHistory {
   kind: 'transactions'
   /** Each row's date and amount, as exported (or Credit minus Debit). */
-  changes: Array<HistoryRow>
+  changes: Array<Change>
   skipped: number
   /** The header(s) the amounts came from. */
   column: string
@@ -76,6 +89,10 @@ const BALANCE = [/balance/i, /value|worth|market|total/i]
 const AMOUNT = /amount/i
 const DEBIT = /debit|withdrawal/i
 const CREDIT = /credit|deposit/i
+// A clean merchant name, when there's one, makes the better Store name.
+const DESCRIPTION = [/merchant|payee/i, /description/i, /memo|details/i]
+const CATEGORY = /category/i
+const TYPE = /^\s*(transaction\s*)?type\s*$/i
 
 export function parseBalanceHistory(text: string): ParsedHistory {
   const lines = text.includes('\t')
@@ -85,6 +102,7 @@ export function parseBalanceHistory(text: string): ParsedHistory {
 
   let column: number | null = null
   let header: string | null = null
+  let changes: TransactionHistory | undefined
   const first = cells[0] as Array<string> | undefined
   if (first && !first.some((c) => readDate(c))) {
     cells.shift()
@@ -96,18 +114,24 @@ export function parseBalanceHistory(text: string): ParsedHistory {
         break
       }
     }
-    if (column === null) {
-      const amount = first.findIndex((c) => AMOUNT.test(c))
-      const debit = first.findIndex((c) => DEBIT.test(c))
-      const credit = first.findIndex((c) => CREDIT.test(c))
-      if (amount >= 0) return readChanges(cells, [amount], first[amount].trim())
-      if (debit >= 0 && credit >= 0)
-        return readChanges(
-          cells,
-          [credit, debit],
-          `${first[credit].trim()} − ${first[debit].trim()}`,
-        )
-    }
+    const named = (re: RegExp) =>
+      first.findIndex((c, i) => i !== column && re.test(c))
+    const amount = named(AMOUNT)
+    const debit = named(DEBIT)
+    const credit = named(CREDIT)
+    const words = textColumns(first)
+    changes =
+      amount >= 0
+        ? readChanges(cells, [amount], first[amount].trim(), words)
+        : debit >= 0 && credit >= 0
+          ? readChanges(
+              cells,
+              [credit, debit],
+              `${first[credit].trim()} − ${first[debit].trim()}`,
+              words,
+            )
+          : undefined
+    if (column === null && changes) return changes
   }
 
   const byDate = new Map<string, number>()
@@ -133,6 +157,27 @@ export function parseBalanceHistory(text: string): ParsedHistory {
       .sort((a, b) => (a.date < b.date ? -1 : 1)),
     skipped,
     column: header,
+    ...(changes && { changes }),
+  }
+}
+
+interface TextColumns {
+  description: number
+  category: number
+  type: number
+}
+
+/** Where a transactions export keeps each row's words. */
+function textColumns(header: Array<string>): TextColumns {
+  let description = -1
+  for (const re of DESCRIPTION) {
+    description = header.findIndex((c) => re.test(c))
+    if (description >= 0) break
+  }
+  return {
+    description,
+    category: header.findIndex((c) => CATEGORY.test(c)),
+    type: header.findIndex((c) => TYPE.test(c)),
   }
 }
 
@@ -141,8 +186,11 @@ function readChanges(
   cells: Array<Array<string>>,
   [amountOrCredit, debit]: Array<number>,
   column: string,
+  text: TextColumns,
 ): TransactionHistory {
-  const changes: Array<HistoryRow> = []
+  const word = (row: Array<string>, i: number) =>
+    i >= 0 ? row[i]?.trim() || undefined : undefined
+  const changes: Array<Change> = []
   let skipped = 0
   let positive = 0
   for (const row of cells) {
@@ -161,7 +209,13 @@ function readChanges(
       continue
     }
     if (amount > 0) positive++
-    changes.push({ date, amount })
+    changes.push({
+      date,
+      amount,
+      description: word(row, text.description),
+      category: word(row, text.category),
+      type: word(row, text.type),
+    })
   }
   changes.sort((a, b) => (a.date < b.date ? -1 : 1))
   return {
@@ -184,6 +238,61 @@ export function guessDirection(h: TransactionHistory, debt: boolean): 1 | -1 {
   if (h.split) return debt ? -1 : 1
   const spendingPositive = h.positive > h.changes.length / 2
   return spendingPositive === debt ? 1 : -1
+}
+
+/** Card payments, transfers and pay: money moving, not spending. */
+const MOVING = /payment|autopay|transfer|xfer|deposit|payroll|direct dep/i
+const REFUND = /refund|return/i
+
+export interface Purchases {
+  rows: Array<PostedRow>
+  /** Payments, transfers and pay. */
+  moving: number
+  /** Money into a bank account that isn't a refund. */
+  moneyIn: number
+  /** Rows without a description to name a Store by. */
+  unnamed: number
+}
+
+/**
+ * The spending in a transactions export, as purchases for its Account:
+ * positive is spending, negative a refund. `direction` is how the amounts
+ * move the balance (guessDirection, flipped if the Member says so).
+ */
+export function purchasesFrom(
+  h: TransactionHistory,
+  direction: 1 | -1,
+  debt: boolean,
+): Purchases {
+  const out: Purchases = { rows: [], moving: 0, moneyIn: 0, unnamed: 0 }
+  for (const c of h.changes) {
+    if (!c.description) {
+      out.unnamed++
+      continue
+    }
+    if (MOVING.test(c.type ?? '') || MOVING.test(c.description)) {
+      out.moving++
+      continue
+    }
+    // On a card spending adds to what's owed; in a bank it takes away.
+    const spent = (debt ? 1 : -1) * direction * c.amount
+    if (spent === 0) continue
+    if (
+      spent < 0 &&
+      !debt &&
+      !REFUND.test(`${c.type ?? ''} ${c.description}`)
+    ) {
+      out.moneyIn++
+      continue
+    }
+    out.rows.push({
+      date: c.date,
+      description: c.description,
+      amount: spent / 100,
+      category: c.category ?? null,
+    })
+  }
+  return out
 }
 
 /**

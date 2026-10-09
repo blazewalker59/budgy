@@ -3,7 +3,7 @@
  * functions and the Agents' MCP tools (docs/adr/0004). Server-only.
  */
 
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { Ledger } from '@/lib/model/types'
 import {
@@ -11,6 +11,7 @@ import {
   balances,
   budgetTargets,
   categories,
+  imports,
   paySchedules,
   plannedExpenses,
   savedLenses,
@@ -38,8 +39,10 @@ export async function loadLedger(db: Database): Promise<Ledger> {
           amount: transactions.amount,
           category: transactions.category,
           note: transactions.note,
+          starting: sql<number>`${imports.account} is null`,
         })
         .from(transactions)
+        .leftJoin(imports, eq(imports.id, transactions.importId))
         .orderBy(transactions.date),
       db.select().from(paySchedules).orderBy(paySchedules.createdAt),
       db.select().from(storeRules),
@@ -80,7 +83,9 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       ...l,
       lens: readLens(l.lens as Record<string, unknown>),
     })),
-    txns,
+    txns: txns.map(({ starting, ...t }) =>
+      starting ? { ...t, starting: true } : t,
+    ),
     pay: pay.map(({ id, name, amount, cadence, anchor, secondDay }) => ({
       id,
       name,

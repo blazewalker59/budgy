@@ -13,8 +13,6 @@ as sportsline. Google sign-in, limited to the Household's emails.
 ```sh
 bun install
 bun run db:migrate:local
-# Put the CSV exports (and the planning artifact's artifact-state.json) in seed/
-bun run seed:local
 bun run dev                     # http://localhost:3000
 ```
 
@@ -38,14 +36,14 @@ An MCP server at `/mcp` for AI agents (docs/adr/0004): make a token on the
 Agents page (account menu), then e.g.
 `claude mcp add --transport http budgy https://<host>/mcp --header "Authorization: Bearer bg_…"`.
 Tools cover spending summaries, breakdowns, history, the Budget, upcoming
-bills, Budget Alerts and a Daily Digest; write tokens can also import CSV
-exports and Move or note purchases.
+bills, Budget Alerts and a Daily Digest; write tokens can also add an
+account's purchases, record balances, and Move or note purchases.
 
 ## Deploy
 
 Merges to `main` deploy to production via GitHub Actions (no staging). By
 hand: `bun run ship`. Migrations: `bun run db:migrate:remote -- --env production`.
-Starting data: `bun run seed:remote`.
+Purchases come in per Account: upload its export on its Accounts sheet.
 
 Worker secrets (`wrangler secret put <NAME> --env production`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,

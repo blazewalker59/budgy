@@ -17,10 +17,11 @@ none of that can live in code.
 - The code keeps only generic rules: processor prefixes, check and ATM rows,
   big chains, hardware stores as upkeep, escrow disbursements, and personal
   Categories named after an Owner.
-- The Household's rules are one JSON record (`settings.import_rules`): an
-  account-name map, store aliases, and patterns for upkeep vendors, the
-  mortgage servicer and non-spending rows. Members edit it on the Import
-  screen; `scripts/seed.ts` loads it from the git-ignored `seed/`.
+- The Household's rules are one JSON record (`settings.import_rules`): store
+  aliases, and patterns for upkeep vendors, the mortgage servicer and
+  non-spending rows. Members edit it at the foot of Accounts. (The
+  whole-household import, its account-name map and the seed script are gone:
+  purchases come in per Account, docs/adr/0005.)
 - Rules shape future imports only; Transactions already imported keep their
   Store and Category (Moves and Store Rules change those).
 

@@ -2,7 +2,8 @@
  * What an Agent can do with Budgy (docs/adr/0004): read the Household's
  * spending every way the app shows it, hear Budget Alerts, get a Daily
  * Digest of a day's purchases across every Account and, with a `write`
- * token, import an export and Move or note a purchase. Amounts are US
+ * token, add an account's purchases, record balances, and Move or note a
+ * purchase. Amounts are US
  * dollars. Everything reads the Ledger fresh for each call.
  */
 
@@ -17,12 +18,12 @@ import {
   moveTransaction,
   noteTransaction,
 } from '@/lib/ledger/queries'
-import { runImport } from '@/lib/ledger/importer'
 import {
   findAccount,
   postTransactions,
   recordBalances,
 } from '@/lib/ledger/accounts'
+import { postedRowInput } from '@/lib/import/posted'
 import {
   equity,
   isDebt,
@@ -42,10 +43,10 @@ import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
 import { CADENCE_LABELS, OWNERS, PAY_CADENCE_LABELS } from '@/lib/model/types'
 
-export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Data is only as fresh as the latest imported export: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have the finance app's latest CSV export, import it with import_transactions_csv (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
+export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Purchases arrive per account (a Member's upload of that account's export, or an Agent's add_transactions), so data is only as fresh as each account's latest: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have an account's new purchases (say, the day's Apple Card activity), add them with add_transactions (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
 
 export const WRITE_INSTRUCTIONS =
-  'This token may also change the Ledger: import_transactions_csv adds new purchases from the finance app’s export; add_transactions adds purchases you read yourself to one account (for a daily Apple Card upload: the day’s purchases, commit true); record_balances records account balances, one or a whole history; update_transaction moves a purchase to another Category or notes it. Preview imports with commit false first unless asked for a scheduled one. Say what you changed.'
+  'This token may also change the Ledger: add_transactions adds purchases you read yourself to one account (for a daily Apple Card upload: the day’s purchases, commit true); record_balances records account balances, one or a whole history; update_transaction moves a purchase to another Category or notes it. Preview purchases with commit false first unless asked for a scheduled one. Say what you changed.'
 
 const MONTH = z.string().regex(/^\d{4}-\d{2}$/, 'A month as YYYY-MM')
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date as YYYY-MM-DD')
@@ -554,31 +555,6 @@ export function budgyTools(
 
   const write: Array<McpTool> = [
     tool({
-      name: 'import_transactions_csv',
-      title: 'Import transactions (CSV)',
-      description:
-        'Import the finance app’s CSV export (columns Date, Description, Type, Category, Amount, Account, …). Only spending is kept; purchases already imported are never added twice, so overlapping exports are safe. With commit false (the default) it only reports what would be added.',
-      input: z.object({
-        fileName: z.string().max(200).default('agent-import.csv'),
-        csv: z
-          .string()
-          .min(1)
-          .max(5_000_000)
-          .describe('The whole CSV file as text'),
-        commit: z.boolean().default(false),
-      }),
-      call: async ({ fileName, csv, commit }) => {
-        const summary = await runImport(db, {
-          fileName,
-          text: csv,
-          commit,
-          importedBy: `${caller.memberEmail} via ${caller.agentName}`,
-        })
-        cached = null
-        return { committed: commit && summary.added > 0, ...summary }
-      },
-    }),
-    tool({
       name: 'record_balances',
       title: 'Record balances',
       description:
@@ -629,19 +605,7 @@ export function budgyTools(
         'Add purchases you read yourself (say, a day of Apple Card activity) to one account. Each is filed under the category given if it names one of the household’s categories, else where that store’s purchases usually go, else Uncategorized. Purchases already there are skipped, including one on the same day for the same amount under another description, so posting the same day twice is safe. Leave out card payments and transfers. With commit false (the default) it only reports what would be added.',
       input: z.object({
         account: z.string().min(1).max(60),
-        transactions: z
-          .array(
-            z.object({
-              date: DATE,
-              description: z.string().trim().min(1).max(200),
-              amount: z
-                .number()
-                .describe('Dollars; positive is spending, negative a refund'),
-              category: z.string().max(60).nullable().optional(),
-            }),
-          )
-          .min(1)
-          .max(2000),
+        transactions: z.array(postedRowInput).min(1).max(2000),
         commit: z.boolean().default(false),
       }),
       call: async ({ account, transactions, commit }) => {

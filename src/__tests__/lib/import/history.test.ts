@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   guessDirection,
   parseBalanceHistory,
+  purchasesFrom,
   readDate,
   readMoney,
   rebuildBalances,
@@ -82,7 +83,14 @@ describe('a transactions export', () => {
       skipped: 0,
     })
     if (p.kind !== 'transactions') return
-    expect(p.changes[0]).toEqual({ date: '2026-01-05', amount: 500 })
+    // The clean Merchant name wins over the raw Description.
+    expect(p.changes[0]).toEqual({
+      date: '2026-01-05',
+      amount: 500,
+      description: 'Coffee',
+      category: 'Restaurants',
+      type: 'Purchase',
+    })
   })
 
   it('knows spending adds to a card’s balance and takes from a bank’s', () => {
@@ -108,11 +116,84 @@ describe('a transactions export', () => {
     expect(guessDirection(p, false)).toBe(1)
   })
 
-  it('uses a running Balance column when the export has one', () => {
+  it('uses a running Balance column when the export has one, keeping its transactions', () => {
     const p = parseBalanceHistory(
       'Date,Description,Amount,Balance\n2026-01-02,Rent,-1000,4000\n2026-01-15,Pay,2000,6000',
     )
     expect(p).toMatchObject({ kind: 'balances', column: 'Balance' })
+    if (p.kind !== 'balances') return
+    expect(p.changes?.changes.map((c) => [c.description, c.amount])).toEqual([
+      ['Rent', -100_000],
+      ['Pay', 200_000],
+    ])
+  })
+})
+
+describe('purchasesFrom', () => {
+  it('makes a card’s spending its purchases, leaving out payments', () => {
+    const p = parseBalanceHistory(
+      [
+        'Transaction Date,Description,Merchant,Category,Type,Amount (USD)',
+        '01/05/2026,COFFEE 123,Coffee,Restaurants,Purchase,5.00',
+        '01/06/2026,BOOKS,Books,Shopping,Purchase,20.00',
+        '01/07/2026,SHOES,Shoes,Shopping,Credit,-60.00',
+        '02/03/2026,ACH PAYMENT,Card,Payment,Payment,-100.00',
+        '02/04/2026,,,,Purchase,12.00',
+      ].join('\n'),
+    )
+    if (p.kind !== 'transactions') throw new Error('transactions expected')
+    const out = purchasesFrom(p, guessDirection(p, true), true)
+    expect(out.rows).toEqual([
+      {
+        date: '2026-01-05',
+        description: 'Coffee',
+        amount: 5,
+        category: 'Restaurants',
+      },
+      {
+        date: '2026-01-06',
+        description: 'Books',
+        amount: 20,
+        category: 'Shopping',
+      },
+      {
+        date: '2026-01-07',
+        description: 'Shoes',
+        amount: -60,
+        category: 'Shopping',
+      },
+    ])
+    expect(out).toMatchObject({ moving: 1, unnamed: 1, moneyIn: 0 })
+  })
+
+  it('leaves out a bank’s deposits and transfers but keeps refunds', () => {
+    const p = parseBalanceHistory(
+      [
+        'Date,Description,Amount',
+        '2026-01-02,Hardware Store,-80',
+        '2026-01-03,Grocer,-50',
+        '2026-01-04,Grocer refund,10',
+        '2026-01-15,Employer,2000',
+        '2026-01-16,Online Transfer to Savings,-500',
+      ].join('\n'),
+    )
+    if (p.kind !== 'transactions') throw new Error('transactions expected')
+    const out = purchasesFrom(p, guessDirection(p, false), false)
+    expect(out.rows.map((r) => [r.description, r.amount])).toEqual([
+      ['Hardware Store', 80],
+      ['Grocer', 50],
+      ['Grocer refund', -10],
+    ])
+    expect(out).toMatchObject({ moving: 1, moneyIn: 1 })
+  })
+
+  it('follows a flipped direction', () => {
+    const p = parseBalanceHistory(
+      'Date,Description,Amount\n2026-01-02,Lunch,15',
+    )
+    if (p.kind !== 'transactions') throw new Error('transactions expected')
+    expect(purchasesFrom(p, 1, true).rows[0].amount).toBe(15)
+    expect(purchasesFrom(p, -1, true).rows[0].amount).toBe(-15)
   })
 })
 

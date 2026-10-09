@@ -1,10 +1,10 @@
 /**
- * Changing Accounts and their Balances in D1, and adding purchases an Agent
- * posts for one Account. Shared by the app's server functions and the
+ * Changing Accounts and their Balances in D1, and adding one Account's
+ * purchases (uploaded, or posted by an Agent). Shared by the app's server functions and the
  * Agents' tools. Server-only.
  */
 
-import { and, between, eq, sql } from 'drizzle-orm'
+import { and, between, eq, inArray, isNull, sql } from 'drizzle-orm'
 import {
   ROWS_PER_INSERT,
   STATEMENTS_PER_BATCH,
@@ -133,6 +133,8 @@ export async function deleteBalance(
 export interface PostSummary extends Omit<Prepared, 'fresh'> {
   account: string
   added: number
+  /** Starting purchases over the same dates, taken out for these. */
+  replaced: number
   filed: Array<{
     date: string
     description: string
@@ -142,9 +144,14 @@ export interface PostSummary extends Omit<Prepared, 'fresh'> {
   }>
 }
 
+/** A Transaction from the whole-household export Budgy started from. */
+const isStarting = sql<number>`${imports.account} is null`
+
 /**
- * Add the purchases an Agent read for one Account. Without `commit`, only
- * say what would happen.
+ * Add purchases for one Account: from its uploaded export, or read by an
+ * Agent. With `replaceStarting`, the starting purchases over the same dates
+ * make way for these (each handing its Move and note to its match).
+ * Without `commit`, only say what would happen.
  */
 export async function postTransactions(
   db: Database,
@@ -153,11 +160,14 @@ export async function postTransactions(
     rows: Array<PostedRow>
     commit: boolean
     importedBy: string
+    replaceStarting?: boolean
+    /** How the import is listed: an Agent's post or a Member's upload. */
+    via?: 'posted' | 'uploaded'
   },
 ): Promise<PostSummary> {
   const account = await findAccount(db, input.account)
   const dates = input.rows.map((r) => r.date).sort()
-  const [rules, cats, history, existing] = await Promise.all([
+  const [rules, cats, history, inRange] = await Promise.all([
     loadImportRules(db),
     db.select({ name: categories.name }).from(categories),
     db
@@ -173,8 +183,14 @@ export async function postTransactions(
             date: transactions.date,
             amount: transactions.amount,
             description: transactions.description,
+            store: transactions.store,
+            sourceCategory: transactions.sourceCategory,
+            category: transactions.category,
+            note: transactions.note,
+            starting: isStarting,
           })
           .from(transactions)
+          .leftJoin(imports, eq(imports.id, transactions.importId))
           .where(
             and(
               eq(transactions.account, account.name),
@@ -183,32 +199,55 @@ export async function postTransactions(
           )
       : Promise.resolve([]),
   ])
+  const replacing = input.replaceStarting
+    ? inRange.filter((t) => t.starting)
+    : []
+  const existing = input.replaceStarting
+    ? inRange.filter((t) => !t.starting)
+    : inRange
   const prepared = await preparePosted({
     account: account.name,
     rows: input.rows,
     categories: cats.map((c) => c.name),
     history: storeHistory(history),
     existing,
+    replacing,
     rules,
   })
   const summary: PostSummary = {
     account: account.name,
     added: prepared.fresh.length,
+    replaced: replacing.length,
     alreadyHad: prepared.alreadyHad,
+    notSpending: prepared.notSpending,
+    carried: prepared.carried,
     duplicates: prepared.duplicates,
     filed: prepared.fresh.map((t) => ({
       date: t.date,
       description: t.description,
       amount: t.amount / 100,
-      category: t.sourceCategory,
+      category: t.category ?? t.sourceCategory,
       how: t.filed,
     })),
   }
-  if (!input.commit || !prepared.fresh.length) return summary
+  if (!input.commit || (!prepared.fresh.length && !replacing.length))
+    return summary
 
   const importId = `im_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
   const statements = []
-  for (const name of new Set(prepared.fresh.map((t) => t.sourceCategory)))
+  // Out first, so a new row with a starting one's id can take its place.
+  for (let i = 0; i < replacing.length; i += IDS_PER_DELETE)
+    statements.push(
+      db.delete(transactions).where(
+        inArray(
+          transactions.id,
+          replacing.slice(i, i + IDS_PER_DELETE).map((t) => t.id),
+        ),
+      ),
+    )
+  const categoryNames = new Set(prepared.fresh.map((t) => t.sourceCategory))
+  for (const t of prepared.fresh) if (t.category) categoryNames.add(t.category)
+  for (const name of categoryNames)
     statements.push(
       db.insert(categories).values(newCategory(name)).onConflictDoNothing(),
     )
@@ -229,7 +268,8 @@ export async function postTransactions(
   statements.push(
     db.insert(imports).values({
       id: importId,
-      fileName: `posted to ${account.name}`,
+      fileName: `${input.via ?? 'posted'} to ${account.name}`,
+      account: account.name,
       importedBy: input.importedBy,
       added: prepared.fresh.length,
       skipped: prepared.alreadyHad + prepared.duplicates.length,
@@ -240,4 +280,41 @@ export async function postTransactions(
     await db.batch(chunk as [(typeof chunk)[number], ...typeof chunk])
   }
   return summary
+}
+
+/** D1 binds at most 100 values a statement. */
+const IDS_PER_DELETE = 90
+
+/**
+ * Take out the starting purchases still here (one Account's, or all), for
+ * when each Account's own uploads have taken over. Returns how many.
+ */
+export async function removeStarting(
+  db: Database,
+  account?: string,
+): Promise<number> {
+  const starting = db
+    .select({ id: imports.id })
+    .from(imports)
+    .where(isNull(imports.account))
+  const where = account
+    ? and(
+        inArray(transactions.importId, starting),
+        eq(transactions.account, account),
+      )
+    : inArray(transactions.importId, starting)
+  const gone = await db
+    .delete(transactions)
+    .where(where)
+    .returning({ id: transactions.id })
+  // A starting import with nothing left is history no one needs.
+  await db
+    .delete(imports)
+    .where(
+      and(
+        isNull(imports.account),
+        sql`not exists (select 1 from ${transactions} where ${transactions.importId} = ${imports.id})`,
+      ),
+    )
+  return gone.length
 }

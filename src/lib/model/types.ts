@@ -117,6 +117,11 @@ export interface Txn {
   /** This Transaction's own Move, if any. */
   category: string | null
   note: string | null
+  /**
+   * From the whole-household export Budgy started from, until that
+   * Account's own upload replaces it.
+   */
+  starting?: boolean
 }
 
 /** How often a paycheck comes. */

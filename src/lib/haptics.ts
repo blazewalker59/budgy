@@ -2,8 +2,8 @@
  * A light buzz under the finger, so the installed app (src/lib/pwa.ts)
  * feels native on a phone. Android has the Vibration API; iOS Safari has
  * none, but ticks when a switch (`<input type="checkbox" switch>`, iOS 18+)
- * is toggled by its label, so a hidden one is clicked instead: one tick per
- * buzz there. Touch screens only, and only during a tap or gesture.
+ * is toggled by its label during a tap, so a hidden one is clicked instead:
+ * one tick per buzz there. Touch screens only, and only during a tap or gesture.
  */
 
 import { useEffect } from 'react'
@@ -33,27 +33,28 @@ const TICK_MS = 90
 const SAME_TAP_MS = 50
 
 let last = 0
-let iosSwitch: HTMLLabelElement | null = null
 
 const touch = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(pointer: coarse)').matches
 
+const ios = () =>
+  /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+/** One tick on iOS: a fresh hidden switch, clicked by its label, then gone. */
 function tick(): void {
-  if (!iosSwitch) {
-    iosSwitch = document.createElement('label')
-    iosSwitch.setAttribute('aria-hidden', 'true')
-    iosSwitch.dataset.haptic = 'off'
-    iosSwitch.style.cssText =
-      'position:fixed;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;'
-    const input = document.createElement('input')
-    input.type = 'checkbox'
-    input.setAttribute('switch', '')
-    input.tabIndex = -1
-    iosSwitch.appendChild(input)
-    document.body.appendChild(iosSwitch)
-  }
-  iosSwitch.click()
+  const label = document.createElement('label')
+  label.setAttribute('aria-hidden', 'true')
+  label.dataset.haptic = 'off'
+  label.style.display = 'none'
+  const input = document.createElement('input')
+  input.type = 'checkbox'
+  input.setAttribute('switch', '')
+  label.appendChild(input)
+  document.head.appendChild(label)
+  label.click()
+  label.remove()
 }
 
 export function haptic(kind: Haptic = 'tap'): void {
@@ -61,7 +62,7 @@ export function haptic(kind: Haptic = 'tap'): void {
   const now = performance.now()
   if (now - last < SAME_TAP_MS) return
   last = now
-  if ('vibrate' in navigator) {
+  if (!ios() && 'vibrate' in navigator) {
     try {
       navigator.vibrate(PATTERNS[kind])
     } catch {

@@ -40,14 +40,22 @@ describe('haptics', () => {
     expect(vibrate).toHaveBeenCalledTimes(1)
   })
 
-  it('ticks a hidden switch on iOS, which has no vibrate', () => {
+  it('ticks a fresh hidden switch on iOS, even where vibrate exists', () => {
     coarse(true)
-    haptic()
-    const label = document.querySelector('label[data-haptic="off"]')!
-    expect(label.querySelector('input[switch]')).not.toBeNull()
-    expect((label.querySelector('input') as HTMLInputElement).checked).toBe(
-      true,
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X)',
     )
+    const vibrate = vi.fn()
+    Object.assign(navigator, { vibrate })
+    const toggled: Array<boolean> = []
+    document.addEventListener('change', (e) => {
+      const input = e.target as HTMLInputElement
+      if (input.hasAttribute('switch')) toggled.push(input.checked)
+    })
+    haptic()
+    expect(toggled).toEqual([true])
+    expect(vibrate).not.toHaveBeenCalled()
+    expect(document.querySelector('input[switch]')).toBeNull()
   })
 
   it('does nothing with a mouse', () => {

@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { haptic } from '@/lib/haptics'
 
 /** Drag further than this (px), or flick faster than FLICK, to dismiss. */
 const DISMISS_PX = 110
@@ -82,6 +83,8 @@ export function Sheet({
       setDrag(0)
       return
     }
+    // A tick where letting go would dismiss it, either way across.
+    if (dy > DISMISS_PX !== drag > DISMISS_PX) haptic('select')
     setDrag(dy)
   }
   const onTouchEnd = (e: React.TouchEvent) => {

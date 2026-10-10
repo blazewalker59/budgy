@@ -215,6 +215,7 @@ function Details({
         <button
           type="button"
           onClick={onDelete}
+          data-haptic="warning"
           className="inline-flex items-center gap-1 rounded px-1 text-muted hover:text-over"
         >
           <Trash2 size={13} aria-hidden /> Delete
@@ -712,6 +713,7 @@ function StartingHere({ name }: { name: string }) {
           setConfirm(false)
         }}
         onBlur={() => setConfirm(false)}
+        data-haptic={confirm ? 'warning' : undefined}
         className="font-semibold text-over"
       >
         {confirm ? `Remove ${n}? Tap again` : `Remove them`}

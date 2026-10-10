@@ -1,8 +1,8 @@
 import { useState } from 'react'
+import { Dropdown } from './Dropdown'
 import { useBook } from '@/lib/ledger/book'
 import { TRANSFER, allCategoryNames } from '@/lib/model/ledger'
 import { cn } from '@/lib/utils'
-import { Dropdown } from '@/components/shared/Dropdown'
 
 const NEW = '__new'
 

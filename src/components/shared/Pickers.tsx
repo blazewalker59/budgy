@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { Dropdown } from './Dropdown'
 import { monthLabel, shiftMonth } from '@/lib/model/dates'
-import { Dropdown } from '@/components/shared/Dropdown'
 
 export function MonthPicker({
   month,

@@ -1,10 +1,5 @@
 import type { Tag } from '@/lib/model/types'
 
-export const TAG_TEXT: Record<Tag, string> = {
-  need: 'text-need',
-  nice: 'text-nice',
-  fluff: 'text-fluff',
-}
 export const TAG_BG: Record<Tag, string> = {
   need: 'bg-need',
   nice: 'bg-nice',

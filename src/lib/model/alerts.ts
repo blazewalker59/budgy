@@ -21,7 +21,7 @@ import { setAside } from './plans'
 import type { LedgerIndex } from './ledger'
 import type { Occurrence } from './plans'
 
-export type AlertKind =
+type AlertKind =
   | 'over-target'
   | 'on-pace-over'
   | 'budget-on-pace-over'
@@ -31,7 +31,7 @@ export type AlertKind =
   | 'missing-imports'
   | 'possible-duplicates'
 
-export type Severity = 'high' | 'medium' | 'info'
+type Severity = 'high' | 'medium' | 'info'
 
 export interface Alert {
   kind: AlertKind
@@ -44,9 +44,9 @@ export interface Alert {
 }
 
 /** Bills due within this many days are worth a heads-up. */
-export const BILL_NOTICE_DAYS = 14
+const BILL_NOTICE_DAYS = 14
 /** A single purchase this big (cents) in the last week is worth a mention. */
-export const LARGE_PURCHASE = 30_000
+const LARGE_PURCHASE = 30_000
 /** Pace alerts wait until this share of the month has gone, so day 2 isn't alarming. */
 const PACE_FROM = 0.33
 

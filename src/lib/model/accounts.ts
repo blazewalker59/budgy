@@ -89,7 +89,7 @@ export interface WorthMonth extends NetWorth {
  * from its first Balance; a closed one counts until it's closed only if it
  * was given a final Balance (closing records zero).
  */
-export function worthAsOf(ledger: Ledger, date: string): NetWorth {
+function worthAsOf(ledger: Ledger, date: string): NetWorth {
   const kinds = new Map(ledger.accounts.map((a) => [a.name, a]))
   let assets = 0
   let debts = 0

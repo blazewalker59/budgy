@@ -13,22 +13,22 @@ import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, TAGS, TAG_LABELS } from './types'
 import type { LedgerIndex } from './ledger'
 import type { AccountKind, Tag, Txn } from './types'
 
-export type Flag = 'refunds' | 'planned' | 'uncategorized' | 'big'
-export const FLAGS: ReadonlyArray<Flag> = [
+type Flag = 'refunds' | 'planned' | 'uncategorized' | 'big'
+const FLAGS: ReadonlyArray<Flag> = [
   'refunds',
   'planned',
   'uncategorized',
   'big',
 ]
-export const FLAG_LABELS: Record<Flag, string> = {
+const FLAG_LABELS: Record<Flag, string> = {
   refunds: 'Refunds',
   planned: 'Planned bills',
   uncategorized: 'Uncategorized',
   big: '$300 and up',
 }
 /** A purchase this big is "big". */
-export const BIG = 30_000
-export const UNCATEGORIZED = 'Uncategorized'
+const BIG = 30_000
+const UNCATEGORIZED = 'Uncategorized'
 
 export interface Lens {
   people?: Array<string>

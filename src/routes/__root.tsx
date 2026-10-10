@@ -34,7 +34,11 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       { name: 'apple-mobile-web-app-title', content: 'Budgy' },
       { name: 'mobile-web-app-capable', content: 'yes' },
       { name: 'robots', content: 'noindex' },
-      { name: 'description', content: 'Our household budget' },
+      {
+        name: 'description',
+        content:
+          'A shared household budget: understand spending, plan upcoming expenses, and track your financial picture together.',
+      },
     ],
     links: [
       { rel: 'stylesheet', href: appCss },

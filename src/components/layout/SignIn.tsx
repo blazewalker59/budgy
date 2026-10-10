@@ -1,4 +1,5 @@
-import { signIn, signOut } from '@/lib/auth/client'
+import { GoogleSignInButton, SignedOutHome } from './SignedOutHome'
+import { signOut } from '@/lib/auth/client'
 
 function Frame({ children }: { children: React.ReactNode }) {
   return (
@@ -18,19 +19,20 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 export function SignIn({ callbackURL = '/' }: { callbackURL?: string }) {
+  if (callbackURL === '/') return <SignedOutHome />
   return (
     <Frame>
-      <h1 className="text-2xl font-extrabold tracking-tight">Budgy</h1>
+      <h1 className="text-2xl font-extrabold tracking-tight">
+        Join your Household
+      </h1>
       <p className="mt-2 text-sm text-muted">
-        Our household budget: where the money went, and what’s coming.
+        Sign in with the Google account your invitation was sent to. You’ll
+        review the Household before accepting—signing in won’t join it
+        automatically.
       </p>
-      <button
-        type="button"
-        onClick={() => void signIn.social({ provider: 'google', callbackURL })}
-        className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background"
-      >
-        Sign in with Google
-      </button>
+      <div className="mt-6">
+        <GoogleSignInButton callbackURL={callbackURL} />
+      </div>
     </Frame>
   )
 }

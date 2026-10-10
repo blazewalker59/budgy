@@ -64,7 +64,9 @@ export function ImportRules() {
         <p>How future uploads are named and categorized.</p>
         <ul className="list-disc pl-4">
           <li>Stores that go by another name</li>
-          <li>Local vendors that count as home upkeep</li>
+          <li>Hardware stores and other home upkeep</li>
+          <li>Descriptions that aren’t upkeep</li>
+          <li>The category that splits into mortgage and utilities</li>
           <li>Rows that aren’t spending</li>
         </ul>
       </div>

@@ -131,7 +131,10 @@ describe('preparePosted', () => {
         rules: {
           stores: [],
           upkeep: 'Green Lawn',
+          hardware: [],
+          upkeepExclude: '',
           mortgage: '',
+          mortgageCategory: '',
           notSpending: 'Index Fund',
         },
       },

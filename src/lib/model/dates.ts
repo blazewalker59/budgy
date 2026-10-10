@@ -116,13 +116,16 @@ export function relativeDays(from: string, to: string): string {
   return `in ${Math.round(n / 30.4)} months`
 }
 
+/** Fallback when a Household has no usable IANA zone of its own. */
+export const DEFAULT_TIME_ZONE = 'America/New_York'
+
 /** Today's date in the Household's time zone. */
-export function today(timeZone = 'America/New_York'): string {
+export function today(timeZone = DEFAULT_TIME_ZONE): string {
   return dateOn(new Date(), timeZone)
 }
 
 /** The date a moment falls on in the Household's time zone. */
-export function dateOn(at: Date, timeZone = 'America/New_York'): string {
+export function dateOn(at: Date, timeZone = DEFAULT_TIME_ZONE): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',

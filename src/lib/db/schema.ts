@@ -126,6 +126,16 @@ const createdAt = () =>
 export const households = sqliteTable('households', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  /**
+   * IANA zone for this Household's "today": sync, the digest, and the UI.
+   * The original Household stays on America/New_York (0015).
+   */
+  timeZone: text('time_zone').notNull().default('America/New_York'),
+  /**
+   * JSON array of spending owners ("Joint", members, a child). Import turns
+   * any of these except Joint into a "<name> personal" Category.
+   */
+  owners: text('owners').notNull().default('["Joint"]'),
   createdAt: createdAt(),
 })
 

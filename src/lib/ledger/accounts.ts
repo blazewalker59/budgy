@@ -14,6 +14,7 @@ import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Account, Balance } from '@/lib/model/types'
 import type { PostedRow, Prepared } from '@/lib/import/posted'
 import type { UpdateSource } from '@/lib/updates/receipts'
+import { householdOwners } from '@/lib/households/locale'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import {
   accountInputs,
@@ -305,8 +306,9 @@ async function postTransactionsUnlocked(
 ): Promise<PostSummary> {
   const account = await findAccount(db, input.account)
   const dates = input.rows.map((r) => r.date).sort()
-  const [rules, cats, history, inRange] = await Promise.all([
+  const [rules, owners, cats, history, inRange] = await Promise.all([
     loadImportRules(db),
+    householdOwners(db),
     db
       .select({ name: categories.name })
       .from(categories)
@@ -395,6 +397,7 @@ async function postTransactionsUnlocked(
         categories: cats.map((c) => c.name),
         history: storeHistory(history),
         rules,
+        owners,
       })
     : null
   const prepared =
@@ -407,6 +410,7 @@ async function postTransactionsUnlocked(
       existing,
       replacing,
       rules,
+      owners,
     }))
   const summary: PostSummary = {
     account: account.name,

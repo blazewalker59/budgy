@@ -5,9 +5,8 @@
  * change these only with care.
  */
 
-import { EMPTY_RULES, compile } from './rules'
+import { EMPTY_RULES, compile, completeRules } from './rules'
 import type { ImportRules } from './rules'
-import { OWNERS } from '@/lib/model/types'
 
 const PREFIX = /^(Pp|Wwp|Sq|Tst|Sp|Wf|Ddbr|Dd)\s*\*\s*/i
 
@@ -51,31 +50,31 @@ export function isSpending(
   return !compile(rules.notSpending)?.test(description)
 }
 
-const HARDWARE = /Lowe's|Home Depot|Ace Hardware/i
-
 /** The finance app's Category, re-filed into this Household's buckets. */
 export function bucketCategory(
   category: string,
   description: string,
   store: string,
   rules: ImportRules = EMPTY_RULES,
+  owners: ReadonlyArray<string> = [],
 ): string {
-  const upkeep = compile(rules.upkeep, 'i')
-  if (
-    (HARDWARE.test(description) || upkeep?.test(description)) &&
-    !description.toLowerCase().includes('golf')
+  const filed = completeRules(rules)
+  const upkeep = compile(filed.upkeep, 'i')
+  const hardware = filed.hardware.some(
+    (name) =>
+      name.length > 0 && description.toLowerCase().includes(name.toLowerCase()),
   )
-    return 'Home upkeep'
+  const excluded = compile(filed.upkeepExclude, 'i')?.test(description) ?? false
+  if ((hardware || upkeep?.test(description)) && !excluded) return 'Home upkeep'
   if (store === 'Paper checks' || store === 'Cash withdrawals')
     return 'Checks & cash'
-  if (category === 'Mortgage and Utilities')
-    return compile(rules.mortgage)?.test(description)
+  if (filed.mortgageCategory && category === filed.mortgageCategory)
+    return compile(filed.mortgage)?.test(description)
       ? 'Mortgage'
       : 'Utilities & phones'
-  if (
-    (OWNERS as ReadonlyArray<string>).includes(category) &&
-    category !== 'Joint'
-  )
+  // Joint is the shared label, not a person. Other owners' export categories
+  // are that person's spending.
+  if (owners.some((owner) => owner !== 'Joint' && owner === category))
     return `${category} personal`
   return category
 }

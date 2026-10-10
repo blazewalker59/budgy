@@ -16,6 +16,7 @@ import {
   revokeAccountUploadToken,
 } from '@/lib/updates/server'
 import { UPLOAD_TOKENS_KEY, useUploadTokens } from '@/lib/updates/useUpdates'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 import { CopyLine } from '@/components/shared/CopyLine'
 import { Dropdown } from '@/components/shared/Dropdown'
 
@@ -32,6 +33,7 @@ export function ShortcutUpload({
     savedFormat ?? (account.kind === 'credit' ? 'apple-card' : ''),
   )
   const [created, setCreated] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState<string | null>(null)
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: UPLOAD_TOKENS_KEY })
   const create = useMutation({
@@ -149,25 +151,37 @@ export function ShortcutUpload({
       {!!mine.length && (
         <ul className="divide-y divide-border rounded-xl border border-border">
           {mine.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 px-3 py-1.5">
-              <span className="min-w-0 flex-1 truncate text-muted">
-                <span className="font-mono">{t.prefix}…</span> ·{' '}
-                {EXPORT_LABELS[t.format]} · {t.memberEmail} ·{' '}
-                {t.lastUsedAt
-                  ? `used ${new Date(t.lastUsedAt).toLocaleString()}`
-                  : 'never used'}
-              </span>
-              <button
-                type="button"
-                disabled={revoke.isPending}
-                onClick={() => {
-                  if (confirm('Revoke this token? Its Shortcut stops working.'))
+            <li key={t.id} className="px-3 py-1.5">
+              {revoking === t.id ? (
+                <ConfirmPanel
+                  question="Revoke this token?"
+                  detail="Its Shortcut stops working."
+                  action="Revoke"
+                  onConfirm={() => {
                     revoke.mutate(t.id)
-                }}
-                className="min-h-11 rounded-full px-2 font-semibold text-muted hover:text-over disabled:opacity-50"
-              >
-                Revoke
-              </button>
+                    setRevoking(null)
+                  }}
+                  onCancel={() => setRevoking(null)}
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate text-muted">
+                    <span className="font-mono">{t.prefix}…</span> ·{' '}
+                    {EXPORT_LABELS[t.format]} · {t.memberEmail} ·{' '}
+                    {t.lastUsedAt
+                      ? `used ${new Date(t.lastUsedAt).toLocaleString()}`
+                      : 'never used'}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={revoke.isPending}
+                    onClick={() => setRevoking(t.id)}
+                    className="min-h-11 rounded-full px-2 font-semibold text-muted hover:text-over disabled:opacity-50"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              )}
             </li>
           ))}
         </ul>

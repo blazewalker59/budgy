@@ -143,6 +143,8 @@ export async function preparePosted(input: {
   /** Starting purchases these rows replace (left out of `existing`). */
   replacing?: Array<Replaced>
   rules?: ImportRules
+  /** This Household's owners; any but Joint become "<name> personal". */
+  owners?: ReadonlyArray<string>
 }): Promise<Prepared> {
   const rules = input.rules ?? EMPTY_RULES
   const byName = new Map(input.categories.map((c) => [c.toLowerCase(), c]))
@@ -231,7 +233,13 @@ export async function preparePosted(input: {
         old?.sourceCategory ??
         given ??
         usual?.category ??
-        bucketCategory(UNCATEGORIZED, r.description, store, rules),
+        bucketCategory(
+          UNCATEGORIZED,
+          r.description,
+          store,
+          rules,
+          input.owners,
+        ),
       amount,
       filed: old
         ? 'replaced'

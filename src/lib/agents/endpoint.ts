@@ -12,6 +12,7 @@ import { BodyTooLarge, readLimited } from '@/lib/updates/http'
 import { dbFromD1 } from '@/lib/db'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { today } from '@/lib/model/dates'
+import { householdTimeZone } from '@/lib/households/locale'
 import { householdDatabase } from '@/lib/households/scope'
 
 export const MCP_PATH = '/mcp'
@@ -72,9 +73,10 @@ export async function serveMcp(
   }
 
   try {
+    const scope = householdDatabase(db, caller.householdId)
     const reply = await handleMcp(
       message,
-      budgyTools(householdDatabase(db, caller.householdId), caller, today()),
+      budgyTools(scope, caller, today(await householdTimeZone(scope))),
       caller.scopes.includes('write')
         ? `${INSTRUCTIONS} ${WRITE_INSTRUCTIONS}`
         : INSTRUCTIONS,

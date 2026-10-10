@@ -77,7 +77,7 @@ function Gate() {
   if (ledger.isError) return <Crashed error={ledger.error} />
   if (!ledger.data) return <Splash />
   return (
-    <BookProvider ledger={ledger.data}>
+    <BookProvider ledger={ledger.data} timeZone={state.household.timeZone}>
       <AppShell member={state.member}>
         <Outlet />
       </AppShell>

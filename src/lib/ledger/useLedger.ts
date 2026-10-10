@@ -1,8 +1,8 @@
 /**
  * The Ledger in the browser: one query holds every row, and each edit
  * patches it before the server answers (the server is the record; a failed
- * edit puts the old Ledger back). The other Member's edits arrive on focus
- * and every minute.
+ * edit puts the old Ledger back, refetches, and says so). The other Member's
+ * edits arrive on focus and every minute.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -41,11 +41,38 @@ import type {
   Tag,
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
+import { clientMessage } from '@/lib/errors'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
+
+/** Shown once for every failed Ledger save (LedgerSaveError). */
+let saveError: string | null = null
+const saveErrorListeners = new Set<() => void>()
+
+function publishSaveError(next: string | null) {
+  saveError = next
+  for (const listener of saveErrorListeners) listener()
+}
+
+export function reportSaveError(error: unknown) {
+  publishSaveError(clientMessage(error, 'Couldn’t save. Try again.'))
+}
+
+export function clearSaveError() {
+  if (saveError) publishSaveError(null)
+}
+
+export function subscribeSaveError(listener: () => void) {
+  saveErrorListeners.add(listener)
+  return () => saveErrorListeners.delete(listener)
+}
+
+export function currentSaveError() {
+  return saveError
+}
 
 /** Never reuse another login's or Household's cached Ledger. */
 function useLedgerKey() {
@@ -101,10 +128,22 @@ function useEdit<TVars>(
         queryClient.setQueryData<Ledger>(queryKey, patch(previous, vars))
       return { previous, queryKey }
     },
-    onError: (_error, _vars, context) => {
-      if (context?.previous)
-        queryClient.setQueryData(context.queryKey, context.previous)
+    onError: (error, _vars, context) => {
+      const key = context?.queryKey ?? queryKey
+      if (context?.previous) queryClient.setQueryData(key, context.previous)
+      reportSaveError(error)
+      // The copy we rolled back to can be stale. Replace it with the server's
+      // Ledger when that read works; a failed read keeps the rollback and the
+      // alert, instead of taking down the screen.
+      void getLedger()
+        .then((ledger) => {
+          queryClient.setQueryData(key, ledger)
+        })
+        .catch(() => {
+          // The alert already explains the failed save.
+        })
     },
+    onSuccess: () => clearSaveError(),
   })
 }
 

@@ -51,7 +51,7 @@ import {
 } from '@/lib/db/schema'
 import { CADENCES, TAGS } from '@/lib/model/types'
 import { payInput } from '@/lib/model/pay'
-import { importRulesSchema } from '@/lib/import/rules'
+import { completeRules, importRulesSchema } from '@/lib/import/rules'
 import { postedRowInput } from '@/lib/import/posted'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 
@@ -459,7 +459,7 @@ export const setImportRules = createServerFn({ method: 'POST' })
   .validator((data: ImportRules) => importRulesSchema.parse(data))
   .handler(({ data }) =>
     withMember(async ({ db }) => {
-      const value = JSON.stringify(data)
+      const value = JSON.stringify(completeRules(data))
       await db
         .insert(settings)
         .values(householdRow(db, { key: RULES_KEY, value }))

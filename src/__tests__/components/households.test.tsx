@@ -52,7 +52,13 @@ const person = {
   image: null,
   emailVerified: true,
 }
-const household = { id: 'hh_test', name: 'Our budget', role: 'owner' as const }
+const household = {
+  id: 'hh_test',
+  name: 'Our budget',
+  role: 'owner' as const,
+  timeZone: 'America/New_York',
+  owners: ['Joint'],
+}
 const clients: Array<QueryClient> = []
 function mount(component: React.ReactNode) {
   const client = new QueryClient({

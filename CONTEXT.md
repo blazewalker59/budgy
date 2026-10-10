@@ -58,8 +58,8 @@ _Avoid_: salary, gross income, income
 
 **Account**:
 A card, bank, investment, retirement, 529 or other account the Household
-has. Each has a **kind**, an **Owner** (Blaze, Alex, Joint, or anyone else,
-such as a child for a 529), and optionally an institution. Purchases come
+has. Each has a **kind**, an **Owner** (Joint, a person in this Household,
+or anyone else, such as a child for a 529), and optionally an institution. Purchases come
 from the card and bank Accounts.
 
 **Balance**:

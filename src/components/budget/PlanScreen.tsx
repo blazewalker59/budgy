@@ -26,11 +26,12 @@ export function PlanScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
   const others = filtersOf(lens).filter((f) => f.type !== 'person').length
   return (
     <div className="space-y-5">
-      <div className="mx-auto max-w-4xl space-y-2">
+      <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-lg font-extrabold tracking-tight">Plan</h1>
           <Segmented
             label="Plan section"
+            size="lg"
             value={tab}
             options={TABS}
             onChange={(t) =>

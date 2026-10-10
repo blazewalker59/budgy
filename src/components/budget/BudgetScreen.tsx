@@ -146,7 +146,7 @@ export function BudgetScreen({ owner }: { owner?: string }) {
     )
 
   return (
-    <div className="mx-auto max-w-4xl space-y-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-extrabold tracking-tight">
           {owner ? `Budget, ${owner}’s spending` : 'Budget'}
@@ -162,74 +162,86 @@ export function BudgetScreen({ owner }: { owner?: string }) {
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <Stat label="Targets" value={dollars(totalTarget)} detail="per month" />
-        <Stat
-          label={owner ? `${owner}’s typical` : 'Typical'}
-          value={dollars(totalTypical)}
-          detail={
-            owner
-              ? `${totalTarget ? Math.round((totalTypical / totalTarget) * 100) : 0}% of household Targets`
-              : totalTypical > totalTarget
-                ? `${dollars(totalTypical - totalTarget)} over`
-                : `${dollars(totalTarget - totalTypical)} under`
-          }
-          tone={
-            owner ? undefined : totalTypical > totalTarget ? 'over' : 'good'
-          }
-        />
-        <Stat
-          label="Planned"
-          value={dollars(setAside)}
-          detail="set aside / mo"
-        />
-      </div>
+      <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <Stat
+              label="Targets"
+              value={dollars(totalTarget)}
+              detail="per month"
+            />
+            <Stat
+              label={owner ? `${owner}’s typical` : 'Typical'}
+              value={dollars(totalTypical)}
+              detail={
+                owner
+                  ? `${totalTarget ? Math.round((totalTypical / totalTarget) * 100) : 0}% of household Targets`
+                  : totalTypical > totalTarget
+                    ? `${dollars(totalTypical - totalTarget)} over`
+                    : `${dollars(totalTarget - totalTypical)} under`
+              }
+              tone={
+                owner ? undefined : totalTypical > totalTarget ? 'over' : 'good'
+              }
+            />
+            <Stat
+              label="Planned"
+              value={dollars(setAside)}
+              detail="set aside / mo"
+            />
+          </div>
 
-      {owner ? (
-        <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted">
-          Typical is {owner}’s spending. Targets and take-home are the
-          household’s. Clear the person filter to see take-home pay.
-        </p>
-      ) : (
-        <IncomePlan
-          pay={pay}
-          typical={typicalSplit}
-          budget={budgetSplit}
-          onOpen={() => setPaySheet(true)}
-        />
-      )}
-      <BudgetMix slices={mix} />
-
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <p className="min-w-0 text-[11px] text-muted">
-          Typical = {windowLabel} average, without set-aside bills
-          {gaps.length > 0 && (
-            <span
-              className="ml-1 inline-flex items-center gap-0.5 text-nice"
-              title={gaps
-                .map(
-                  (g) =>
-                    `${monthLabel(g.month)}: ${g.gaps.map((x) => x.account).join(', ')}`,
-                )
-                .join('; ')}
-            >
-              <AlertTriangle size={11} aria-hidden />
-              {gaps.map((g) => monthLabel(g.month).slice(0, 3)).join(', ')} may
-              be low
-            </span>
+          {owner ? (
+            <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted">
+              Typical is {owner}’s spending. Targets and take-home are the
+              household’s. Clear the person filter to see take-home pay.
+            </p>
+          ) : (
+            <IncomePlan
+              pay={pay}
+              typical={typicalSplit}
+              budget={budgetSplit}
+              onOpen={() => setPaySheet(true)}
+            />
           )}
-        </p>
-        <Segmented
-          label="Typical month over"
-          value={span}
-          options={SPANS}
-          onChange={setSpan}
-        />
-      </div>
+          <BudgetMix slices={mix} />
+        </div>
 
-      {list('Everyday', everyday)}
-      {list('Housing', housing)}
-      <AddCategory />
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <p className="min-w-0 text-[11px] text-muted">
+              Typical = {windowLabel} average, without set-aside bills
+              {gaps.length > 0 && (
+                <span
+                  className="ml-1 inline-flex items-center gap-0.5 text-nice"
+                  title={gaps
+                    .map(
+                      (g) =>
+                        `${monthLabel(g.month)}: ${g.gaps.map((x) => x.account).join(', ')}`,
+                    )
+                    .join('; ')}
+                >
+                  <AlertTriangle size={11} aria-hidden />
+                  {gaps
+                    .map((g) => monthLabel(g.month).slice(0, 3))
+                    .join(', ')}{' '}
+                  may be low
+                </span>
+              )}
+            </p>
+            <Segmented
+              label="Typical month over"
+              value={span}
+              options={SPANS}
+              onChange={setSpan}
+            />
+          </div>
+
+          {list('Everyday', everyday)}
+          {list('Housing', housing)}
+          <AddCategory />
+        </div>
+      </div>
       {sheet && (
         <CategorySheet
           name={sheet}

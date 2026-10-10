@@ -31,7 +31,6 @@ export function PlanScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
           <h1 className="text-lg font-extrabold tracking-tight">Plan</h1>
           <Segmented
             label="Plan section"
-            size="lg"
             value={tab}
             options={TABS}
             onChange={(t) =>

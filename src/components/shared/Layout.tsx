@@ -91,23 +91,17 @@ export function Segmented<T extends string>({
   options,
   onChange,
   label,
-  size = 'md',
 }: {
   value: T
   options: ReadonlyArray<{ value: T; label: string }>
   onChange: (value: T) => void
   label: string
-  /** lg: a screen's own sections, beside its title. */
-  size?: 'md' | 'lg'
 }) {
   return (
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn(
-        'flex w-fit rounded-full bg-sunken',
-        size === 'lg' ? 'p-1' : 'p-0.5',
-      )}
+      className="flex w-fit rounded-full bg-sunken p-0.5"
     >
       {options.map((o) => (
         <button
@@ -117,8 +111,7 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'rounded-full font-semibold text-muted',
-            size === 'lg' ? 'min-h-9 px-4 text-sm' : 'px-2.5 py-0.5 text-xs',
+            'rounded-full px-2.5 py-0.5 text-xs font-semibold text-muted',
             value === o.value && 'bg-surface text-foreground shadow-sm',
           )}
         >

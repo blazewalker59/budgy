@@ -8,9 +8,10 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronRight, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import { AccountUpdates } from './AccountUpdates'
+import { RemoveStarting } from './RemoveStarting'
 import { Baseline, WorthSheet, dayWithYear } from './WorthSheet'
 import { RulesTab } from './RulesTab'
 import type { WorthView } from './WorthSheet'
@@ -21,7 +22,7 @@ import { Duplicates } from '@/components/accounts/Duplicates'
 import { filtersOf } from '@/lib/model/lens'
 import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
-import { useRemoveStarting, useSaveAccount } from '@/lib/ledger/useLedger'
+import { useSaveAccount } from '@/lib/ledger/useLedger'
 import {
   ACCOUNT_GROUPS,
   activity,
@@ -252,8 +253,7 @@ function AccountsList({ lens }: { lens: Lens }) {
  */
 function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
   const { ix } = useBook()
-  const removeStarting = useRemoveStarting()
-  const [confirm, setConfirm] = useState(false)
+  const [open, setOpen] = useState(false)
   const byAccount = useMemo(() => {
     const by = new Map<string, number>()
     for (const t of everyTxn(ix))
@@ -263,50 +263,51 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
   if (!byAccount.length) return null
   const total = byAccount.reduce((n, [, c]) => n + c, 0)
   return (
-    <section className="space-y-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
-      <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-        Starting purchases
-      </h2>
-      <p className="text-muted">
-        {total} purchases are still from the first bulk import.
-      </p>
-      <ol className="list-decimal space-y-0.5 pl-4 text-muted">
-        <li>
-          Open each account and upload its export. Categories and notes carry
-          over.
-        </li>
-        <li>Remove whatever’s left.</li>
-      </ol>
-      <ul className="flex flex-wrap gap-1.5">
-        {byAccount.map(([name, n]) => (
-          <li key={name}>
-            <button
-              type="button"
-              onClick={() => onOpen(name)}
-              className="rounded-full border border-border bg-sunken px-2 py-0.5 font-semibold hover:border-accent"
-            >
-              {name} <span className="font-normal text-muted">{n}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
+    <section className="overflow-hidden rounded-xl border border-border bg-surface text-xs">
       <button
         type="button"
-        onClick={() => {
-          if (!confirm) return setConfirm(true)
-          removeStarting.mutate({})
-          setConfirm(false)
-        }}
-        onBlur={() => setConfirm(false)}
-        className={cn(
-          'rounded-full px-2 py-0.5 font-semibold',
-          confirm ? 'bg-over text-background' : 'text-over',
-        )}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className="flex min-h-11 w-full items-center gap-1.5 px-3 text-left text-[11px] font-semibold uppercase tracking-wide text-muted"
       >
-        {confirm
-          ? `Remove all ${total}? Tap again`
-          : `Remove all ${total} starting purchases`}
+        {open ? (
+          <ChevronDown size={13} aria-hidden />
+        ) : (
+          <ChevronRight size={13} aria-hidden />
+        )}
+        Starting purchases
+        <span className="font-normal normal-case tracking-normal">
+          · {total.toLocaleString()} from the first bulk import
+        </span>
       </button>
+      {open && (
+        <div className="space-y-2 border-t border-border px-3 py-2.5">
+          <ol className="list-decimal space-y-0.5 pl-4 text-muted">
+            <li>
+              Open each account and upload its export. Categories and notes
+              carry over.
+            </li>
+            <li>Remove whatever’s left.</li>
+          </ol>
+          <ul className="flex flex-wrap gap-1.5">
+            {byAccount.map(([name, n]) => (
+              <li key={name}>
+                <button
+                  type="button"
+                  onClick={() => onOpen(name)}
+                  className="rounded-full border border-border bg-sunken px-2 py-0.5 font-semibold hover:border-accent"
+                >
+                  {name}{' '}
+                  <span className="font-normal text-muted">
+                    {n.toLocaleString()}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <RemoveStarting count={total} />
+        </div>
+      )}
     </section>
   )
 }

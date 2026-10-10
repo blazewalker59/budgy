@@ -9,6 +9,7 @@ import { Link } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FileUp, Trash2 } from 'lucide-react'
 import { OwnerInput } from './AccountsScreen'
+import { RemoveStarting } from './RemoveStarting'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { ParsedHistory } from '@/lib/import/history'
 import type { PostSummary } from '@/lib/ledger/server'
@@ -19,7 +20,6 @@ import {
   useDeleteAccount,
   useDeleteBalance,
   useRecordBalances,
-  useRemoveStarting,
   useSaveAccount,
 } from '@/lib/ledger/useLedger'
 import { activity, balanceByMonth, equity, isDebt } from '@/lib/model/accounts'
@@ -696,30 +696,19 @@ function ImportHistory({
 /** This Account's starting purchases still here, and taking them out. */
 function StartingHere({ name }: { name: string }) {
   const { ix } = useBook()
-  const removeStarting = useRemoveStarting()
-  const [confirm, setConfirm] = useState(false)
   const n = useMemo(
     () => everyTxn(ix).filter((t) => t.starting && t.account === name).length,
     [ix, name],
   )
   if (!n) return null
   return (
-    <p className="px-1 text-xs text-muted">
-      {n} of them are from the first bulk import. Upload this account’s export
-      to replace them.{' '}
-      <button
-        type="button"
-        onClick={() => {
-          if (!confirm) return setConfirm(true)
-          removeStarting.mutate({ account: name })
-          setConfirm(false)
-        }}
-        onBlur={() => setConfirm(false)}
-        className="font-semibold text-over"
-      >
-        {confirm ? `Remove ${n}? Tap again` : `Remove them`}
-      </button>
-    </p>
+    <div className="space-y-2 px-1 text-xs text-muted">
+      <p>
+        {n.toLocaleString()} of them are from the first bulk import. Upload this
+        account’s export to replace them.
+      </p>
+      <RemoveStarting account={name} count={n} />
+    </div>
   )
 }
 

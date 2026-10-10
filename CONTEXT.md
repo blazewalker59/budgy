@@ -28,7 +28,8 @@ Categories, Store Rules, Targets, Planned Expenses and Pay Schedules.
 One purchase (or refund) on one Account, from that Account's uploaded export
 or posted by an Agent. Only spending is kept: card payments, transfers,
 deposits, escrow payouts and investment contributions are left out. Its id is
-a hash of the row, so uploading the same rows again adds nothing.
+a hash of the row for exports without source IDs, or a stable connector
+identity when available; overlapping updates add no duplicate source IDs.
 _Avoid_: expense, charge
 
 **Starting purchase**:
@@ -36,6 +37,13 @@ A Transaction from the whole-household export Budgy started from. An
 Account's own upload can replace the ones over its dates (each handing its
 Move and note to the new purchase that day for that amount); any left can
 be removed from Accounts.
+
+**Update receipt**:
+One committed Account update: its source, dates, added or changed purchases,
+skips, review issues, and whether it succeeded, failed or needs attention.
+A successful check with no new purchases still has a receipt. The latest
+attempt is separate from the last success. A recent check is not proof that
+the source supplied complete data through today (docs/adr/0009).
 
 **Pay Schedule**:
 A paycheck the Household counts on, entered by hand: whose, how much lands in

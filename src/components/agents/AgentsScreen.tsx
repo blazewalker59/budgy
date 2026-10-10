@@ -16,7 +16,7 @@ import { useSession } from '@/lib/ledger/useLedger'
 
 const TOKENS_KEY = ['api-tokens']
 
-const DAILY_PROMPT = `Every morning: if there's a new transactions export from our finance app, import it into Budgy with import_transactions_csv (commit true). Then call get_daily_digest for yesterday and send me a short summary: what we spent by person and account, anything unusual, and every Budget Alert, most urgent first. Mention any account whose data looks out of date.`
+const DAILY_PROMPT = `Every morning: if you have an account’s new posted purchases, add them to Budgy with add_transactions (commit true), leaving out payments and transfers. Then call get_daily_digest for yesterday and send me a short summary: what we spent by person and account, anything unusual, and every Budget Alert, most urgent first. Do not invent or assume bank access; mention any account whose source data looks out of date.`
 
 function CopyLine({ text, label }: { text: string; label: string }) {
   const [copied, setCopied] = useState(false)

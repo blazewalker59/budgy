@@ -607,7 +607,10 @@ export function budgyTools(
         'Add purchases you read yourself (say, a day of Apple Card activity) to one account. Each is filed under the category given if it names one of the household’s categories, else where that store’s purchases usually go, else Uncategorized. Purchases already there are skipped, including one on the same day for the same amount under another description, so posting the same day twice is safe. Leave out card payments and transfers. With commit false (the default) it only reports what would be added.',
       input: z.object({
         account: z.string().min(1).max(60),
-        transactions: z.array(postedRowInput).min(1).max(2000),
+        transactions: z
+          .array(postedRowInput.omit({ sourceId: true }))
+          .min(1)
+          .max(2000),
         commit: z.boolean().default(false),
       }),
       call: async ({ account, transactions, commit }) => {

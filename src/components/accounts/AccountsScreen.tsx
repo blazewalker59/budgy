@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ChevronRight, Plus } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
+import { AccountUpdates } from './AccountUpdates'
 import { RulesTab } from './RulesTab'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
@@ -50,10 +51,11 @@ const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
 /** A Balance older than this is worth updating. */
 const STALE_DAYS = 35
 
-type Tab = 'accounts' | 'rules'
+type Tab = 'accounts' | 'rules' | 'updates'
 
 const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
   { value: 'accounts', label: 'Accounts' },
+  { value: 'updates', label: 'Updates' },
   { value: 'rules', label: 'Rules' },
 ]
 
@@ -63,7 +65,11 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
     <div className="mx-auto max-w-3xl space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold tracking-tight">
-          {tab === 'rules' ? 'Filing rules' : 'Accounts'}
+          {tab === 'rules'
+            ? 'Filing rules'
+            : tab === 'updates'
+              ? 'Update Accounts'
+              : 'Accounts'}
         </h1>
         <Segmented
           label="Accounts or rules"
@@ -73,13 +79,19 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
             void navigate({
               search: (s) => ({
                 ...s,
-                tab: t === 'rules' ? 'rules' : undefined,
+                tab: t === 'accounts' ? undefined : t,
               }),
             })
           }
         />
       </div>
-      {tab === 'rules' ? <RulesTab /> : <AccountsList lens={lens} />}
+      {tab === 'rules' ? (
+        <RulesTab />
+      ) : tab === 'updates' ? (
+        <AccountUpdates />
+      ) : (
+        <AccountsList lens={lens} />
+      )}
     </div>
   )
 }

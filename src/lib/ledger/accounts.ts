@@ -4,7 +4,7 @@
  * Agents' tools. Server-only.
  */
 
-import { and, between, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, between, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   STATEMENTS_PER_BATCH,
   loadImportRules,
@@ -13,8 +13,12 @@ import {
 import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Account, Balance } from '@/lib/model/types'
 import type { PostedRow, Prepared } from '@/lib/import/posted'
+import type { UpdateSource } from '@/lib/updates/receipts'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import {
+  accountInputs,
+  accountUpdateLocks,
+  accountUpdates,
   accounts,
   balances,
   categories,
@@ -22,7 +26,20 @@ import {
   transactions,
 } from '@/lib/db/schema'
 import { newCategory } from '@/lib/model/defaults'
-import { preparePosted, storeHistory } from '@/lib/import/posted'
+import { addDays } from '@/lib/model/dates'
+import {
+  postedRowInput,
+  preparePosted,
+  storeHistory,
+} from '@/lib/import/posted'
+import { prepareIdentified } from '@/lib/updates/reconcile'
+import {
+  acquireUpdate,
+  finishReceipt,
+  releaseUpdate,
+  renewUpdate,
+  startReceipt,
+} from '@/lib/updates/receipts'
 
 /** An Account by name, any case; the error lists the real names. */
 export async function findAccount(
@@ -78,20 +95,42 @@ export async function saveAccount(
 
 /** Remove an Account and its Balances; only one without purchases. */
 export async function deleteAccount(db: Database, name: string): Promise<void> {
-  const used = await db
-    .select({ id: transactions.id })
-    .from(transactions)
-    .where(inHousehold(db, transactions, eq(transactions.account, name)))
-    .limit(1)
-  if (used.length) throw new Error(`${name} has purchases; close it instead.`)
-  await db.batch([
-    db
-      .delete(balances)
-      .where(inHousehold(db, balances, eq(balances.account, name))),
-    db
-      .delete(accounts)
-      .where(inHousehold(db, accounts, eq(accounts.name, name))),
-  ])
+  const lease = await acquireUpdate(db, name)
+  try {
+    const used = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(inHousehold(db, transactions, eq(transactions.account, name)))
+      .limit(1)
+    if (used.length) throw new Error(`${name} has purchases; close it instead.`)
+    await db.batch([
+      db
+        .delete(balances)
+        .where(inHousehold(db, balances, eq(balances.account, name))),
+      db
+        .delete(accounts)
+        .where(inHousehold(db, accounts, eq(accounts.name, name))),
+      db
+        .delete(accountUpdates)
+        .where(
+          inHousehold(db, accountUpdates, eq(accountUpdates.account, name)),
+        ),
+      db
+        .delete(accountUpdateLocks)
+        .where(
+          inHousehold(
+            db,
+            accountUpdateLocks,
+            eq(accountUpdateLocks.account, name),
+          ),
+        ),
+      db
+        .delete(accountInputs)
+        .where(inHousehold(db, accountInputs, eq(accountInputs.account, name))),
+    ])
+  } finally {
+    await releaseUpdate(db, name, lease)
+  }
 }
 
 /**
@@ -161,6 +200,14 @@ export interface PostSummary extends Omit<Prepared, 'fresh'> {
   added: number
   /** Starting purchases over the same dates, taken out for these. */
   replaced: number
+  updated: number
+  linked: number
+  review: Array<{
+    date: string
+    description: string
+    amount: number
+    reason: string
+  }>
   filed: Array<{
     date: string
     description: string
@@ -179,17 +226,73 @@ const isStarting = sql<number>`${imports.account} is null`
  * make way for these (each handing its Move and note to its match).
  * Without `commit`, only say what would happen.
  */
+export interface PostInput {
+  account: string
+  rows: Array<PostedRow>
+  commit: boolean
+  importedBy: string
+  replaceStarting?: boolean
+  /** How the import is listed: an Agent's post or a Member's upload. */
+  via?: UpdateSource
+  /** Trusted connector namespace, stable across overlapping windows. */
+  sourceNamespace?: string
+  coverage?: { from: string; to: string }
+  /** Payments/transfers excluded by the normalizer, before purchase filing. */
+  excluded?: number
+}
+
+/** All writers use one Account lease and one receipt format. Preview is read-only. */
 export async function postTransactions(
   db: Database,
-  input: {
-    account: string
-    rows: Array<PostedRow>
-    commit: boolean
-    importedBy: string
-    replaceStarting?: boolean
-    /** How the import is listed: an Agent's post or a Member's upload. */
-    via?: 'posted' | 'uploaded'
-  },
+  input: PostInput,
+): Promise<PostSummary> {
+  if (input.rows.length > 20_000)
+    throw new Error('An update may include at most 20,000 purchases')
+  input = { ...input, rows: input.rows.map((row) => postedRowInput.parse(row)) }
+  if (input.rows.some((row) => row.sourceId) && !input.sourceNamespace)
+    throw new Error('Source IDs require a connector namespace')
+  if (input.sourceNamespace && input.replaceStarting)
+    throw new Error(
+      'Identified sources reconcile individually; they cannot replace a date range',
+    )
+  const account = await findAccount(db, input.account)
+  if (account.closed) throw new Error('Reopen this Account before updating it')
+  if (!input.commit)
+    return postTransactionsUnlocked(db, { ...input, account: account.name })
+  const lease = await acquireUpdate(db, account.name)
+  const id = crypto.randomUUID()
+  let started = false
+  try {
+    await startReceipt(db, {
+      id,
+      account: account.name,
+      source: input.via ?? 'posted',
+      updatedBy: input.importedBy,
+      dates: input.coverage
+        ? [input.coverage.from, input.coverage.to]
+        : input.rows.map((r) => r.date),
+    })
+    started = true
+    const summary = await postTransactionsUnlocked(
+      db,
+      { ...input, account: account.name },
+      lease,
+    )
+    await renewUpdate(db, account.name, lease)
+    await finishReceipt(db, id, summary)
+    return summary
+  } catch (error) {
+    if (started) await finishReceipt(db, id, null)
+    throw error
+  } finally {
+    await releaseUpdate(db, account.name, lease)
+  }
+}
+
+async function postTransactionsUnlocked(
+  db: Database,
+  input: PostInput,
+  lease?: string,
 ): Promise<PostSummary> {
   const account = await findAccount(db, input.account)
   const dates = input.rows.map((r) => r.date).sort()
@@ -218,6 +321,7 @@ export async function postTransactions(
             category: transactions.category,
             note: transactions.note,
             starting: isStarting,
+            sourceKey: transactions.sourceKey,
           })
           .from(transactions)
           .leftJoin(
@@ -231,7 +335,13 @@ export async function postTransactions(
             and(
               inHousehold(db, transactions),
               eq(transactions.account, account.name),
-              between(transactions.date, dates[0], dates[dates.length - 1]),
+              between(
+                transactions.date,
+                input.sourceNamespace ? addDays(dates[0], -3) : dates[0],
+                input.sourceNamespace
+                  ? addDays(dates[dates.length - 1], 3)
+                  : dates[dates.length - 1],
+              ),
             ),
           )
       : Promise.resolve([]),
@@ -242,21 +352,62 @@ export async function postTransactions(
   const existing = input.replaceStarting
     ? inRange.filter((t) => !t.starting)
     : inRange
-  const prepared = await preparePosted({
-    account: account.name,
-    rows: input.rows,
-    categories: cats.map((c) => c.name),
-    history: storeHistory(history),
-    existing,
-    replacing,
-    rules,
-  })
+  const identifiedExisting = input.sourceNamespace
+    ? await db
+        .select({
+          id: transactions.id,
+          date: transactions.date,
+          amount: transactions.amount,
+          description: transactions.description,
+          sourceKey: transactions.sourceKey,
+        })
+        .from(transactions)
+        .where(
+          inHousehold(
+            db,
+            transactions,
+            and(
+              eq(transactions.account, account.name),
+              isNotNull(transactions.sourceKey),
+            ),
+          ),
+        )
+    : []
+  const identified = input.sourceNamespace
+    ? await prepareIdentified({
+        account: account.name,
+        namespace: input.sourceNamespace,
+        rows: input.rows,
+        existing: [
+          ...new Map(
+            [...inRange, ...identifiedExisting].map((t) => [t.id, t]),
+          ).values(),
+        ],
+        categories: cats.map((c) => c.name),
+        history: storeHistory(history),
+        rules,
+      })
+    : null
+  const prepared =
+    identified?.prepared ??
+    (await preparePosted({
+      account: account.name,
+      rows: input.rows,
+      categories: cats.map((c) => c.name),
+      history: storeHistory(history),
+      existing,
+      replacing,
+      rules,
+    }))
   const summary: PostSummary = {
     account: account.name,
     added: prepared.fresh.length,
     replaced: replacing.length,
+    updated: identified?.changes.length ?? 0,
+    linked: identified?.links.length ?? 0,
+    review: identified?.conflicts ?? [],
     alreadyHad: prepared.alreadyHad,
-    notSpending: prepared.notSpending,
+    notSpending: prepared.notSpending + (input.excluded ?? 0),
     carried: prepared.carried,
     duplicates: prepared.duplicates,
     filed: prepared.fresh.map((t) => ({
@@ -267,11 +418,67 @@ export async function postTransactions(
       how: t.filed,
     })),
   }
-  if (!input.commit || (!prepared.fresh.length && !replacing.length))
+  if (
+    !input.commit ||
+    (!prepared.fresh.length &&
+      !replacing.length &&
+      !summary.updated &&
+      !summary.linked)
+  )
     return summary
 
   const importId = `im_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`
   const statements = []
+  // Write the import header first: a failed later chunk must not leave
+  // saved purchases looking like unowned starting data on retry.
+  statements.push(
+    db.insert(imports).values({
+      householdId: db.householdId,
+      id: importId,
+      fileName: `${input.via ?? 'posted'} to ${account.name}`,
+      account: account.name,
+      importedBy: input.importedBy,
+      added: prepared.fresh.length,
+      skipped: prepared.alreadyHad + prepared.duplicates.length,
+    }),
+  )
+  for (const link of identified?.links ?? [])
+    statements.push(
+      db
+        .update(transactions)
+        .set({ sourceKey: link.sourceKey, importId })
+        .where(
+          inHousehold(
+            db,
+            transactions,
+            and(
+              eq(transactions.id, link.id),
+              eq(transactions.account, account.name),
+              isNull(transactions.sourceKey),
+            ),
+          ),
+        ),
+    )
+  for (const change of identified?.changes ?? []) {
+    const { id, sourceKey, ...data } = change
+    // Never write category, sourceCategory or note: Member filing always wins.
+    statements.push(
+      db
+        .update(transactions)
+        .set({ ...data, month: data.date.slice(0, 7) })
+        .where(
+          inHousehold(
+            db,
+            transactions,
+            and(
+              eq(transactions.id, id),
+              eq(transactions.account, account.name),
+              eq(transactions.sourceKey, sourceKey),
+            ),
+          ),
+        ),
+    )
+  }
   // Out first, so a new row with a starting one's id can take its place.
   for (let i = 0; i < replacing.length; i += IDS_PER_DELETE)
     statements.push(
@@ -307,22 +514,17 @@ export async function postTransactions(
               ...t,
               householdId: db.householdId,
               importId,
+              sourceKey: identified?.keys.get(t.id) ?? null,
             })),
         )
         .onConflictDoNothing(),
     )
-  statements.push(
-    db.insert(imports).values({
-      householdId: db.householdId,
-      id: importId,
-      fileName: `${input.via ?? 'posted'} to ${account.name}`,
-      account: account.name,
-      importedBy: input.importedBy,
-      added: prepared.fresh.length,
-      skipped: prepared.alreadyHad + prepared.duplicates.length,
-    }),
-  )
+  if (input.replaceStarting && statements.length > STATEMENTS_PER_BATCH)
+    throw new Error(
+      'Replacing starting purchases must fit in one atomic update. Split this export into smaller date ranges.',
+    )
   for (let i = 0; i < statements.length; i += STATEMENTS_PER_BATCH) {
+    if (lease) await renewUpdate(db, account.name, lease)
     const chunk = statements.slice(i, i + STATEMENTS_PER_BATCH)
     await db.batch(chunk as [(typeof chunk)[number], ...typeof chunk])
   }

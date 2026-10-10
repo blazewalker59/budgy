@@ -27,16 +27,30 @@ export interface PostedRow {
   amount: number
   /** A Category's name; otherwise the Store's usual one is used. */
   category?: string | null
+  /** A posted connector transaction's stable ID, when one is available. */
+  sourceId?: string
 }
 
 export const postedRowInput = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD'),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD')
+    .refine((date) => {
+      const parsed = new Date(`${date}T00:00:00Z`)
+      return (
+        !Number.isNaN(parsed.getTime()) &&
+        parsed.toISOString().slice(0, 10) === date
+      )
+    }, 'A real calendar date is required'),
   description: z.string().trim().min(1).max(200),
   amount: z
     .number()
     .finite()
+    .min(-1_000_000)
+    .max(1_000_000)
     .describe('Dollars; positive is spending, negative a refund'),
   category: z.string().max(60).nullable().optional(),
+  sourceId: z.string().min(1).max(200).optional(),
 })
 
 export interface Filed {
@@ -171,12 +185,20 @@ export async function preparePosted(input: {
       out.alreadyHad++
       continue
     }
-    if (match?.length) {
+    // Same amount/day alone is not identity: two different stores can cost
+    // the same. Keep one-to-one matching, but require a normalized Store too.
+    const matchIndex =
+      match?.findIndex(
+        (description) =>
+          storeName(description, rules).toLowerCase() ===
+          storeName(r.description, rules).toLowerCase(),
+      ) ?? -1
+    if (match && matchIndex >= 0) {
       out.duplicates.push({
         date: r.date,
         description: r.description,
         amount: r.amount,
-        existing: match.shift()!,
+        existing: match.splice(matchIndex, 1)[0],
       })
       continue
     }

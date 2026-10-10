@@ -72,9 +72,10 @@ separate disposable local Wrangler D1 database validates migration syntax.
 
 ## Subsequent slices
 
-1. **Unified ingestion:** shared account mapping, import receipts (including
-   zero new purchases), source identity, reconciliation preserving Moves/notes,
-   and one last-success/error presentation across input types.
+1. **Unified ingestion foundation:** implemented in
+   [0009](./0009-unified-account-updates.md), not yet deployed. Routine export
+   updates and agent posts share receipts, leases and filing; stable-ID
+   reconciliation is ready for connector adapters.
 2. **Apple Card:** verify current-cycle date-range exports on the Household's
    iPhone, then implement a revocable, narrowly scoped share-sheet upload token
    and a "Send to Budgy" Shortcut. No native app or Origin dependency.

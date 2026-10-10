@@ -35,6 +35,7 @@ import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'
 import { Sheet } from '@/components/shared/Sheet'
 import { WorthChart } from '@/components/charts/lazy'
+import { UPDATES_KEY } from '@/lib/updates/useUpdates'
 
 export function AccountSheet({
   name,
@@ -79,6 +80,21 @@ export function AccountSheet({
       />
       {account.kind === 'property' && <EquityLine name={name} />}
       <UpdateBalance account={account} today={book.today} />
+      {['credit', 'checking', 'savings'].includes(account.kind) && (
+        <p className="px-1 text-xs text-muted">
+          For routine purchase updates, use{' '}
+          <Link
+            to="/accounts"
+            search={{ tab: 'updates' }}
+            onClick={onClose}
+            className="font-semibold text-accent"
+          >
+            Account Updates
+          </Link>
+          . No balance is needed. The history importer below remains available
+          for balance backfills.
+        </p>
+      )}
       {points.length > 1 && (
         <WorthChart
           points={points}
@@ -393,16 +409,13 @@ function ImportHistory({
     }
   }, [bought, replacing, account.name])
 
-  const posting =
-    addPurchases &&
-    preview !== null &&
-    (preview.added > 0 || (replacing && preview.replaced > 0))
+  const posting = addPurchases && preview !== null && bought.length > 0
   const save = async () => {
     setSaving(true)
     const said: Array<string> = []
     try {
       if (rows.length) {
-        recordBalances.mutate({
+        await recordBalances.mutateAsync({
           balances: rows.map((r) => ({ account: account.name, ...r })),
           replace: hasHistory && replace ? account.name : undefined,
         })
@@ -418,6 +431,7 @@ function ImportHistory({
           },
         })
         await queryClient.invalidateQueries({ queryKey: LEDGER_KEY })
+        await queryClient.invalidateQueries({ queryKey: UPDATES_KEY })
         said.push(
           `${summary.added} purchases${summary.replaced ? ` (in place of ${summary.replaced} starting ones)` : ''}`,
         )

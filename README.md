@@ -55,6 +55,12 @@ account's purchases, record balances, and Move or note purchases.
 Merges to `main` deploy to production via GitHub Actions (no staging). By
 hand: `bun run ship`. Migrations: `bun run db:migrate:remote -- --env production`.
 Purchases come in per Account: upload its export on its Accounts sheet.
+The routine update flow is **Accounts → Updates**: choose an
+export, review its purchases, and confirm. This needs no known balance and keeps
+an update receipt even if nothing new was added. See
+[ADR 0009](docs/adr/0009-unified-account-updates.md). The Account sheet still
+supports manual balances and historical backfills. SimpleFIN connections and
+the share-sheet Shortcut are not connected yet.
 
 Worker secrets (`wrangler secret put <NAME> --env production`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,

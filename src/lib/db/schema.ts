@@ -19,6 +19,7 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core'
 import type { Lens } from '@/lib/model/lens'
+import type { ExportFormat } from '@/lib/updates/exports'
 import type {
   AccountKind,
   Cadence,
@@ -247,12 +248,89 @@ export const transactions = sqliteTable(
     category: text('category'),
     note: text('note'),
     importId: text('import_id').notNull(),
+    /** A connector's stable, namespaced identity; null for legacy exports. */
+    sourceKey: text('source_key'),
     createdAt: createdAt(),
   },
   (t) => [
     primaryKey({ columns: [t.householdId, t.id] }),
     index('transactions_month_idx').on(t.householdId, t.month),
+    uniqueIndex('transactions_source_unique').on(
+      t.householdId,
+      t.account,
+      t.sourceKey,
+    ),
   ],
+)
+
+/** Receipts are distinct from purchase dates: an empty update is still a check. */
+export const accountUpdates = sqliteTable(
+  'account_updates',
+  {
+    householdId: householdId(),
+    id: text('id').notNull(),
+    account: text('account').notNull(),
+    source: text('source')
+      .$type<'uploaded' | 'posted' | 'shortcut' | 'simplefin'>()
+      .notNull(),
+    status: text('status')
+      .$type<'running' | 'succeeded' | 'attention' | 'failed'>()
+      .notNull(),
+    startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
+    finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
+    fromDate: text('from_date'),
+    toDate: text('to_date'),
+    added: integer('added').notNull().default(0),
+    updated: integer('updated').notNull().default(0),
+    linked: integer('linked').notNull().default(0),
+    skipped: integer('skipped').notNull().default(0),
+    review: integer('review').notNull().default(0),
+    /** Safe operational message only; never raw bank responses or credentials. */
+    message: text('message'),
+    issues: text('issues', { mode: 'json' })
+      .$type<
+        Array<{
+          date: string
+          description: string
+          amount: number
+          reason: string
+        }>
+      >()
+      .notNull()
+      .default([]),
+    updatedBy: text('updated_by').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.householdId, t.id] }),
+    index('account_updates_account_idx').on(
+      t.householdId,
+      t.account,
+      t.startedAt,
+    ),
+  ],
+)
+
+/** Serialize writers for an Account; expired leases allow a crashed job to retry. */
+export const accountUpdateLocks = sqliteTable(
+  'account_update_locks',
+  {
+    householdId: householdId(),
+    account: text('account').notNull(),
+    token: text('token').notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.householdId, t.account] })],
+)
+
+/** The chosen export convention is saved per Account, never guessed silently. */
+export const accountInputs = sqliteTable(
+  'account_inputs',
+  {
+    householdId: householdId(),
+    account: text('account').notNull(),
+    format: text('format').$type<ExportFormat>().notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.householdId, t.account] })],
 )
 
 /**

@@ -10,6 +10,7 @@ import {
   Search,
   Sun,
   Users,
+  Vibrate,
   Wallet,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -209,6 +210,13 @@ function MemberMenu({ member }: { member: Member }) {
           >
             <Users size={15} aria-hidden /> Household
           </Link>
+          {/* Temporary: which way of ticking works on this phone. */}
+          <a
+            href="/haptics.html"
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
+          >
+            <Vibrate size={15} aria-hidden /> Test haptics
+          </a>
           <button
             type="button"
             onClick={() => void signOut().then(() => window.location.reload())}

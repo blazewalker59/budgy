@@ -1,16 +1,18 @@
 /**
  * What's ahead, on Plan: the months Planned Expenses make heavy, then each
- * Plan once, by when it's next due (late, coming up, later, paused), to
- * see what's coming and manage them in one place; and bills from history
+ * Plan once, by when it's next due (late, coming up, later, paused), each
+ * opening a sheet with its payments and settings; and bills from history
  * that look like they should be planned.
  */
 
 import { useMemo, useState } from 'react'
 import { ChevronRight, Plus, Sparkles } from 'lucide-react'
+import { PlanForm } from './PlanForm'
+import { PlanSheet } from './PlanSheet'
 import type { Plan } from '@/lib/model/types'
 import type { PlanLine, PlanStatus } from '@/lib/model/plans'
 import { useBook } from '@/lib/ledger/book'
-import { newPlanId, useDeletePlan, useSavePlan } from '@/lib/ledger/useLedger'
+import { newPlanId } from '@/lib/ledger/useLedger'
 import { forecast } from '@/lib/model/forecast'
 import { suggestPlans } from '@/lib/model/detect'
 import {
@@ -20,13 +22,10 @@ import {
   planLines,
 } from '@/lib/model/plans'
 import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
-import { dollars, parseDollars } from '@/lib/model/money'
-import { CADENCES, CADENCE_LABELS } from '@/lib/model/types'
+import { dollars } from '@/lib/model/money'
+import { CADENCE_LABELS } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
-import { CategorySelect } from '@/components/shared/CategorySelect'
 import { ForecastChart } from '@/components/charts/lazy'
-import { Dropdown } from '@/components/shared/Dropdown'
-import { ConfirmPanel } from '@/components/shared/Confirm'
 
 export function UpcomingScreen() {
   const book = useBook()
@@ -39,9 +38,9 @@ export function UpcomingScreen() {
     [book],
   )
   const suggestions = useMemo(() => suggestPlans(book.ix, book.today), [book])
-  const [editing, setEditing] = useState<Plan | null>(null)
-  const adding =
-    editing && !book.ix.ledger.plans.some((p) => p.id === editing.id)
+  const [adding, setAdding] = useState<Plan | null>(null)
+  const [viewing, setViewing] = useState<string | null>(null)
+  const viewed = book.ix.ledger.plans.find((p) => p.id === viewing)
   const setAside = book.ix.ledger.plans
     .filter((p) => p.active)
     .reduce((n, p) => n + monthlySetAside(p), 0)
@@ -72,7 +71,7 @@ export function UpcomingScreen() {
         <button
           type="button"
           onClick={() =>
-            setEditing({
+            setAdding({
               id: newPlanId(),
               name: '',
               category: 'Insurance',
@@ -93,9 +92,7 @@ export function UpcomingScreen() {
         <Forecast months={months} />
 
         <div className="space-y-3">
-          {adding && (
-            <PlanForm plan={editing} onDone={() => setEditing(null)} />
-          )}
+          {adding && <PlanForm plan={adding} onDone={() => setAdding(null)} />}
           {GROUPS.map((g) => {
             const list = lines.filter((l) => l.status === g.status)
             if (!list.length) return null
@@ -108,23 +105,14 @@ export function UpcomingScreen() {
                   </span>
                 </h3>
                 <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
-                  {list.map((l) =>
-                    editing?.id === l.plan.id ? (
-                      <li key={l.plan.id} className="p-2">
-                        <PlanForm
-                          plan={editing}
-                          onDone={() => setEditing(null)}
-                        />
-                      </li>
-                    ) : (
-                      <PlanRow
-                        key={l.plan.id}
-                        line={l}
-                        today={book.today}
-                        onEdit={() => setEditing(l.plan)}
-                      />
-                    ),
-                  )}
+                  {list.map((l) => (
+                    <PlanRow
+                      key={l.plan.id}
+                      line={l}
+                      today={book.today}
+                      onOpen={() => setViewing(l.plan.id)}
+                    />
+                  ))}
                 </ul>
               </section>
             )
@@ -173,7 +161,7 @@ export function UpcomingScreen() {
                     <button
                       type="button"
                       onClick={() =>
-                        setEditing({
+                        setAdding({
                           id: newPlanId(),
                           name: s.store,
                           category: s.category,
@@ -195,6 +183,7 @@ export function UpcomingScreen() {
           )}
         </div>
       </div>
+      {viewed && <PlanSheet plan={viewed} onClose={() => setViewing(null)} />}
     </div>
   )
 }
@@ -210,23 +199,22 @@ const GROUPS: ReadonlyArray<{
   { status: 'paused', title: 'Paused', hint: 'not budgeted' },
 ]
 
-/** One Plan: what it is and costs, and when it's next due. Tap to edit. */
+/** One Plan: what it is and costs, and when it's next due. Tap for more. */
 function PlanRow({
   line: { plan, status, next, more, lastPaid },
   today,
-  onEdit,
+  onOpen,
 }: {
   line: PlanLine
   today: string
-  onEdit: () => void
+  onOpen: () => void
 }) {
   const aside = monthlySetAside(plan)
   return (
     <li>
       <button
         type="button"
-        onClick={onEdit}
-        aria-label={`Edit ${plan.name}`}
+        onClick={onOpen}
         className={cn(
           'flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left text-[13px] hover:bg-sunken',
           status === 'paused' && 'opacity-60',
@@ -300,181 +288,5 @@ function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
         </div>
       )}
     </section>
-  )
-}
-
-function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
-  const { ix } = useBook()
-  const save = useSavePlan()
-  const remove = useDeletePlan()
-  const existing = ix.ledger.plans.some((p) => p.id === plan.id)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [draft, setDraft] = useState(plan)
-  const [amount, setAmount] = useState(
-    plan.amount ? String(plan.amount / 100) : '',
-  )
-  const stores = useMemo(
-    () => [...new Set(ix.ledger.txns.map((t) => t.store))].sort(),
-    [ix],
-  )
-  const cents = parseDollars(amount)
-  const valid = draft.name.trim() && cents && cents > 0
-  return (
-    <form
-      className="mb-1 grid gap-3 rounded-xl border-2 border-planned/40 bg-surface p-3 sm:grid-cols-2"
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!valid) return
-        save.mutate({
-          ...draft,
-          name: draft.name.trim(),
-          store: draft.store?.trim() || null,
-          amount: cents,
-        })
-        onDone()
-      }}
-    >
-      <Field label="Name">
-        <input
-          autoFocus
-          value={draft.name}
-          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-          placeholder="Car insurance"
-          maxLength={60}
-          className="field w-full"
-        />
-      </Field>
-      <Field label="Category">
-        <CategorySelect
-          label="Category"
-          value={draft.category}
-          onChange={(category) => setDraft({ ...draft, category })}
-          className="w-full"
-        />
-      </Field>
-      <Field label="Amount">
-        <input
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="1,250"
-          className="field w-full"
-        />
-      </Field>
-      <Field label="How often">
-        <Dropdown<Plan['cadence']>
-          value={draft.cadence}
-          onChange={(cadence) => setDraft({ ...draft, cadence })}
-          label="How often"
-          className="w-full"
-          options={CADENCES.map((c) => ({
-            value: c,
-            label: CADENCE_LABELS[c],
-          }))}
-        />
-        <span className="mt-1 block text-xs text-muted">
-          {isSetAside(draft)
-            ? 'Kept out of targets, budgeted on its due dates.'
-            : 'Counts toward the category’s target.'}
-        </span>
-      </Field>
-      <Field label="Next due">
-        <input
-          type="date"
-          value={draft.anchor}
-          onChange={(e) =>
-            e.target.value && setDraft({ ...draft, anchor: e.target.value })
-          }
-          className="field w-full"
-        />
-      </Field>
-      <Field label="Paid to (optional)">
-        <input
-          list="plan-stores"
-          value={draft.store ?? ''}
-          onChange={(e) =>
-            setDraft({ ...draft, store: e.target.value || null })
-          }
-          placeholder="Any store, matched by amount"
-          className="field w-full"
-        />
-        <datalist id="plan-stores">
-          {stores.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-      </Field>
-      {confirmDelete && (
-        <div className="sm:col-span-2">
-          <ConfirmPanel
-            question={`Delete ${plan.name}?`}
-            detail="Its payments stay in Spending, counted as everyday spending again."
-            action="Delete"
-            onConfirm={() => {
-              remove.mutate({ id: plan.id })
-              onDone()
-            }}
-            onCancel={() => setConfirmDelete(false)}
-          />
-        </div>
-      )}
-      <div
-        className={cn(
-          'flex flex-wrap items-center justify-end gap-2 sm:col-span-2',
-          confirmDelete && 'hidden',
-        )}
-      >
-        {existing && (
-          <span className="mr-auto flex gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                save.mutate({ ...plan, active: !plan.active })
-                onDone()
-              }}
-              className="min-h-9 rounded-full bg-sunken px-3 text-xs font-semibold"
-            >
-              {plan.active ? 'Pause' : 'Resume'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="min-h-9 rounded-full px-3 text-xs font-semibold text-over"
-            >
-              Delete
-            </button>
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={onDone}
-          className="min-h-9 rounded-full px-4 text-sm font-medium text-muted"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          disabled={!valid}
-          className="min-h-9 rounded-full bg-foreground px-4 text-xs font-semibold text-background disabled:opacity-40"
-        >
-          Save
-        </button>
-      </div>
-    </form>
-  )
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className="block text-sm">
-      <span className="mb-1 block font-medium text-muted">{label}</span>
-      {children}
-    </label>
   )
 }

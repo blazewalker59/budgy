@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   keepLens,
   validateAccountsSearch,
-  validateLensSearch,
   validateOverviewSearch,
   validatePlanSearch,
   validateSpendingSearch,
@@ -11,17 +10,17 @@ import {
 
 describe('screen search', () => {
   it('reads a Lens, including the older owner, acct, and cat names', () => {
-    expect(validateLensSearch({ owner: 'Alex' })).toMatchObject({
+    expect(validateOverviewSearch({ owner: 'Alex' })).toMatchObject({
       people: ['Alex'],
     })
-    expect(validateLensSearch({ acct: 'A,B' })).toMatchObject({
+    expect(validateSpendingSearch({ acct: 'A,B' })).toMatchObject({
       accounts: ['A', 'B'],
     })
-    expect(validateLensSearch({ cat: 'Groceries' })).toMatchObject({
+    expect(validateAccountsSearch({ cat: 'Groceries' })).toMatchObject({
       categories: ['Groceries'],
     })
     expect(
-      validateLensSearch({ people: ['Alex'], owner: 'Blaze' }),
+      validatePlanSearch({ people: ['Alex'], owner: 'Blaze' }),
     ).toMatchObject({ people: ['Alex'] })
   })
 

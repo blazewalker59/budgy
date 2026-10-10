@@ -5,7 +5,7 @@
  */
 
 import { z } from 'zod'
-import { lastDayOf } from './dates'
+import { lastDayOf, monthRange } from './dates'
 import { ACCOUNT_KINDS, DEBT_KINDS } from './types'
 import type { Account, AccountKind, Balance, Ledger } from './types'
 
@@ -85,27 +85,161 @@ export interface WorthMonth extends NetWorth {
 }
 
 /**
- * Net worth at each month's end. An Account counts from its first Balance;
- * a closed one counts until it's closed only if it was given a final
- * Balance (closing records zero).
+ * Net worth on a day, from every Balance on or before it. An Account counts
+ * from its first Balance; a closed one counts until it's closed only if it
+ * was given a final Balance (closing records zero).
  */
+export function worthAsOf(ledger: Ledger, date: string): NetWorth {
+  const kinds = new Map(ledger.accounts.map((a) => [a.name, a]))
+  let assets = 0
+  let debts = 0
+  for (const [name, b] of latestBalances(ledger.balances, date)) {
+    const a = kinds.get(name)
+    if (!a) continue
+    if (isDebt(a)) debts += b.amount
+    else assets += b.amount
+  }
+  return { assets, debts, net: assets - debts }
+}
+
+/** Net worth at each month's end (`worthAsOf`). */
 export function netWorthByMonth(
   ledger: Ledger,
   months: Array<string>,
 ): Array<WorthMonth> {
-  const kinds = new Map(ledger.accounts.map((a) => [a.name, a]))
-  return months.map((month) => {
-    const latest = latestBalances(ledger.balances, lastDayOf(month))
-    let assets = 0
-    let debts = 0
-    for (const [name, b] of latest) {
-      const a = kinds.get(name)
-      if (!a) continue
-      if (isDebt(a)) debts += b.amount
-      else assets += b.amount
+  return months.map((month) => ({
+    month,
+    ...worthAsOf(ledger, lastDayOf(month)),
+  }))
+}
+
+/** Each Account's first Balance date. */
+function firstBalances(balances: Array<Balance>): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const b of balances) {
+    const had = out.get(b.account)
+    if (!had || b.date < had) out.set(b.account, b.date)
+  }
+  return out
+}
+
+/**
+ * The baseline net worth is counted from when none is chosen: the first
+ * day every open Account had a Balance. Before it, history is mostly
+ * Accounts arriving (a backfilled card, then everything else on the day
+ * it was set up), not money gained.
+ */
+export function autoBaseline(ledger: Ledger): string | null {
+  const firsts = firstBalances(ledger.balances)
+  let out: string | null = null
+  for (const a of ledger.accounts) {
+    const first = firsts.get(a.name)
+    if (a.closed || !first) continue
+    if (!out || first > out) out = first
+  }
+  return out
+}
+
+export interface WorthHistory {
+  baseline: string
+  /** No baseline was chosen: it's `autoBaseline`. */
+  auto: boolean
+  /** Net worth on the baseline, and today. */
+  start: number
+  now: number
+  /** The baseline's month (as of the baseline), then each month's end. */
+  points: Array<{ month: string; value: number }>
+  /** Open Accounts with no Balance yet on the baseline: their arrival counts as change. */
+  late: Array<string>
+}
+
+/** Net worth from the baseline (chosen, else `autoBaseline`) to today. */
+export function worthHistory(
+  ledger: Ledger,
+  chosen: string | null,
+  today: string,
+): WorthHistory | null {
+  const baseline = chosen ?? autoBaseline(ledger)
+  if (!baseline) return null
+  const first = baseline.slice(0, 7)
+  const now = today.slice(0, 7)
+  const later = first < now ? monthRange(now, 600).filter((m) => m > first) : []
+  const start = worthAsOf(ledger, baseline).net
+  const firsts = firstBalances(ledger.balances)
+  return {
+    baseline,
+    auto: chosen === null,
+    start,
+    now: worthAsOf(ledger, today).net,
+    points: [
+      { month: first, value: start },
+      ...later.map((m) => ({
+        month: m,
+        value: worthAsOf(ledger, m === now ? today : lastDayOf(m)).net,
+      })),
+    ],
+    late: ledger.accounts
+      .filter((a) => {
+        const f = firsts.get(a.name)
+        return !a.closed && f !== undefined && f > baseline
+      })
+      .map((a) => a.name),
+  }
+}
+
+/** The Accounts screen's groups, in order. */
+export const ACCOUNT_GROUPS: ReadonlyArray<{
+  title: string
+  kinds: ReadonlyArray<AccountKind>
+}> = [
+  { title: 'Cash', kinds: ['checking', 'savings'] },
+  { title: 'Credit cards', kinds: ['credit'] },
+  { title: 'Investments', kinds: ['brokerage'] },
+  { title: 'Retirement', kinds: ['retirement'] },
+  { title: 'Education', kinds: ['education'] },
+  { title: 'Home & property', kinds: ['property'] },
+  { title: 'Loans', kinds: ['loan'] },
+  { title: 'Other', kinds: ['other'] },
+]
+
+export interface WorthPart {
+  title: string
+  /** Cents; what's owed is positive on the debts side. */
+  total: number
+  accounts: Array<{ account: Account; amount: number }>
+}
+
+/**
+ * What one side of net worth is made of: each group of open Accounts with
+ * a Balance, largest first, and its Accounts, largest first.
+ */
+export function worthParts(
+  ledger: Ledger,
+  side: 'assets' | 'debts',
+): Array<WorthPart> {
+  const latest = latestBalances(ledger.balances)
+  return ACCOUNT_GROUPS.map((g) => {
+    const accounts = ledger.accounts
+      .filter(
+        (a) =>
+          !a.closed &&
+          g.kinds.includes(a.kind) &&
+          isDebt(a) === (side === 'debts') &&
+          latest.has(a.name),
+      )
+      .map((account) => ({
+        account,
+        amount: latest.get(account.name)!.amount,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+    return {
+      title: g.title,
+      total: accounts.reduce((n, a) => n + a.amount, 0),
+      accounts,
     }
-    return { month, assets, debts, net: assets - debts }
   })
+    .filter((p) => p.accounts.length)
+    .sort((a, b) => b.total - a.total)
 }
 
 /** One Account's Balance at each month's end, null before its first. */

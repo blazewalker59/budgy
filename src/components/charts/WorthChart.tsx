@@ -22,11 +22,14 @@ export interface WorthPoint {
 export function WorthChart({
   points,
   label,
+  headline,
   color = CHART_COLORS.accent,
   height = 170,
 }: {
   points: Array<WorthPoint>
   label: string
+  /** In place of the change since the first point's month. */
+  headline?: string
   color?: string
   height?: number
 }) {
@@ -84,13 +87,17 @@ export function WorthChart({
   return (
     <ChartCard
       headline={
-        first &&
-        last &&
-        points.length > 1 && (
-          <span className="tabular-nums">
-            {signedDollars(last.value - first.value)} since{' '}
-            {monthLabel(first.month)}
-          </span>
+        headline ? (
+          <span className="tabular-nums">{headline}</span>
+        ) : (
+          first &&
+          last &&
+          points.length > 1 && (
+            <span className="tabular-nums">
+              {signedDollars(last.value - first.value)} since{' '}
+              {monthLabel(first.month)}
+            </span>
+          )
         )
       }
       legend={[{ label, color, shape: 'line' }]}

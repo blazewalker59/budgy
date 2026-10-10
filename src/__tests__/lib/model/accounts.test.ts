@@ -4,6 +4,7 @@ import type { Account } from '@/lib/model/types'
 import {
   accountInput,
   activity,
+  autoBaseline,
   balanceByMonth,
   equity,
   latestBalances,
@@ -11,6 +12,8 @@ import {
   netWorthByMonth,
   ownerNames,
   worth,
+  worthHistory,
+  worthParts,
 } from '@/lib/model/accounts'
 
 const acct = (
@@ -209,5 +212,90 @@ describe('equity', () => {
       debts: 33_000_000,
       net: 15_000_000,
     })
+  })
+})
+
+describe('net worth baseline', () => {
+  // A card backfilled to Dec 2024, then everything else on setup day.
+  const setup = ledger({
+    accounts: [
+      acct('Card', 'credit'),
+      acct('House', 'property'),
+      acct('Mortgage', 'loan'),
+      acct('Gone', 'checking', { closed: true }),
+    ],
+    balances: [
+      { account: 'Card', date: '2024-12-31', amount: 100_000 },
+      { account: 'Gone', date: '2025-01-01', amount: 0 },
+      { account: 'House', date: '2026-10-08', amount: 48_000_000 },
+      { account: 'Mortgage', date: '2026-10-08', amount: 30_000_000 },
+      { account: 'Card', date: '2026-10-08', amount: 200_000 },
+      { account: 'House', date: '2026-10-09', amount: 48_100_000 },
+    ],
+  })
+
+  it('starts automatically on the first day every open account had a balance', () => {
+    expect(autoBaseline(setup)).toBe('2026-10-08')
+  })
+
+  it('counts change from the baseline, not from accounts arriving', () => {
+    const h = worthHistory(setup, null, '2026-10-10')!
+    expect(h).toMatchObject({
+      baseline: '2026-10-08',
+      auto: true,
+      start: 48_000_000 - 30_000_000 - 200_000,
+      now: 48_100_000 - 30_000_000 - 200_000,
+      late: [],
+    })
+    expect(h.points).toEqual([{ month: '2026-10', value: h.start }])
+  })
+
+  it('takes a chosen baseline, and names the accounts that arrive after it', () => {
+    const h = worthHistory(setup, '2026-09-01', '2026-10-10')!
+    expect(h.auto).toBe(false)
+    expect(h.start).toBe(-100_000)
+    expect(h.late).toEqual(['House', 'Mortgage'])
+    expect(h.points.map((p) => p.month)).toEqual(['2026-09', '2026-10'])
+    expect(h.points[1].value).toBe(h.now)
+  })
+
+  it('has none without balances', () => {
+    expect(worthHistory(ledger({ balances: [] }), null, '2026-10-10')).toBe(
+      null,
+    )
+  })
+})
+
+describe('worthParts', () => {
+  it('groups each side, largest first, leaving out closed accounts and ones with no balance', () => {
+    const l = ledger({
+      accounts: [
+        acct('Checking', 'checking'),
+        acct('Savings', 'savings'),
+        acct('401k', 'retirement'),
+        acct('Card', 'credit'),
+        acct('Old', 'checking', { closed: true }),
+        acct('New', 'brokerage'),
+      ],
+      balances: [
+        { account: 'Checking', date: '2026-10-01', amount: 100 },
+        { account: 'Savings', date: '2026-10-01', amount: 300 },
+        { account: '401k', date: '2026-10-01', amount: 1_000 },
+        { account: 'Card', date: '2026-10-01', amount: 50 },
+        { account: 'Old', date: '2026-10-01', amount: 999 },
+      ],
+    })
+    const assets = worthParts(l, 'assets')
+    expect(assets.map((p) => [p.title, p.total])).toEqual([
+      ['Retirement', 1_000],
+      ['Cash', 400],
+    ])
+    expect(assets[1].accounts.map((a) => a.account.name)).toEqual([
+      'Savings',
+      'Checking',
+    ])
+    expect(worthParts(l, 'debts').map((p) => [p.title, p.total])).toEqual([
+      ['Credit cards', 50],
+    ])
   })
 })

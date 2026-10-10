@@ -27,6 +27,7 @@ import {
   savePlan,
   setStoreRule,
   setTarget,
+  setWorthBaseline,
 } from './server'
 import type { AccountEdit } from './server'
 import type {
@@ -309,6 +310,13 @@ export function useKeepDuplicate() {
   return useEdit(
     (v: { goes: string; stays: string }) => keepDuplicatePair({ data: v }),
     (l, v) => ({ ...l, kept: [...l.kept, pairKey(v.goes, v.stays)] }),
+  )
+}
+
+export function useWorthBaseline() {
+  return useEdit(
+    (v: { date: string | null }) => setWorthBaseline({ data: v }),
+    (l, v) => ({ ...l, baseline: v.date }),
   )
 }
 

@@ -11,7 +11,9 @@ import { useNavigate } from '@tanstack/react-router'
 import { ChevronRight, Plus } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import { AccountUpdates } from './AccountUpdates'
+import { Baseline, WorthSheet, dayWithYear } from './WorthSheet'
 import { RulesTab } from './RulesTab'
+import type { WorthView } from './WorthSheet'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
@@ -21,35 +23,25 @@ import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
 import { useRemoveStarting, useSaveAccount } from '@/lib/ledger/useLedger'
 import {
+  ACCOUNT_GROUPS,
   activity,
   equity,
   isDebt,
   latestBalances,
   netWorth,
-  netWorthByMonth,
   ownerNames,
+  worthHistory,
 } from '@/lib/model/accounts'
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
 import { useHousehold } from '@/lib/households/useHousehold'
-import { dayLabel, daysBetween, monthRange } from '@/lib/model/dates'
-import { dollars } from '@/lib/model/money'
+import { dayLabel, daysBetween } from '@/lib/model/dates'
+import { dollars, shortDollars, signedDollars } from '@/lib/model/money'
 import { everyTxn } from '@/lib/model/ledger'
 import { ownerColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Segmented, Stat } from '@/components/shared/Layout'
 import { WorthChart } from '@/components/charts/lazy'
 import { Dropdown } from '@/components/shared/Dropdown'
-
-const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
-  { title: 'Cash', kinds: ['checking', 'savings'] },
-  { title: 'Credit cards', kinds: ['credit'] },
-  { title: 'Investments', kinds: ['brokerage'] },
-  { title: 'Retirement', kinds: ['retirement'] },
-  { title: 'Education', kinds: ['education'] },
-  { title: 'Home & property', kinds: ['property'] },
-  { title: 'Loans', kinds: ['loan'] },
-  { title: 'Other', kinds: ['other'] },
-]
 
 /** A Balance older than this is worth updating. */
 const STALE_DAYS = 35
@@ -132,16 +124,11 @@ function AccountsList({ lens }: { lens: Lens }) {
     () => new Map(equity(ledger).map((e) => [e.property, e])),
     [ledger],
   )
-  const history = useMemo(() => {
-    const first = ledger.balances[0]?.date.slice(0, 7)
-    if (!first) return []
-    const now = book.today.slice(0, 7)
-    const months = monthRange(now, 600).filter((m) => m >= first)
-    return netWorthByMonth(ledger, months).map((m) => ({
-      month: m.month,
-      value: m.net,
-    }))
-  }, [ledger, book.today])
+  const history = useMemo(
+    () => worthHistory(ledger, book.ix.ledger.baseline, book.today),
+    [ledger, book.ix.ledger.baseline, book.today],
+  )
+  const [breakdown, setBreakdown] = useState<WorthView | null>(null)
 
   const open = ledger.accounts.filter((a) => !a.closed)
   const closed = ledger.accounts.filter((a) => a.closed)
@@ -167,17 +154,39 @@ function AccountsList({ lens }: { lens: Lens }) {
       />
 
       <div className="grid grid-cols-3 gap-2">
-        <Stat label="Have" value={dollars(worth.assets)} />
-        <Stat label="Owe" value={dollars(worth.debts)} />
-        <Stat
-          label="Net worth"
-          value={dollars(worth.net)}
-          tone={worth.net < 0 ? 'over' : undefined}
-        />
+        {(
+          [
+            { view: 'assets', label: 'Have', value: worth.assets },
+            { view: 'debts', label: 'Owe', value: worth.debts },
+            { view: 'net', label: 'Net worth', value: worth.net },
+          ] as const
+        ).map((s) => (
+          <button
+            key={s.view}
+            type="button"
+            onClick={() => setBreakdown(s.view)}
+            aria-label={`${s.label} ${dollars(s.value)}: see what makes it up`}
+            className="min-w-0 rounded-xl text-left active:scale-[0.98] transition-transform"
+          >
+            <Stat
+              label={s.label}
+              value={shortDollars(s.value)}
+              tappable
+              tone={s.view === 'net' && s.value < 0 ? 'over' : undefined}
+            />
+          </button>
+        ))}
       </div>
-      {history.length > 1 && <WorthChart points={history} label="Net worth" />}
+      {history && history.points.length > 1 && (
+        <WorthChart
+          points={history.points}
+          label="Net worth"
+          headline={`${signedDollars(history.now - history.start)} since ${dayWithYear(history.baseline, book.today)}`}
+        />
+      )}
+      {history && <Baseline history={history} today={book.today} />}
 
-      {GROUPS.map((g) => {
+      {ACCOUNT_GROUPS.map((g) => {
         const list = open.filter((a) => g.kinds.includes(a.kind))
         if (!list.length) return null
         const total = list.reduce(
@@ -221,6 +230,16 @@ function AccountsList({ lens }: { lens: Lens }) {
 
       <AddAccount onAdded={setSheet} />
       <StartingPurchases onOpen={setSheet} />
+      {breakdown && (
+        <WorthSheet
+          ledger={ledger}
+          history={history}
+          today={book.today}
+          initial={breakdown}
+          onOpenAccount={setSheet}
+          onClose={() => setBreakdown(null)}
+        />
+      )}
       {sheet && <AccountSheet name={sheet} onClose={() => setSheet(null)} />}
     </>
   )

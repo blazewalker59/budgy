@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { dollars, money, parseDollars, signedDollars } from '@/lib/model/money'
+import {
+  dollars,
+  money,
+  parseDollars,
+  shortDollars,
+  signedDollars,
+} from '@/lib/model/money'
 
 describe('money', () => {
   it('formats cents', () => {
@@ -15,5 +21,15 @@ describe('money', () => {
     expect(parseDollars('80')).toBe(8_000)
     expect(parseDollars('')).toBeNull()
     expect(parseDollars('abc')).toBeNull()
+  })
+})
+
+describe('shortDollars', () => {
+  it('stays exact under $100k, then shortens', () => {
+    expect(shortDollars(7_519_00)).toBe('$7,519')
+    expect(shortDollars(99_999_00)).toBe('$99,999')
+    expect(shortDollars(302_611_00)).toBe('$303K')
+    expect(shortDollars(1_061_489_00)).toBe('$1.06M')
+    expect(shortDollars(-302_611_00)).toBe('-$303K')
   })
 })

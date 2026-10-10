@@ -86,6 +86,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
     targets: [],
     plans: [],
     kept: [],
+    baseline: null,
     ...over,
   }
 }

@@ -1,5 +1,6 @@
 /** Compact building blocks shared by every screen. */
 
+import { ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function Stat({
@@ -7,18 +8,24 @@ export function Stat({
   value,
   detail,
   tone,
+  tappable,
   children,
 }: {
   label: string
   value: string
   detail?: string
   tone?: 'over' | 'planned' | 'good'
+  /** Shows it opens more, with a chevron by the label. */
+  tappable?: boolean
   children?: React.ReactNode
 }) {
   return (
     <div className="min-w-0 rounded-xl border border-border bg-surface px-3 py-2">
-      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-muted">
-        {label}
+      <p className="flex items-center gap-0.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        <span className="truncate">{label}</span>
+        {tappable && (
+          <ChevronRight size={12} className="shrink-0" aria-hidden />
+        )}
       </p>
       <p className="text-xl font-extrabold leading-tight tracking-tight">
         {value}

@@ -15,6 +15,20 @@ export function dollars(cents: number): string {
   return whole.format(Math.round(cents / 100))
 }
 
+const compact = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumSignificantDigits: 3,
+})
+
+/** "$1,235" under $100k, then "$303K", "$1.06M": for tight spaces. */
+export function shortDollars(cents: number): string {
+  return Math.abs(cents) < 10_000_000
+    ? dollars(cents)
+    : compact.format(cents / 100)
+}
+
 /** "$1,234.56" */
 export function money(cents: number): string {
   return exact.format(cents / 100)

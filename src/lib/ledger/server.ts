@@ -12,6 +12,7 @@ import {
   loadLedger,
   moveTransaction,
   noteTransaction,
+  saveBaseline,
 } from './queries'
 import { RULES_KEY, loadImportRules } from './importer'
 import { keepBoth, mergeDuplicate } from './duplicates'
@@ -431,6 +432,20 @@ export const mergeDuplicatePair = createServerFn({ method: 'POST' })
 export const keepDuplicatePair = createServerFn({ method: 'POST' })
   .validator((data: { goes: string; stays: string }) => pairInput.parse(data))
   .handler(({ data }) => withMember(({ db }) => keepBoth(db, data)))
+
+/** The day net worth history counts from; null for the automatic one. */
+export const setWorthBaseline = createServerFn({ method: 'POST' })
+  .validator((data: { date: string | null }) =>
+    z
+      .object({
+        date: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/)
+          .nullable(),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) => withMember(({ db }) => saveBaseline(db, data.date)))
 
 export const getImportRules = createServerFn({ method: 'GET' }).handler(() =>
   withMember(({ db }) => loadImportRules(db)),

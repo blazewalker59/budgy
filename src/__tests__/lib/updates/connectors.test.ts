@@ -431,6 +431,13 @@ describe('SimpleFIN client', () => {
       )) as typeof fetch
     const { accounts, attention } = await fetchSimplefin(ACCESS, {}, transport)
     expect(attention).toBe(false)
+    const blank = (() =>
+      Promise.resolve(
+        Response.json({ accounts: [{ ...sapphire, currency: '' }] }),
+      )) as typeof fetch
+    expect((await fetchSimplefin(ACCESS, {}, blank)).accounts[0].currency).toBe(
+      'USD',
+    )
     expect(accounts).toEqual([
       {
         id: 'ACT-1',

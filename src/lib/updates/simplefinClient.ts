@@ -183,7 +183,8 @@ function normalize(set: z.infer<typeof accountSet>): Array<SimplefinAccount> {
         connection?.org_name ??
         connection?.name ??
         'Unknown institution',
-      currency: a.currency ?? 'USD',
+      // Some institutions send a blank currency; SimpleFIN's default is USD.
+      currency: a.currency?.trim() || 'USD',
       balance: a.balance,
       balanceDate: a['balance-date'] ?? null,
       transactions: (a.transactions ?? []).map((t) => ({

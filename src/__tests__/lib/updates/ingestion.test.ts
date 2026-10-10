@@ -256,7 +256,7 @@ describe('Unified account ingestion', () => {
       sourceNamespace: 'test-connector',
     })
     expect(result.added).toBe(0)
-    expect(result.review[0].reason).toContain('different posting date')
+    expect(result.review[0].reason).toContain('different date')
     expect((await loadLedger(a)).txns).toHaveLength(1)
   })
 

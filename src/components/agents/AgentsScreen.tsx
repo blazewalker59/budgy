@@ -54,11 +54,16 @@ export function AgentsScreen() {
       <div>
         <h1 className="text-lg font-extrabold tracking-tight">Agents</h1>
         <p className="text-xs text-muted">
-          Let an AI agent (Claude, Grok or your own bot) use Budgy as you: ask
-          about spending any way the app shows it, get Budget Alerts, a daily
-          digest of every account, and, if you allow it, import exports and move
-          or note purchases.
+          Let an AI agent, like Claude or your own bot, use Budgy as you. It
+          can:
         </p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted">
+          <li>Answer questions about your spending</li>
+          <li>Send Budget Alerts and a daily digest</li>
+          <li>
+            Import purchases, change categories and add notes, if you allow it
+          </li>
+        </ul>
       </div>
 
       {created ? (
@@ -68,8 +73,8 @@ export function AgentsScreen() {
         >
           <p className="font-semibold">Your new token</p>
           <p className="text-xs text-muted">
-            Copy it now: it won’t be shown again. Anyone with it can read your
-            budget, so keep it in your agent’s secrets.
+            Copy it now. It won’t be shown again. Keep it secret, since anyone
+            with it can read your budget.
           </p>
           <CopyLine text={created} label="token" />
           <button
@@ -93,7 +98,7 @@ export function AgentsScreen() {
             onChange={(e) => setName(e.target.value)}
             maxLength={60}
             autoComplete="off"
-            placeholder="New token: what it’s for, e.g. Claude daily digest"
+            placeholder="Token name, e.g. Claude daily digest"
             aria-label="Token name"
             className="field min-w-48 flex-1"
           />
@@ -123,11 +128,11 @@ export function AgentsScreen() {
       <section className="space-y-2 rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px]">
         <p className="font-semibold">Connect an agent</p>
         <p className="text-xs text-muted">
-          An MCP server at this URL, with your token as a header:
+          Add an MCP server with this URL and header.
         </p>
         <CopyLine text={endpoint} label="URL" />
         <CopyLine text={`Authorization: Bearer ${token}`} label="header" />
-        <p className="pt-1 text-xs text-muted">Claude Code:</p>
+        <p className="pt-1 text-xs text-muted">Or run this in Claude Code.</p>
         <CopyLine
           text={`claude mcp add --transport http budgy ${endpoint} --header "Authorization: Bearer ${token}"`}
           label="Claude Code command"
@@ -137,10 +142,10 @@ export function AgentsScreen() {
       <section className="space-y-2 rounded-xl border border-border bg-surface px-3 py-2.5 text-[13px]">
         <p className="font-semibold">A daily digest</p>
         <p className="text-xs text-muted">
-          Schedule your agent (a Claude scheduled task, a cron job running your
-          bot) to run each morning with something like this. Budgy only knows
-          what’s been imported, so the digest is as fresh as the latest export;
-          a token that can import lets the agent bring it in first.
+          Have your agent run this each morning, for example as a Claude
+          scheduled task or a cron job. The digest only covers what’s been
+          imported. With a token that can import, the agent adds new purchases
+          first.
         </p>
         <CopyLine text={DAILY_PROMPT} label="daily prompt" />
       </section>

@@ -36,8 +36,7 @@ export function ShortcutUpload({
     queryClient.invalidateQueries({ queryKey: UPLOAD_TOKENS_KEY })
   const create = useMutation({
     mutationFn: () => {
-      if (!format)
-        throw new Error('Choose the export format and amount convention')
+      if (!format) throw new Error('Choose an export format.')
       return createAccountUploadToken({
         data: { account: account.name, format },
       })
@@ -60,9 +59,8 @@ export function ShortcutUpload({
   return (
     <div className="space-y-3 border-t border-border pt-3 text-xs">
       <p className="text-muted">
-        Send an export straight from your iPhone’s share sheet. The Shortcut’s
-        token can only add purchases to {account.name}; it can’t read anything.
-        Each upload is checked and filed like any other, without a preview.
+        Send an export from your iPhone’s share sheet. The token can only add
+        purchases to {account.name}. It can’t read anything.
       </p>
 
       {created ? (
@@ -72,34 +70,46 @@ export function ShortcutUpload({
         >
           <p className="font-semibold">Build the Shortcut</p>
           <p className="text-muted">
-            Copy the token now: it won’t be shown again.
+            Copy the token now. It won’t be shown again.
           </p>
           <ol className="list-decimal space-y-1.5 pl-4">
             <li>
               In Shortcuts, make a new Shortcut named “Send to Budgy (
-              {account.name})”. In its details, turn on Show in Share Sheet and
-              have it receive Files.
+              {account.name})”. In its details, turn on{' '}
+              <b>Show in Share Sheet</b> and set it to receive <b>Files</b>.
             </li>
             <li>
-              Add <b>Get Contents of URL</b>, with this URL:
+              Add <b>Get Contents of URL</b> with this URL:
               <CopyLine text={endpoint} label="upload URL" />
             </li>
             <li>
-              Set Method to POST and add a header named Authorization with this
-              value:
+              Set <b>Method</b> to POST. Add a header named Authorization with
+              this value:
               <CopyLine text={`Bearer ${created}`} label="header value" />
             </li>
-            <li>Set Request Body to File, and choose Shortcut Input.</li>
             <li>
-              Add <b>Show Notification</b> with the Contents of URL, to see what
-              was added.
+              Set <b>Request Body</b> to File and choose <b>Shortcut Input</b>.
+            </li>
+            <li>
+              Add <b>Show Notification</b> with the Contents of URL. It shows
+              what was added.
             </li>
           </ol>
           <p className="text-muted">
-            {format === 'apple-card'
-              ? 'Then in Wallet: Apple Card → Card Balance → Export Transactions → choose dates → CSV → Share → your Shortcut.'
-              : 'Then export a CSV from your bank and share it to your Shortcut.'}{' '}
-            Overlapping date ranges are fine; nothing is added twice.
+            {format === 'apple-card' ? (
+              <>
+                To send purchases, in Wallet tap <strong>Apple Card</strong> →{' '}
+                <strong>Card Balance</strong> →{' '}
+                <strong>Export Transactions</strong>. Choose dates and CSV, then
+                tap <strong>Share</strong> → <strong>your Shortcut</strong>.
+              </>
+            ) : (
+              <>
+                To send purchases, export a CSV from your bank. Tap{' '}
+                <strong>Share</strong> → <strong>your Shortcut</strong>.
+              </>
+            )}{' '}
+            Overlapping dates are fine.
           </p>
           <button
             type="button"
@@ -117,7 +127,7 @@ export function ShortcutUpload({
               value={format}
               disabled={create.isPending}
               label="The export it will send"
-              placeholder="Choose the amount convention…"
+              placeholder="Choose a format…"
               className="min-h-11 w-full"
               onChange={setFormat}
               options={EXPORT_FORMATS.filter(

@@ -79,7 +79,7 @@ export async function prepareIdentified(input: {
           description: row.description,
           amount: row.amount,
           reason:
-            'Previously imported purchase is now excluded by an import rule. Review it before removing it.',
+            'An import rule now leaves this purchase out. Review it before removing it.',
         })
       } else if (
         previous.date !== row.date ||
@@ -117,7 +117,7 @@ export async function prepareIdentified(input: {
         description: row.description,
         amount: row.amount,
         reason:
-          'Several existing purchases match. Nothing was merged or added; review the matching purchases.',
+          'Several existing purchases match. Nothing was added. Review the matches.',
       })
       continue
     }
@@ -141,8 +141,7 @@ export async function prepareIdentified(input: {
         date: row.date,
         description: row.description,
         amount: row.amount,
-        reason:
-          'An existing purchase may use a different posting date. Review it before adding or matching this source purchase.',
+        reason: 'This may match a purchase with a different date. Review it.',
       })
       continue
     }

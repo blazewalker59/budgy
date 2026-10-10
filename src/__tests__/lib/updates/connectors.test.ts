@@ -169,7 +169,7 @@ describe('Shortcut upload tokens', () => {
     await saveAccount(a, { name: 'Checking', ...card, kind: 'checking' }, true)
     await expect(
       createUploadToken(a, me, 'Checking', 'apple-card'),
-    ).rejects.toThrow(/credit-card/)
+    ).rejects.toThrow(/credit card account/)
   })
 })
 
@@ -264,7 +264,7 @@ describe('SimpleFIN connections', () => {
     await expect(
       mapBankAccount(a, { ...target, providerId: 'ACT-2' }),
     ).rejects.toThrow(/already linked to Sapphire/)
-    await expect(mapBankAccount(b, target)).rejects.toThrow(/No such/)
+    await expect(mapBankAccount(b, target)).rejects.toThrow(/no longer exists/)
     expect(
       (await listConnections(a))[0].accounts.find(
         (x) => x.providerId === 'ACT-1',
@@ -306,7 +306,7 @@ describe('SimpleFIN connections', () => {
     const [connection] = await listConnections(a)
     expect(connection.status).toBe('attention')
     expect(connection.lastError).toBe(
-      'SimpleFIN says: Connection to Vanguard may need attention. b Log in /b Check your connections in Bridge.',
+      'SimpleFIN says: Connection to Vanguard may need attention. b Log in /b Check your connections in SimpleFIN Bridge.',
     )
     expect(connection.accounts[0]).toMatchObject({
       account: 'Card',
@@ -395,7 +395,7 @@ describe('SimpleFIN client', () => {
         }),
       )) as typeof fetch
     await expect(fetchSimplefin(ACCESS, {}, redirecting)).rejects.toThrow(
-      /couldn’t safely read/,
+      /couldn’t read/,
     )
   })
 
@@ -489,7 +489,7 @@ describe('SimpleFIN client', () => {
         new Response('https://u:p@evil.test/simplefin'),
       )) as typeof fetch
     await expect(claimSimplefin(SETUP, transport)).rejects.toThrow(
-      /couldn’t be claimed/,
+      /setup token didn’t work/,
     )
   })
 
@@ -740,7 +740,7 @@ describe('SimpleFIN sync', () => {
       transport,
     )
     await expect(syncConnection(a, id, KEY, transport)).rejects.toThrow(
-      /Link at least one/,
+      /Link a bank account/,
     )
   })
 })

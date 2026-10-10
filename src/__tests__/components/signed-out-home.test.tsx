@@ -26,15 +26,15 @@ describe('Signed-out home', () => {
       'Plan life together',
     )
     expect(screen.getByText('Know where the money went')).toBeTruthy()
-    expect(screen.getByText('Make room for what’s coming')).toBeTruthy()
-    expect(screen.getByText('See more than spending')).toBeTruthy()
-    expect(screen.getByText('A plan you can share')).toBeTruthy()
+    expect(screen.getByText('Plan for what’s coming')).toBeTruthy()
+    expect(screen.getByText('Track balances')).toBeTruthy()
+    expect(screen.getByText('Share it')).toBeTruthy()
     expect(screen.getByText(/Invite-only for now/)).toBeTruthy()
     expect(
-      screen.getByText(/Automatic bank syncing isn’t available yet/),
+      screen.getByText(/SimpleFIN Bridge to sync them automatically/),
     ).toBeTruthy()
     expect(screen.getByText('Example data')).toBeTruthy()
-    expect(screen.getByText(/not anyone’s Household data/)).toBeTruthy()
+    expect(screen.getByText(/not a real Household/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /create account/i })).toBeNull()
     expect(mocks.social).not.toHaveBeenCalled()
   })
@@ -65,9 +65,7 @@ describe('Signed-out home', () => {
     expect(
       screen.getByRole('heading', { name: 'Join your Household' }),
     ).toBeTruthy()
-    expect(
-      screen.getByText(/signing in won’t join it automatically/),
-    ).toBeTruthy()
+    expect(screen.getByText(/confirm before joining/)).toBeTruthy()
     expect(screen.queryByText('Example data')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }))
     await waitFor(() =>
@@ -87,7 +85,7 @@ describe('Signed-out home', () => {
     fireEvent.click(button)
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      'Could not start sign-in. Please try again.',
+      'Couldn’t start sign-in. Try again.',
     )
     expect((button as HTMLButtonElement).disabled).toBe(false)
   })

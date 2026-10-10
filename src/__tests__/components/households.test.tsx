@@ -74,7 +74,7 @@ describe('Household onboarding', () => {
   it('requires a name, explains privacy, and submits creation only on request', async () => {
     mocks.start.mockReturnValue(new Promise(() => {}))
     mount(<Onboarding member={person} />)
-    expect(screen.getByText(/Only your Household can see/)).toBeTruthy()
+    expect(screen.getByText(/No one else can see it/)).toBeTruthy()
     expect(
       (
         screen.getByRole('button', {
@@ -142,7 +142,7 @@ describe('Invitation acceptance', () => {
     mount(<JoinHousehold token={'a'.repeat(43)} />)
     expect(await screen.findByRole('alert')).toHaveProperty(
       'textContent',
-      expect.stringContaining('won’t replace or merge'),
+      expect.stringContaining('can’t join another Household'),
     )
     expect(
       screen.queryByRole('button', { name: 'Accept invitation' }),
@@ -152,7 +152,7 @@ describe('Invitation acceptance', () => {
   it('explains a wrong-email or expired link without disclosing Household details', async () => {
     mocks.session = { status: 'no-household', member: person }
     mocks.preview.mockRejectedValue(
-      new Error('Invitation is unavailable or belongs to another email'),
+      new Error('This invitation is unavailable or for a different email'),
     )
     mount(<JoinHousehold token={'a'.repeat(43)} />)
     expect(await screen.findByRole('alert')).toHaveProperty(
@@ -203,7 +203,9 @@ describe('Household management', () => {
     mount(<HouseholdScreen />)
     fireEvent.click(await screen.findByRole('button', { name: 'Remove' }))
     expect(mocks.remove).not.toHaveBeenCalled()
-    expect(screen.getByText(/Their access and agent tokens/)).toBeTruthy()
+    expect(
+      screen.getByText(/They lose access and their agent tokens stop working/),
+    ).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Confirm' }))
     await waitFor(() =>
       expect(mocks.remove).toHaveBeenCalledWith({ data: { memberId: 'bob' } }),

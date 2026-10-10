@@ -197,11 +197,11 @@ function AlwaysFile({
   return (
     <div className="col-span-full flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-accent-soft px-2 py-1 text-xs">
       <span>
-        Always file <strong>{store}</strong> under <strong>{category}</strong>?
+        Always put <strong>{store}</strong> in <strong>{category}</strong>?
         <span className="text-muted">
           {' '}
           {others
-            ? `Moves ${others} more ${others === 1 ? 'purchase' : 'purchases'} there, and future uploads.`
+            ? `Also changes ${others} other ${others === 1 ? 'purchase' : 'purchases'} and future uploads.`
             : 'Future uploads too.'}
         </span>
       </span>

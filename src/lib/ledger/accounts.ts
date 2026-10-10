@@ -104,7 +104,7 @@ export async function deleteAccount(db: Database, name: string): Promise<void> {
       .from(transactions)
       .where(inHousehold(db, transactions, eq(transactions.account, name)))
       .limit(1)
-    if (used.length) throw new Error(`${name} has purchases; close it instead.`)
+    if (used.length) throw new Error(`${name} has purchases. Close it instead.`)
     await db.batch([
       db
         .delete(balances)
@@ -256,7 +256,7 @@ export async function postTransactions(
   input: PostInput,
 ): Promise<PostSummary> {
   if (input.rows.length > 20_000)
-    throw new Error('An update may include at most 20,000 purchases')
+    throw new Error('An update can include at most 20,000 purchases.')
   input = { ...input, rows: input.rows.map((row) => postedRowInput.parse(row)) }
   if (input.rows.some((row) => row.sourceId) && !input.sourceNamespace)
     throw new Error('Source IDs require a connector namespace')
@@ -265,7 +265,7 @@ export async function postTransactions(
       'Identified sources reconcile individually; they cannot replace a date range',
     )
   const account = await findAccount(db, input.account)
-  if (account.closed) throw new Error('Reopen this Account before updating it')
+  if (account.closed) throw new Error('Reopen this account to update it.')
   if (!input.commit)
     return postTransactionsUnlocked(db, { ...input, account: account.name })
   const lease = await acquireUpdate(db, account.name)
@@ -530,7 +530,7 @@ async function postTransactionsUnlocked(
     )
   if (input.replaceStarting && statements.length > STATEMENTS_PER_BATCH)
     throw new Error(
-      'Replacing starting purchases must fit in one atomic update. Split this export into smaller date ranges.',
+      'This export is too large to replace starting purchases at once. Split it into smaller date ranges.',
     )
   for (let i = 0; i < statements.length; i += STATEMENTS_PER_BATCH) {
     if (lease) await renewUpdate(db, account.name, lease)

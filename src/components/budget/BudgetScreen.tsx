@@ -187,9 +187,8 @@ export function BudgetScreen({ owner }: { owner?: string }) {
 
       {owner ? (
         <p className="rounded-xl border border-dashed border-border px-3 py-2 text-xs text-muted">
-          Typical months are {owner}’s spending; Targets and take-home are the
-          household’s. Clear the person filter to see the share of take-home
-          pay.
+          Typical is {owner}’s spending. Targets and take-home are the
+          household’s. Clear the person filter to see take-home pay.
         </p>
       ) : (
         <IncomePlan
@@ -215,10 +214,8 @@ export function BudgetScreen({ owner }: { owner?: string }) {
                 .join('; ')}
             >
               <AlertTriangle size={11} aria-hidden />
-              low: {gaps
-                .map((g) => monthLabel(g.month).slice(0, 3))
-                .join(', ')}{' '}
-              missing imports
+              {gaps.map((g) => monthLabel(g.month).slice(0, 3)).join(', ')} may
+              be low
             </span>
           )}
         </p>
@@ -294,7 +291,7 @@ function CategoryList({
         </span>
         <span
           className="text-right [grid-area:diff]"
-          title="Target minus typical; amber means a cut"
+          title="Target minus typical. Amber means a cut."
         >
           ±
         </span>

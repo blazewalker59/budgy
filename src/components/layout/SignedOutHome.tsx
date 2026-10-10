@@ -26,13 +26,11 @@ export function GoogleSignInButton({
     try {
       const result = await signIn.social({ provider: 'google', callbackURL })
       if (result.error) {
-        setError(
-          result.error.message ?? 'Could not start sign-in. Please try again.',
-        )
+        setError(result.error.message ?? 'Couldn’t start sign-in. Try again.')
         setPending(false)
       }
     } catch {
-      setError('Could not start sign-in. Please try again.')
+      setError('Couldn’t start sign-in. Try again.')
       setPending(false)
     }
   }
@@ -61,25 +59,24 @@ const FEATURES = [
     icon: PieChart,
     title: 'Know where the money went',
     detail:
-      'See spending by category, store, person or account. Compare the month with your budget, without losing the bigger picture.',
+      'See spending by category, store, person or account, against your budget.',
   },
   {
     icon: CalendarDays,
-    title: 'Make room for what’s coming',
+    title: 'Plan for what’s coming',
     detail:
-      'Plan for the big, occasional expenses alongside your everyday targets. See upcoming due dates before they catch you off guard.',
+      'Budget for occasional bills like car insurance next to your monthly targets. See what’s due soon.',
   },
   {
     icon: Wallet,
-    title: 'See more than spending',
+    title: 'Track balances',
     detail:
-      'Keep account balances and follow your net worth over time. Cards, savings, investments and loans belong in the same picture.',
+      'Record balances for cards, savings, investments and loans. Follow your net worth over time.',
   },
   {
     icon: Users,
-    title: 'A plan you can share',
-    detail:
-      'Invite your partner into one Household. Both of you can view and edit the same budget, file purchases and leave useful notes.',
+    title: 'Share it',
+    detail: 'Invite your partner. You both see and edit the same budget.',
   },
 ] as const
 
@@ -105,7 +102,7 @@ export function SignedOutHome() {
           <div>
             <p className="mb-5 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-accent">
               <span className="size-1.5 rounded-full bg-accent" aria-hidden /> A
-              little clarity for your household
+              budget for two
             </p>
             <h1
               id="welcome-heading"
@@ -116,16 +113,14 @@ export function SignedOutHome() {
               <span className="text-accent">Plan life together.</span>
             </h1>
             <p className="mt-6 max-w-lg text-base leading-relaxed text-muted sm:text-lg">
-              Budgy brings your purchases, budget and upcoming expenses into one
-              shared picture. Less wondering where the money went. More knowing
-              what you can plan for.
+              Your purchases, budget and upcoming bills in one place, shared
+              with your partner.
             </p>
             <div className="mt-8 space-y-3">
               <GoogleSignInButton />
               <p className="max-w-sm text-xs leading-relaxed text-muted">
-                Invite-only for now. Already have access? Sign in above. Joining
-                a Household? Open your invitation link and use the invited
-                Google account.
+                Invite-only for now. Got an invitation? Open its link and sign
+                in with the Google account it was sent to.
               </p>
             </div>
             <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted">
@@ -134,7 +129,7 @@ export function SignedOutHome() {
                 className="mt-0.5 shrink-0 text-accent"
                 aria-hidden
               />{' '}
-              Your Household’s Ledger is separate from every other Household’s.
+              Only people in your Household can see your budget.
             </p>
           </div>
           <BudgetPreview />
@@ -146,13 +141,13 @@ export function SignedOutHome() {
         >
           <div className="mx-auto max-w-6xl px-5 py-12 sm:px-8 sm:py-16">
             <p className="text-xs font-bold tracking-widest text-accent uppercase">
-              A budget that makes sense
+              What you get
             </p>
             <h2
               id="features-heading"
               className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl"
             >
-              The whole picture. Not just a list of transactions.
+              More than a list of transactions
             </h2>
             <div className="mt-9 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
               {FEATURES.map(({ icon: Icon, title, detail }) => (
@@ -176,35 +171,32 @@ export function SignedOutHome() {
         >
           <div>
             <p className="text-xs font-bold tracking-widest text-accent uppercase">
-              Make it yours
+              Getting started
             </p>
             <h2
               id="start-heading"
               className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl"
             >
-              Start with what you have.
-              <br />
-              Build a plan you can keep.
+              Start with what you have
             </h2>
             <p className="mt-4 max-w-md text-sm leading-relaxed text-muted">
-              Budgy currently uses account exports for purchases and recorded or
-              imported balances. Automatic bank syncing isn’t available yet—you
-              stay in control of what you bring in.
+              Link your banks through SimpleFIN Bridge to sync them
+              automatically, or upload the exports you download.
             </p>
           </div>
           <ol className="space-y-5">
             {[
               [
-                'One Household, one Ledger',
-                'With access, create your Household and invite your partner—or accept the invitation someone shared with you.',
+                'Set up your Household',
+                'Create it and invite your partner, or accept an invitation.',
               ],
               [
-                'Bring your accounts together',
-                'Add your financial accounts, upload transaction exports and record balances. Store rules help keep purchases filed consistently.',
+                'Add your accounts',
+                'Upload transaction exports and record balances. Store Rules categorize purchases for you.',
               ],
               [
-                'Find your everyday rhythm',
-                'Set category targets, plan for occasional expenses, and check how the month is going together.',
+                'Set your budget',
+                'Set monthly targets, add occasional bills, and check the month together.',
               ],
             ].map(([title, detail], index) => (
               <li key={title} className="flex gap-4">
@@ -224,10 +216,7 @@ export function SignedOutHome() {
       </main>
 
       <footer className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-6 text-xs text-muted sm:px-8">
-        <p className="font-semibold">
-          budgy · A clearer plan for your household.
-        </p>
-        <p>Private Households. Shared understanding.</p>
+        <p className="font-semibold">budgy · A household budget for two</p>
       </footer>
     </div>
   )
@@ -323,7 +312,7 @@ function BudgetPreview() {
         <span className="text-sm font-bold">$320</span>
       </div>
       <p className="mt-4 text-center text-[10px] text-muted">
-        An illustrative month, not anyone’s Household data.
+        Example data, not a real Household.
       </p>
     </section>
   )

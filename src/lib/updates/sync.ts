@@ -74,7 +74,7 @@ export async function syncConnection(
       ),
     )
   if (!mapped.length)
-    throw new Error('Link at least one account to a Budgy Account first.')
+    throw new Error('Link a bank account to a Budgy account first.')
   const until = today()
   const from = mapped
     .map((m) =>
@@ -169,7 +169,7 @@ export async function syncConnection(
         error:
           error instanceof Error && !error.message.startsWith('Failed query')
             ? error.message
-            : 'This sync did not finish. It will be retried.',
+            : 'This sync didn’t finish. Budgy will try again.',
       })
     }
   }

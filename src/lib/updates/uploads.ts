@@ -26,11 +26,11 @@ export async function createUploadToken(
   format: ExportFormat,
 ): Promise<{ id: string; token: string; account: string }> {
   const account = await findAccount(db, accountName)
-  if (account.closed) throw new Error('Reopen this Account before updating it')
+  if (account.closed) throw new Error('Reopen this account to update it.')
   if (!['credit', 'checking', 'savings'].includes(account.kind))
-    throw new Error('Only card and bank Accounts take purchase exports')
+    throw new Error('Only card and bank accounts take purchase exports.')
   if (format === 'apple-card' && account.kind !== 'credit')
-    throw new Error('Choose a credit-card Account for an Apple Card export')
+    throw new Error('Apple Card exports only work with a credit card account.')
   const active = await db
     .select({ id: uploadTokens.id })
     .from(uploadTokens)

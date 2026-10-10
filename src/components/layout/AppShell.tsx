@@ -141,7 +141,7 @@ function ThemeButton() {
   return (
     <button
       type="button"
-      aria-label="Switch light or dark"
+      aria-label="Switch between light and dark"
       onClick={() => setTheme(currentTheme() === 'dark' ? 'light' : 'dark')}
       className="flex size-8 items-center justify-center rounded-full text-muted hover:text-foreground"
     >
@@ -191,7 +191,8 @@ function MemberMenu({ member }: { member: Member }) {
             <p className="flex gap-2 rounded-lg px-2 py-1.5 text-xs text-muted">
               <Download size={15} className="shrink-0" aria-hidden />
               <span>
-                Install: tap Share, then <strong>Add to Home Screen</strong>.
+                To install, tap <strong>Share</strong> →{' '}
+                <strong>Add to Home Screen</strong>.
               </span>
             </p>
           )}

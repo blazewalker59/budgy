@@ -65,7 +65,7 @@ export async function decryptAccess(
     return new TextDecoder().decode(decrypted)
   } catch {
     throw new Error(
-      'Connection credentials cannot be opened. Reauthorize this connection.',
+      'Couldn’t open this connection. Disconnect it and connect again.',
     )
   }
 }

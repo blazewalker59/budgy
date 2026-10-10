@@ -79,12 +79,11 @@ export function HouseholdScreen() {
           {household.name}
         </h1>
         <p className="text-sm text-muted">
-          Your Household shares one private Ledger. Every Member can view and
-          edit it; the owner manages membership.
+          Everyone here can see and edit the budget. The owner manages who’s in.
         </p>
       </header>
       <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
-        <h2 className="text-sm font-bold">Members</h2>
+        <h2 className="text-sm font-bold">People</h2>
         <ul className="space-y-3">
           {members.map((member) => (
             <li
@@ -111,7 +110,7 @@ export function HouseholdScreen() {
                       setConfirmation({
                         action: 'transfer',
                         id: member.id,
-                        name: member.name ?? 'this Member',
+                        name: member.name ?? 'this person',
                       })
                     }
                   >
@@ -125,7 +124,7 @@ export function HouseholdScreen() {
                       setConfirmation({
                         action: 'remove',
                         id: member.id,
-                        name: member.name ?? 'this Member',
+                        name: member.name ?? 'this person',
                       })
                     }
                   >
@@ -140,8 +139,8 @@ export function HouseholdScreen() {
           <div className="space-y-2 rounded-lg border border-border bg-background p-3">
             <p className="text-sm">
               {confirmation.action === 'remove'
-                ? `Remove ${confirmation.name}? Their access and agent tokens will stop working. Purchases and notes stay in the Ledger.`
-                : `Make ${confirmation.name} the owner? You’ll remain a Member, but will no longer manage invitations or membership.`}
+                ? `Remove ${confirmation.name}? They lose access and their agent tokens stop working. Their purchases and notes stay.`
+                : `Make ${confirmation.name} the owner? You’ll stay in the Household but can’t manage invites or members.`}
             </p>
             <div className="flex gap-2">
               <button
@@ -168,9 +167,8 @@ export function HouseholdScreen() {
         <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
           <h2 className="text-sm font-bold">Invite someone</h2>
           <p className="text-xs text-muted">
-            Use their Google account’s email. The link works once, expires in
-            seven days, and can be revoked. Share it yourself; Budgy doesn’t
-            send email.
+            Enter the email of their Google account, then send them the link
+            yourself. It works once and expires in 7 days.
           </p>
           <form
             className="flex flex-wrap gap-2"
@@ -206,7 +204,7 @@ export function HouseholdScreen() {
               className="space-y-2 rounded-lg bg-accent-soft p-3"
             >
               <p className="text-sm font-semibold">
-                Copy this link now—it won’t be shown again.
+                Copy this link now. It won’t be shown again.
               </p>
               <input
                 aria-label="Invitation link"
@@ -229,7 +227,7 @@ export function HouseholdScreen() {
               </button>
               {copyError && (
                 <p className="text-xs text-muted">
-                  Select the link above and copy it manually.
+                  Couldn’t copy. Select the link and copy it yourself.
                 </p>
               )}
             </div>
@@ -265,8 +263,7 @@ export function HouseholdScreen() {
       )}
       {!owner && !members.some((m) => m.role === 'owner') && (
         <p role="status" className="text-sm text-muted">
-          The owner of this migrated Household still needs to be assigned before
-          invitations can be managed.
+          This Household has no owner yet, so no one can send invites.
         </p>
       )}
       {(invite.isError || manage.isError) && (

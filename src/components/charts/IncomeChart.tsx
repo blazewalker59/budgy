@@ -115,7 +115,7 @@ export function IncomeChart({
       definition={definition}
       height={66}
       initialWidth={340}
-      ariaLabel={`A typical month spends ${pct(rows.Typical.spentShare)} of ${dollars(income)} take-home; the Budget spends ${pct(rows.Budget.spentShare)}`}
+      ariaLabel={`Share of ${dollars(income)} take-home spent. Typical month: ${pct(rows.Typical.spentShare)}. Budget: ${pct(rows.Budget.spentShare)}.`}
     />
   )
 }

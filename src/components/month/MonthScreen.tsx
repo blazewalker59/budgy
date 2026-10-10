@@ -115,7 +115,9 @@ export function MonthScreen({
       <LensBar
         page="/"
         note={
-          lens.from ? 'Dates apply on Spending; this is one month.' : undefined
+          lens.from
+            ? 'Overview shows one month. Dates apply on Spending.'
+            : undefined
         }
       />
 
@@ -410,8 +412,7 @@ function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
       {open && (
         <div className="absolute inset-x-0 top-full z-20 mt-1 space-y-1 rounded-xl sm:left-auto sm:w-72 border border-border bg-surface p-2.5 text-xs shadow-lg">
           <p className="text-muted">
-            No purchases lately where there usually are, so this month may look
-            cheaper than it was:
+            No recent purchases on these accounts. This month may look low.
           </p>
           <ul className="space-y-0.5">
             {gaps.map((g) => (
@@ -493,7 +494,7 @@ function CategoryRows({
       <p className="px-3 py-3 text-sm text-muted">
         {isEmpty(lens)
           ? 'Nothing spent.'
-          : 'Nothing this month in the lens. Spending shows it over more months.'}
+          : 'Nothing in the lens this month. See more months on Spending.'}
       </p>
     )
   return (

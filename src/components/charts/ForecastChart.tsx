@@ -108,7 +108,7 @@ export function ForecastChart({
         onSelect={(point) =>
           onSelect(point ? (point.datum as ForecastMonth).month : null)
         }
-        ariaLabel={`Next ${months.length} months of everyday Targets and planned bills; ${dollars(planned)} planned`}
+        ariaLabel={`Everyday Targets and planned bills for the next ${months.length} months. ${dollars(planned)} planned.`}
       />
     </ChartCard>
   )

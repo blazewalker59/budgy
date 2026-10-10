@@ -180,7 +180,7 @@ describe('Household invitations', () => {
     const other = await createHousehold(db, partner, 'Their budget')
     const invite = await createInvite(scope, owner, partner.email)
     await expect(acceptInvite(db, partner, invite.token)).rejects.toThrow(
-      'never replaces',
+      'already belong',
     )
     expect((await findMemberHousehold(db, partner.id))?.id).toBe(other.id)
   })
@@ -316,7 +316,7 @@ describe('Household membership management', () => {
       householdId: other.id,
     })
     await expect(removeMember(scope, owner, stranger.id)).rejects.toThrow(
-      'current Household Member',
+      'isn’t in this Household',
     )
     expect((await findMemberHousehold(db, stranger.id))?.id).toBe(other.id)
   })
@@ -326,7 +326,7 @@ describe('Household membership management', () => {
     const invite = await createInvite(scope, owner, partner.email)
     await acceptInvite(db, partner, invite.token)
     await expect(transferOwnership(scope, owner, stranger.id)).rejects.toThrow(
-      'current Household Member',
+      'isn’t in this Household',
     )
     expect((await findMemberHousehold(db, owner.id))?.role).toBe('owner')
     await transferOwnership(scope, owner, partner.id)

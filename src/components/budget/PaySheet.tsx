@@ -70,9 +70,8 @@ export function PaySheet({
           <span className="text-xs text-muted"> /mo take-home</span>
         </p>
         <p className="text-[11px] text-muted">
-          What lands in the bank per paycheck, after taxes and deductions. A
-          monthly figure counts paychecks per year (every 2 weeks is 26), so a
-          month with a third paycheck doesn’t move it.
+          Enter what lands in the bank per paycheck, after taxes. The monthly
+          figure averages the year, so a third paycheck doesn’t change it.
         </p>
         <ul className="divide-y divide-border">
           {pay.schedules.map((r) => (

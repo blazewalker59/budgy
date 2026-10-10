@@ -46,8 +46,7 @@ export async function renewUpdate(
       ),
     )
     .returning({ token: accountUpdateLocks.token })
-  if (!renewed.length)
-    throw new Error('Account update lease was lost. Retry this update.')
+  if (!renewed.length) throw new Error('This update took too long. Try again.')
 }
 
 export async function releaseUpdate(
@@ -115,15 +114,14 @@ export async function finishReceipt(
               summary.notSpending,
             review: summary.review.length,
             message: summary.review.length
-              ? 'Some source purchases need review. Ambiguous matches were not merged.'
+              ? 'Some purchases need review.'
               : null,
             issues: summary.review,
           }
         : {
             status: 'failed',
             finishedAt: new Date(),
-            message:
-              'This update did not finish. Retry the same source; purchases already saved will not be added again.',
+            message: 'This update didn’t finish. Try again.',
           },
     )
     .where(inHousehold(db, accountUpdates, eq(accountUpdates.id, id)))

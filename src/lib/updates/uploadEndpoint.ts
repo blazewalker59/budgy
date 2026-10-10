@@ -66,7 +66,7 @@ export async function serveUpload(
     ))
   )
     return reply(
-      'This Shortcut’s Budgy token was revoked or is invalid. Make a new one in Accounts → Updates.',
+      'This Shortcut’s token was revoked or is invalid. Make a new one in Accounts → Updates.',
       401,
     )
 
@@ -82,7 +82,7 @@ export async function serveUpload(
     text = await readLimited(request.body, MAX_EXPORT_BYTES)
   } catch (error) {
     return error instanceof BodyTooLarge
-      ? reply('Choose a CSV export smaller than 2 MB.', 413)
+      ? reply('That file is over 2 MB. Choose a smaller CSV export.', 413)
       : reply('That file isn’t a readable CSV export.', 400)
   }
 
@@ -116,7 +116,7 @@ export async function serveUpload(
     const message =
       error instanceof Error && !error.message.startsWith('Failed query')
         ? error.message
-        : 'The update did not finish. Retry; nothing is added twice.'
+        : 'The update didn’t finish. Try again.'
     return reply(`${uploader.account} wasn’t updated. ${message}`, 422)
   }
 }

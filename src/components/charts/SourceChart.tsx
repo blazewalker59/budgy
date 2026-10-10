@@ -76,7 +76,7 @@ export function SourceChart({
         label: o,
         color: ownerColor(o),
       }))}
-      headline={<span>Tap to select</span>}
+      headline={<span>Tap an account to filter</span>}
     >
       <Chart
         definition={definition}

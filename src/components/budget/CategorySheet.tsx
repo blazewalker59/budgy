@@ -78,20 +78,19 @@ export function CategorySheet({
 
       {income > 0 && (
         <p className="px-1 text-xs text-muted">
-          Typical is{' '}
+          Of take-home pay: typical{' '}
           <strong className="text-foreground">
             {percentOf(typical, income)}%
-          </strong>{' '}
-          of take-home pay
+          </strong>
           {target !== null && (
             <>
-              ; the Target,{' '}
+              {' '}
+              · Target{' '}
               <strong className="text-foreground">
                 {percentOf(target, income)}%
               </strong>
             </>
           )}
-          .
         </p>
       )}
       <Settings name={name} />
@@ -144,7 +143,7 @@ function Settings({ name }: { name: string }) {
                 (t) => `${dollars(t.amount)} from ${monthLabel(t.startsMonth)}`,
               )
               .join(' → ')
-          : 'No Target yet: set one on the Budget.'}
+          : 'No Target yet. Set one on the Budget.'}
       </p>
     </section>
   )
@@ -204,7 +203,7 @@ function Stores({ name, months }: { name: string; months: Array<string> }) {
         Stores · {monthLabel(months[0])} –{' '}
         {monthLabel(months[months.length - 1])}
         <span className="ml-1 font-normal normal-case tracking-normal">
-          tap one to file it elsewhere
+          tap one to change its category
         </span>
       </h3>
       <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface text-[13px]">
@@ -242,7 +241,7 @@ function Stores({ name, months }: { name: string; months: Array<string> }) {
               {open && (
                 <div className="flex items-center gap-2 bg-background/60 px-3 pb-2 pt-1">
                   <CategorySelect
-                    label={`File ${s.store} under`}
+                    label={`Category for ${s.store}`}
                     value={name}
                     defaultValue={s.sourceCategory}
                     onChange={(c) => {

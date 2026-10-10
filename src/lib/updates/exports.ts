@@ -67,7 +67,7 @@ export function normalizeExport(
   debt: boolean,
 ) {
   if (new TextEncoder().encode(text).length > MAX_EXPORT_BYTES)
-    throw new Error('Choose a CSV export smaller than 2 MB')
+    throw new Error('That file is over 2 MB. Choose a smaller CSV export.')
   const cells = parseCsv(text.replace(/^\uFEFF/, '')).filter((r) =>
     r.some((c) => c.trim()),
   )
@@ -103,17 +103,19 @@ export function normalizeExport(
     (format === 'debit-credit' ? debit < 0 || credit < 0 : amount < 0)
   )
     throw new Error(
-      'This CSV needs a date, merchant/description, and the amount columns for the selected format',
+      'This CSV is missing a date, description or amount column. Check the export format.',
     )
   if (
     format === 'apple-card' &&
     (!debt || type < 0 || column('amount (usd)') < 0)
   )
     throw new Error(
-      'Choose a credit-card Account and an Apple Card CSV export for this format',
+      'The Apple Card format needs an Apple Card CSV on a credit card account.',
     )
   if (cells.length > 20_000)
-    throw new Error('An export may contain at most 20,000 rows')
+    throw new Error(
+      'An export can have at most 20,000 rows. Split it into smaller date ranges.',
+    )
   const rows: Array<PostedRow> = []
   const invalid: Array<number> = []
   let excluded = 0
@@ -176,12 +178,10 @@ export function normalizeExport(
   }
   if (invalid.length)
     throw new Error(
-      `Could not read ${invalid.length} row${invalid.length === 1 ? '' : 's'} (starting at line ${invalid[0]}). Nothing was imported; check dates, amounts and the selected format.`,
+      `Couldn’t read ${invalid.length} row${invalid.length === 1 ? '' : 's'}, starting at line ${invalid[0]}. Nothing was imported. Check the dates, amounts and export format.`,
     )
   if (!cells.length)
-    throw new Error(
-      'This export has no rows. Choose a transactions CSV, not an empty file.',
-    )
+    throw new Error('This export is empty. Choose a transactions CSV.')
   dates.sort()
   return {
     rows,

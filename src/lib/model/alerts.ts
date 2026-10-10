@@ -69,7 +69,7 @@ export function budgetAlerts(
         kind: 'over-target',
         severity: over > r.target * 0.1 || over > 5_000 ? 'high' : 'medium',
         title: `${r.name} is over its Target`,
-        detail: `${dollars(r.spent)} spent of ${dollars(r.target)} in ${monthLabel(month)}: ${dollars(r.spent - r.target)} over.`,
+        detail: `${dollars(r.spent)} spent of ${dollars(r.target)} in ${monthLabel(month)}. ${dollars(r.spent - r.target)} over.`,
         category: r.name,
         amount: r.spent - r.target,
       })
@@ -84,7 +84,7 @@ export function budgetAlerts(
           kind: 'on-pace-over',
           severity: 'medium',
           title: `${r.name} is on pace to go over`,
-          detail: `${dollars(r.spent)} of ${dollars(r.target)} spent with ${Math.round((1 - view.elapsed) * 100)}% of the month left; on pace for about ${dollars(projected)}.`,
+          detail: `${dollars(r.spent)} of ${dollars(r.target)} spent, ${Math.round((1 - view.elapsed) * 100)}% of the month left. On pace for about ${dollars(projected)}.`,
           category: r.name,
           amount: projected - r.target,
         })
@@ -98,8 +98,8 @@ export function budgetAlerts(
       out.push({
         kind: 'budget-on-pace-over',
         severity: projected > t.target * 1.15 ? 'high' : 'medium',
-        title: 'Everyday spending is on pace to beat the Budget',
-        detail: `${dollars(t.spent)} of ${dollars(t.target)} so far; on pace for about ${dollars(projected)} by month end.`,
+        title: 'Everyday spending is on pace to go over the Budget',
+        detail: `${dollars(t.spent)} of ${dollars(t.target)} so far. On pace for about ${dollars(projected)} by month end.`,
         amount: projected - t.target,
       })
   }
@@ -121,8 +121,8 @@ export function budgetAlerts(
         ? `${o.plan.name} hasn’t shown up yet`
         : `${o.plan.name} is due ${relativeDays(today, o.due)}`,
       detail: late
-        ? `${dollars(o.plan.amount)} was due ${dayLabel(o.due)}; no matching payment is imported yet.`
-        : `About ${dollars(o.plan.amount)} on ${dayLabel(o.due)} (${o.plan.category}). It’s planned, so it won’t count against the everyday Budget.`,
+        ? `${dollars(o.plan.amount)} was due ${dayLabel(o.due)}. No matching payment yet.`
+        : `About ${dollars(o.plan.amount)} due ${dayLabel(o.due)} (${o.plan.category}). Planned, so it’s not in the everyday Budget.`,
       category: o.plan.category,
       amount: o.plan.amount,
     })
@@ -139,7 +139,7 @@ export function budgetAlerts(
       kind: 'large-purchase',
       severity: 'info',
       title: `Large purchase: ${dollars(tx.amount)} at ${tx.store}`,
-      detail: `${dayLabel(tx.date)} on ${tx.account} (${ownerOf(ix, tx)}), filed under ${category}.`,
+      detail: `${dayLabel(tx.date)} on ${tx.account} (${ownerOf(ix, tx)}), in ${category}.`,
       category,
       amount: tx.amount,
     })
@@ -150,7 +150,7 @@ export function budgetAlerts(
       kind: 'missing-imports',
       severity: 'medium',
       title: `${g.account} looks out of date`,
-      detail: `Nothing imported after ${g.last ? dayLabel(g.last) : 'the start of the month'}, so recent spending is undercounted. Import a newer export.`,
+      detail: `Nothing since ${g.last ? dayLabel(g.last) : 'the start of the month'}. Recent spending may be low. Upload a newer export.`,
     })
 
   const duplicates = possibleDuplicates(ix).length
@@ -163,7 +163,7 @@ export function budgetAlerts(
           ? 'A purchase may be here twice'
           : `${duplicates} purchases may be here twice`,
       detail:
-        'Some purchases look to be here twice, often under two names, so spending may be counted twice. Merge or keep them on Accounts → Updates.',
+        'Spending may be counted twice. Review them on Accounts → Updates.',
     })
 
   return out.sort(

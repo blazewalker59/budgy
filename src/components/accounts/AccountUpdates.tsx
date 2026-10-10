@@ -108,17 +108,18 @@ export function AccountUpdates() {
   const settled = cards.filter((c) => !c.needsAction)
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted">
-        How each Account stays current: a linked bank syncs on its own; cards
-        without one take an export, here or from your iPhone’s share sheet.
-        “Last updated” is a successful check, even with nothing new; it isn’t a
-        guarantee the source has every transaction through today.
-      </p>
+      <ul className="list-disc space-y-0.5 pl-4 text-sm text-muted">
+        <li>Linked banks sync on their own.</li>
+        <li>Other cards update from an export, here or from your iPhone.</li>
+        <li>
+          “Last updated” means the last check worked. Some recent transactions
+          may not be in yet.
+        </li>
+      </ul>
       <BankConnections open={banksOpen} onOpenChange={setBanksOpen} />
       {!cards.length && (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
-          Add an Account on the Accounts tab first, then choose how it updates
-          here.
+          No accounts yet. Add one on the Accounts tab.
         </p>
       )}
       {!!needing.length && (
@@ -207,21 +208,20 @@ function AccountCard({
   let summary: string
   let primary: { label: string; panel?: Panel; record?: boolean } | null = null
   if (bank && !bank.present) {
-    summary = `SimpleFIN no longer shares ${bank.name}. Check it in Bridge, or link another account.`
+    summary = `SimpleFIN stopped sharing ${bank.name}. Check SimpleFIN Bridge or link another account.`
     primary = { label: 'Fix link', panel: 'link' }
   } else if (bank) {
     summary = `Updates automatically from ${bank.name} (${bank.institution}).`
   } else if (method === 'shortcut') {
-    summary =
-      'Updates when you share an export to its iPhone Shortcut: export from Wallet or your bank, then Share → your Shortcut.'
+    summary = 'Updates from its iPhone Shortcut.'
   } else if (spending) {
     summary = state?.success
-      ? 'Updated by uploading exports. Set up an easier way so it stays current.'
-      : 'Not set up yet. Choose how its purchases come into Budgy.'
+      ? 'Updated by uploading exports. Set up an easier way.'
+      : 'Not set up yet. Choose how purchases come in.'
     primary = { label: 'Set up updates', panel: 'choose' }
   } else if (unlinkedBanks) {
     summary =
-      'Its balance is entered by hand. Link its bank to keep it current.'
+      'Its balance is entered by hand. Link its bank to update it automatically.'
     primary = { label: 'Link bank', panel: 'link' }
   } else {
     summary = 'Its balance is entered by hand.'
@@ -274,8 +274,8 @@ function AccountCard({
             : 'No balance recorded yet'}
           {bank
             ? bank.syncedThrough
-              ? `; synced through ${bank.syncedThrough}.`
-              : '; waiting for the first sync.'
+              ? `. Synced through ${bank.syncedThrough}.`
+              : '. Waiting for the first sync.'
             : '.'}
         </p>
       )}
@@ -360,8 +360,8 @@ function UpdateOptions({
       icon: <Landmark size={16} aria-hidden />,
       title: 'Automatically from your bank',
       body: spending
-        ? 'Best when your bank is in SimpleFIN Bridge: purchases and the balance arrive on their own, several times a day.'
-        : 'Best when it’s in SimpleFIN Bridge: the balance stays current on its own.',
+        ? 'For banks in SimpleFIN Bridge. Purchases and the balance sync several times a day.'
+        : 'For banks in SimpleFIN Bridge. The balance syncs on its own.',
       current: method === 'bank',
     },
   ]
@@ -371,14 +371,14 @@ function UpdateOptions({
         panel: 'shortcut',
         icon: <Share size={16} aria-hidden />,
         title: 'From your iPhone’s share sheet',
-        body: 'For cards SimpleFIN can’t reach, like Apple Card. Set up a Shortcut once; then export from Wallet or your bank and share it to Budgy in a couple of taps.',
+        body: 'For cards SimpleFIN can’t reach, like Apple Card. Set up a Shortcut once, then share exports to it from Wallet or your bank.',
         current: method === 'shortcut',
       },
       {
         panel: 'upload',
         icon: <FileUp size={16} aria-hidden />,
         title: 'Upload a file now',
-        body: 'A one-off: choose a CSV export, review what’s new, and confirm. Good for catching up.',
+        body: 'Choose a CSV export, review what’s new, then confirm.',
         current: false,
       },
     )
@@ -417,7 +417,7 @@ function UpdateOptions({
                 <span className="block text-muted">
                   {o.body}
                   {o.panel === 'link' && !hasConnection
-                    ? ' Connect SimpleFIN first, in Bank connections above.'
+                    ? ' Connect SimpleFIN in Bank connections above first.'
                     : ''}
                 </span>
               </span>
@@ -444,11 +444,7 @@ function UpdateOptions({
 
 function UpdateStatus({ state }: { state?: UpdateState }) {
   if (!state?.latest)
-    return (
-      <p className="text-xs text-muted">
-        No update receipt yet. Existing purchases and balances are unchanged.
-      </p>
-    )
+    return <p className="text-xs text-muted">No updates yet.</p>
   const latest = state.latest
   const timestamp = (date: Date | null) =>
     date ? new Date(date).toLocaleString() : '—'
@@ -475,7 +471,7 @@ function UpdateStatus({ state }: { state?: UpdateState }) {
       {(latest.status === 'failed' || latest.status === 'attention') && (
         <p role="alert" className="text-over">
           {latest.message}
-          {state.success ? ' The last successful update is shown above.' : ''}
+          {state.success ? ' The last successful update is above.' : ''}
         </p>
       )}
       {!!latest.issues?.length && (
@@ -493,7 +489,7 @@ function UpdateStatus({ state }: { state?: UpdateState }) {
             search={{ accounts: [state.account] }}
             className="font-semibold text-accent"
           >
-            Review this Account’s purchases
+            Review these purchases
           </Link>
         </div>
       )}
@@ -505,7 +501,7 @@ function UpdateStatus({ state }: { state?: UpdateState }) {
       )}
       {latest.fromDate && latest.toDate && (
         <p className="text-muted">
-          Source rows dated {latest.fromDate} through {latest.toDate}
+          Covers {latest.fromDate} through {latest.toDate}
         </p>
       )}
     </div>
@@ -529,8 +525,7 @@ function ExportUpdate({
   const [done, setDone] = useState<string | null>(null)
   const update = useMutation({
     mutationFn: (commit: boolean) => {
-      if (!format)
-        throw new Error('Choose the export format and amount convention')
+      if (!format) throw new Error('Choose an export format.')
       return updateAccountExport({
         data: { account: account.name, text, format, commit },
       })
@@ -558,8 +553,8 @@ function ExportUpdate({
   return (
     <div className="space-y-3 border-t border-border pt-3">
       <p className="text-xs text-muted">
-        No known balance is needed to update purchases. This upload won’t
-        replace your balance history or delete purchases missing from the file.
+        Adds new purchases only. Balances and existing purchases stay as they
+        are.
       </p>
       <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border px-3 text-xs font-semibold">
         <FileUp size={14} aria-hidden />
@@ -580,7 +575,7 @@ function ExportUpdate({
             setText('')
             setFileName('')
             if (file.size > MAX_EXPORT_BYTES) {
-              setProblem('Choose a CSV export smaller than 2 MB')
+              setProblem('That file is over 2 MB. Choose a smaller CSV export.')
               return
             }
             setReading(true)
@@ -590,7 +585,7 @@ function ExportUpdate({
               setFileName(file.name)
               setFormat(detectExport(contents) ?? savedFormat ?? '')
             } catch {
-              setProblem('Could not read this file. Try selecting it again.')
+              setProblem('Couldn’t read that file. Try choosing it again.')
             } finally {
               setReading(false)
             }
@@ -604,7 +599,7 @@ function ExportUpdate({
           value={format}
           disabled={update.isPending || reading}
           label="Export format"
-          placeholder="Choose the amount convention…"
+          placeholder="Choose a format…"
           className="min-h-11 w-full"
           onChange={(value) => {
             setFormat(value)
@@ -619,11 +614,15 @@ function ExportUpdate({
         />
       </label>
       {format === 'apple-card' && (
-        <p className="text-xs text-muted">
-          In Wallet: Apple Card → Card Balance → Export Transactions → choose
-          dates → CSV. Apple’s export is still a manual step; availability of
-          current-cycle dates should be checked on your iPhone.
-        </p>
+        <ol className="list-decimal space-y-0.5 pl-4 text-xs text-muted">
+          <li>
+            In Wallet, tap <strong>Apple Card</strong> →{' '}
+            <strong>Card Balance</strong> → <strong>Export Transactions</strong>
+            .
+          </li>
+          <li>Choose dates and CSV.</li>
+          <li>Upload the file here.</li>
+        </ol>
       )}
       {text && !preview && (
         <button
@@ -643,8 +642,8 @@ function ExportUpdate({
             already present · {preview.summary.notSpending} excluded
           </p>
           <p className="text-muted">
-            {preview.fromDate} through {preview.toDate}. Payments, transfers and
-            non-spending are left out.
+            {preview.fromDate} through {preview.toDate}. Payments and transfers
+            are left out.
           </p>
           <ul className="space-y-1">
             {preview.summary.filed.slice(0, 5).map((row, index) => (
@@ -659,8 +658,8 @@ function ExportUpdate({
             ))}
           </ul>
           <p className="text-muted">
-            Unrecognized stores go to Uncategorized until you file them.
-            Existing Moves and notes stay as they are.
+            New stores go to Uncategorized. Existing categories and notes stay
+            as they are.
           </p>
           <button
             type="button"

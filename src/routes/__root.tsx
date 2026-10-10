@@ -37,7 +37,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         name: 'description',
         content:
-          'A shared household budget: understand spending, plan upcoming expenses, and track your financial picture together.',
+          'A shared household budget. See your spending, plan for bills and track balances together.',
       },
     ],
     links: [
@@ -90,7 +90,7 @@ function Crashed({ error }: { error: unknown }) {
     <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-background px-6 text-center">
       <p className="text-lg font-bold">Something went wrong</p>
       <p className="max-w-sm text-sm text-muted">
-        {error instanceof Error ? error.message : 'Reloading usually helps.'}
+        {error instanceof Error ? error.message : 'Try reloading the page.'}
       </p>
       <button
         type="button"

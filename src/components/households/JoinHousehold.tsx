@@ -37,8 +37,8 @@ export function JoinHousehold({ token }: { token: string }) {
         )}
         {invite.isError && (
           <p role="alert" className="text-sm text-danger">
-            {invite.error.message}. Check that you’re using the invited Google
-            account, or ask the owner for a new link.
+            {invite.error.message}. Make sure you’re signed in with the invited
+            Google account, or ask the owner for a new link.
           </p>
         )}
         {invite.data && (
@@ -47,13 +47,13 @@ export function JoinHousehold({ token }: { token: string }) {
               You’re invited to <strong>{invite.data.name}</strong>.
             </p>
             <p className="text-sm text-muted">
-              Members can see and edit the whole Household Ledger, including
-              purchases, balances and budgets.
+              Everyone in the Household can see and edit its purchases, balances
+              and budget.
             </p>
             {alreadyJoined ? (
               <p role="alert" className="text-sm text-muted">
-                You already belong to {session.household.name}. Joining won’t
-                replace or merge your current budget.
+                You’re already in {session.household.name}, so you can’t join
+                another Household.
               </p>
             ) : (
               <button

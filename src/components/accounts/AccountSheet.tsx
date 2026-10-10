@@ -84,17 +84,16 @@ export function AccountSheet({
       <UpdateBalance account={account} today={book.today} />
       {['credit', 'checking', 'savings'].includes(account.kind) && (
         <p className="px-1 text-xs text-muted">
-          For routine purchase updates, use{' '}
+          For regular purchase updates, use{' '}
           <Link
             to="/accounts"
             search={{ tab: 'updates' }}
             onClick={onClose}
             className="font-semibold text-accent"
           >
-            Account Updates
+            Updates
           </Link>
-          . No balance is needed. The history importer below remains available
-          for balance backfills.
+          . Use the upload below to add past balances.
         </p>
       )}
       {points.length > 1 && (
@@ -245,7 +244,7 @@ function EquityLine({ name }: { name: string }) {
           </strong>
         </>
       ) : (
-        'Add the loan against it as a Loan account, then pick this property as what it’s against.'
+        'To see equity, add the mortgage as a Loan account and set Against to this property.'
       )}
     </p>
   )
@@ -396,7 +395,7 @@ function ImportHistory({
       (error: unknown) =>
         current &&
         setProblem(
-          error instanceof Error ? error.message : 'Could not read it.',
+          error instanceof Error ? error.message : 'Couldn’t read that export.',
         ),
     )
     return () => {
@@ -435,7 +434,9 @@ function ImportHistory({
       setText('')
       setKnown('')
     } catch (error) {
-      setProblem(error instanceof Error ? error.message : 'Could not save it.')
+      setProblem(
+        error instanceof Error ? error.message : 'Couldn’t save. Try again.',
+      )
     } finally {
       setSaving(false)
     }
@@ -474,11 +475,15 @@ function ImportHistory({
           />
         </label>
       </div>
-      <p className="text-muted">
-        The institution’s transactions export: its spending becomes this
-        account’s purchases, and its balances are worked out from one you know.
-        Or a balance history: a date and a balance on each line.
-      </p>
+      <ul className="list-disc space-y-0.5 pl-4 text-muted">
+        <li>
+          <strong>Transactions export.</strong> Its spending becomes this
+          account’s purchases.
+        </li>
+        <li>
+          <strong>Balance history.</strong> One date and balance per line.
+        </li>
+      </ul>
       <textarea
         value={text}
         onChange={(e) => {
@@ -487,7 +492,7 @@ function ImportHistory({
         }}
         rows={3}
         placeholder={'2024-01-31, 41,250.00\n2024-02-29, 42,010.55\n…'}
-        aria-label="Balance history"
+        aria-label="Export or balance history"
         className="field w-full font-mono text-[11px]"
       />
 
@@ -514,9 +519,8 @@ function ImportHistory({
             <strong>
               {parsed.changes.length} transactions, {span(parsed.changes)}
             </strong>{' '}
-            <span className="text-muted">(from “{parsed.column}”)</span>. A
-            transactions export, not balances: enter one balance you know and
-            the rest are worked back from it.
+            <span className="text-muted">(from “{parsed.column}”)</span>. Enter
+            one balance you know to work out the rest.
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="font-semibold">{balanceLabel(account)}</span>
@@ -573,8 +577,8 @@ function ImportHistory({
           )}
           {rows.length > 1 && (
             <p className="text-muted">
-              Check one against a statement: if it’s off, the export may be
-              missing transactions or the direction is backwards.
+              Check one against a statement. If it’s off, transactions may be
+              missing or the direction is backwards.
             </p>
           )}
         </div>
@@ -631,7 +635,7 @@ function ImportHistory({
               {uncategorized > 0 && (
                 <span className="text-muted">
                   {uncategorized === 1 ? '1 goes' : `${uncategorized} go`} to
-                  Uncategorized, to Move later.
+                  Uncategorized.
                 </span>
               )}
             </p>
@@ -645,9 +649,8 @@ function ImportHistory({
                 className="mt-0.5"
               />
               <span>
-                Replace the {startingHere} starting purchases over these dates
-                (from the first bulk import). Their stores, categories, Moves
-                and notes carry over
+                Replace the {startingHere} starting purchases over these dates.
+                Categories and notes carry over
                 {preview?.carried ? ` (${preview.carried})` : ''}.
               </span>
             </label>
@@ -702,8 +705,8 @@ function StartingHere({ name }: { name: string }) {
   if (!n) return null
   return (
     <p className="px-1 text-xs text-muted">
-      {n} of them are still from the first bulk import; uploading this account’s
-      export replaces those over its dates.{' '}
+      {n} of them are from the first bulk import. Upload this account’s export
+      to replace them.{' '}
       <button
         type="button"
         onClick={() => {

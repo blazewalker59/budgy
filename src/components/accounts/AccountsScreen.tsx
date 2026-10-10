@@ -69,13 +69,13 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
       <div className="flex items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold tracking-tight">
           {tab === 'rules'
-            ? 'Filing rules'
+            ? 'Store Rules'
             : tab === 'updates'
               ? 'Update Accounts'
               : 'Accounts'}
         </h1>
         <Segmented
-          label="Accounts or rules"
+          label="Accounts section"
           value={tab}
           options={TABS}
           onChange={(t) =>
@@ -249,10 +249,15 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
         Starting purchases
       </h2>
       <p className="text-muted">
-        {total} purchases are still from the first bulk import. Upload each
-        account’s export on its sheet to replace them over its dates (Moves and
-        notes carry over), then remove whatever’s left.
+        {total} purchases are still from the first bulk import.
       </p>
+      <ol className="list-decimal space-y-0.5 pl-4 text-muted">
+        <li>
+          Open each account and upload its export. Categories and notes carry
+          over.
+        </li>
+        <li>Remove whatever’s left.</li>
+      </ol>
       <ul className="flex flex-wrap gap-1.5">
         {byAccount.map(([name, n]) => (
           <li key={name}>

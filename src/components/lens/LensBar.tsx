@@ -38,7 +38,9 @@ export function LensChip({
         onRemove ? 'pr-0.5' : 'pr-2',
         faded && 'opacity-50',
       )}
-      title={faded ? 'Not used on this screen; kept for the others' : undefined}
+      title={
+        faded ? 'Not used on this screen. Kept for other screens.' : undefined
+      }
     >
       {f.type === 'person' && (
         <span
@@ -133,7 +135,7 @@ export function LensBar({
               'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold',
               forget ? 'text-over' : 'text-planned',
             )}
-            title="Saved lens; tap twice to forget it"
+            title="Saved lens. Tap twice to forget it."
           >
             <Star size={12} className="fill-current" aria-hidden />
             {forget ? `Forget “${saved.name}”?` : saved.name}

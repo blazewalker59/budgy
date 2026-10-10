@@ -43,9 +43,11 @@ export function ImportRules() {
       await setImportRules({ data: parsed })
       await queryClient.invalidateQueries({ queryKey: RULES_KEY })
       setDraft(null)
-      setStatus('Saved. New imports will use these rules.')
+      setStatus('Saved. New uploads will use these rules.')
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'Could not save.')
+      setStatus(
+        error instanceof Error ? error.message : 'Couldn’t save. Try again.',
+      )
     }
   }
 
@@ -59,11 +61,14 @@ export function ImportRules() {
       >
         Import rules {open ? '▾' : '▸'}
       </button>
-      <p className="mb-1 text-xs text-muted">
-        How uploaded purchases are named and filed: stores that go by another
-        name, local vendors that count as home upkeep, and rows that aren’t
-        spending. Changes apply to future uploads.
-      </p>
+      <div className="mb-1 space-y-0.5 text-xs text-muted">
+        <p>How future uploads are named and categorized.</p>
+        <ul className="list-disc pl-4">
+          <li>Stores that go by another name</li>
+          <li>Local vendors that count as home upkeep</li>
+          <li>Rows that aren’t spending</li>
+        </ul>
+      </div>
       {open && (
         <div className="space-y-2">
           <textarea

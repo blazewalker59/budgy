@@ -97,7 +97,9 @@ describe('Account export conventions', () => {
         true,
       ),
     ).toThrow('Nothing was imported')
-    expect(() => normalizeExport(header, 'apple-card', true)).toThrow('no rows')
+    expect(() => normalizeExport(header, 'apple-card', true)).toThrow(
+      'export is empty',
+    )
     expect(() =>
       normalizeExport(
         `${header}\n10/01/2026,10/02/2026,Unknown,Shop,Other,Mystery,100`,
@@ -111,6 +113,6 @@ describe('Account export conventions', () => {
         'apple-card',
         false,
       ),
-    ).toThrow('credit-card')
+    ).toThrow('credit card account')
   })
 })

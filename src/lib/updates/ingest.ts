@@ -24,13 +24,13 @@ export async function ingestAccountExport(
   source: UpdateSource = 'uploaded',
 ) {
   const account = await findAccount(db, data.account)
-  if (account.closed) throw new Error('Reopen this Account before updating it')
+  if (account.closed) throw new Error('Reopen this account to update it.')
   if (!['credit', 'checking', 'savings'].includes(account.kind))
     throw new Error(
-      'This Account uses recorded balances. Open its Account sheet to record a balance or import its history.',
+      'This account only tracks balances. Record one on its account sheet.',
     )
   if (data.format === 'apple-card' && account.kind !== 'credit')
-    throw new Error('Choose a credit-card Account for an Apple Card export')
+    throw new Error('Apple Card exports only work with a credit card account.')
   let normalized: ReturnType<typeof normalizeExport>
   try {
     normalized = normalizeExport(data.text, data.format, isDebt(account))

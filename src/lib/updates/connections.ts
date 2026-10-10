@@ -116,7 +116,7 @@ export async function readBridge(
     .from(bankConnections)
     .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     .get()
-  if (!connection) throw new Error('No such bank connection')
+  if (!connection) throw new Error('That bank connection no longer exists.')
   if (!connectionKeyReady(secret)) throw new Error(NOT_CONFIGURED)
   await spendRequest(db, id)
   let found: Awaited<ReturnType<typeof fetchSimplefin>>
@@ -177,7 +177,7 @@ export async function readBridge(
       .set({
         status: found.problems.length ? 'attention' : 'ready',
         lastError: found.problems.length
-          ? `SimpleFIN says: ${found.problems.join(' ')} Check your connections in Bridge.`
+          ? `SimpleFIN says: ${found.problems.join(' ')} Check your connections in SimpleFIN Bridge.`
           : null,
         lastFetchedAt: new Date(),
       })
@@ -204,13 +204,13 @@ export async function mapBankAccount(
     ),
   )
   const found = await db.select().from(bankAccounts).where(where).get()
-  if (!found) throw new Error('No such bank account')
+  if (!found) throw new Error('That bank account no longer exists.')
   let name: string | null = null
   if (input.account !== null) {
     const account = await findAccount(db, input.account)
-    if (account.closed) throw new Error('Reopen this Account before linking it')
+    if (account.closed) throw new Error('Reopen this account to link it.')
     if (found.currency.toUpperCase() !== 'USD')
-      throw new Error('Budgy only tracks USD accounts')
+      throw new Error('Budgy only supports USD accounts.')
     const linked = await db
       .select({
         name: bankAccounts.name,

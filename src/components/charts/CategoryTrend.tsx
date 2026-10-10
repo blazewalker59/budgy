@@ -158,7 +158,7 @@ export function CategoryTrend({
         definition={definition}
         height={190}
         initialWidth={360}
-        ariaLabel={`Monthly spending over ${months.length} months; typical ${dollars(typical)}`}
+        ariaLabel={`Monthly spending over ${months.length} months. Typical ${dollars(typical)}.`}
       />
     </ChartCard>
   )

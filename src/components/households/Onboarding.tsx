@@ -19,8 +19,7 @@ export function Onboarding({ member }: { member: Member }) {
       <section className="w-full max-w-sm space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-sm">
         <h1 className="text-xl font-extrabold">Start your Household</h1>
         <p className="text-sm text-muted">
-          One shared budget for you and the people you invite. Only your
-          Household can see its Ledger.
+          One budget, shared with the people you invite. No one else can see it.
         </p>
         <p className="text-xs text-muted">Signed in as {member.email}</p>
         <form
@@ -60,7 +59,7 @@ export function Onboarding({ member }: { member: Member }) {
         )}
         <p className="text-xs text-muted">
           Invited to someone else’s Household? Open their invitation link
-          instead. Joining never merges budgets.
+          instead.
         </p>
         <button
           type="button"

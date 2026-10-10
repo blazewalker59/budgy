@@ -27,8 +27,7 @@ export function SignIn({ callbackURL = '/' }: { callbackURL?: string }) {
       </h1>
       <p className="mt-2 text-sm text-muted">
         Sign in with the Google account your invitation was sent to. You’ll
-        review the Household before accepting—signing in won’t join it
-        automatically.
+        confirm before joining.
       </p>
       <div className="mt-6">
         <GoogleSignInButton callbackURL={callbackURL} />
@@ -42,8 +41,8 @@ export function NotAllowed({ email }: { email: string }) {
     <Frame>
       <h1 className="text-xl font-bold">Budgy is invite-only</h1>
       <p className="mt-2 text-sm text-muted">
-        {email} doesn’t have access yet. Sign in with the Google account your
-        invitation was sent to, or ask a Household owner for an invitation.
+        {email} doesn’t have access. Sign in with the account your invitation
+        was sent to, or ask a Household owner to invite you.
       </p>
       <button
         type="button"

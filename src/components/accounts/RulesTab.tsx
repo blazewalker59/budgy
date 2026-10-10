@@ -26,8 +26,8 @@ export function RulesTab() {
   return (
     <div className="space-y-3">
       <p className="px-1 text-xs text-muted">
-        Where each store’s purchases go, past ones and every upload to come.
-        Moving one purchase still wins over its store’s rule.
+        Each rule sets a store’s category for past and future purchases. A
+        category you pick for one purchase still wins.
       </p>
       {suggestions.length > 0 && <Suggestions list={suggestions} />}
       <RuleList uses={uses} />
@@ -50,9 +50,9 @@ function Suggestions({ list }: { list: ReturnType<typeof suggestRules> }) {
     <section className="overflow-hidden rounded-xl border border-nice/40 bg-surface">
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-1.5">
         <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-          From your Moves
+          Suggested
           <span className="ml-1.5 font-normal normal-case tracking-normal">
-            stores you keep moving to the same place
+            stores you keep moving to the same category
           </span>
         </h2>
         {list.length > 1 && (
@@ -77,7 +77,7 @@ function Suggestions({ list }: { list: ReturnType<typeof suggestRules> }) {
               <span className="font-semibold">{s.category}</span>
               <span className="block text-[11px] text-muted">
                 Moved {s.moved} of {s.purchases}
-                {s.changes > 0 && `; ${s.changes} more would move too`}
+                {s.changes > 0 && ` · ${s.changes} more would change`}
               </span>
             </span>
             <button
@@ -154,7 +154,7 @@ function RuleList({ uses }: { uses: ReturnType<typeof ruleUses> }) {
               }
             }}
             className="ml-auto shrink-0 text-xs font-semibold text-accent"
-            title="Rules made for the first bulk import only apply to purchases that came in under one category"
+            title="Some rules only cover purchases imported under one category. This applies them to every purchase."
           >
             Apply all to every purchase
           </button>
@@ -171,7 +171,8 @@ function RuleList({ uses }: { uses: ReturnType<typeof ruleUses> }) {
       </div>
       {!uses.length && (
         <p className="px-3 py-2 text-xs text-muted">
-          No rules yet. Move a purchase and choose Always, or add one below.
+          No rules yet. Add one below, or change a purchase’s category and
+          choose <strong>Always</strong>.
         </p>
       )}
       <ul className="divide-y divide-border text-[13px]">
@@ -204,7 +205,7 @@ function RuleList({ uses }: { uses: ReturnType<typeof ruleUses> }) {
                   </>
                 )}
                 {' · '}
-                {purchases} filed
+                {purchases} purchases
                 {last && `, last ${dayLabel(last)} ’${last.slice(2, 4)}`}
                 {r.tag && ` · ${TAG_LABELS[r.tag]}`}
               </span>
@@ -220,7 +221,7 @@ function RuleList({ uses }: { uses: ReturnType<typeof ruleUses> }) {
             </button>
             {r.category ? (
               <CategorySelect
-                label={`File ${r.store} under`}
+                label={`Category for ${r.store}`}
                 value={r.category}
                 onChange={(c) => change(r, { category: c })}
                 className="w-full min-w-0"
@@ -265,7 +266,7 @@ function AddRule() {
         setCategory('')
       }}
     >
-      <span className="font-semibold">Always file</span>
+      <span className="font-semibold">Always put</span>
       <input
         value={store}
         onChange={(e) => setStore(e.target.value)}
@@ -280,7 +281,7 @@ function AddRule() {
           <option key={s} value={s} />
         ))}
       </datalist>
-      <span className="font-semibold">under</span>
+      <span className="font-semibold">in</span>
       <CategorySelect
         label="Category for the rule"
         value={category}
@@ -314,7 +315,7 @@ function Transfers() {
       <h2 className="border-b border-border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
         Transfers · {txns.length}
         <span className="ml-1.5 font-normal normal-case tracking-normal">
-          money moving between your own accounts, left out of spending
+          between your own accounts, not counted as spending
         </span>
       </h2>
       <TxnList txns={txns} limit={20} />

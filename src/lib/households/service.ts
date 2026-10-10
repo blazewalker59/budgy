@@ -54,8 +54,7 @@ async function requireOwner(db: HouseholdDatabase, actor: HouseholdActor) {
       ),
     )
     .get()
-  if (!membership)
-    throw new Error('Only the Household owner can manage membership')
+  if (!membership) throw new Error('Only the Household owner can do this')
 }
 
 export async function createHousehold(
@@ -153,7 +152,7 @@ export async function createInvite(
     )
     .get()
   if (existing || email === normalizeEmail(actor.email))
-    throw new Error('This person already belongs to a Household')
+    throw new Error('This person is already in a Household')
   const bytes = crypto.getRandomValues(new Uint8Array(32))
   const token = btoa(String.fromCharCode(...bytes))
     .replaceAll('+', '-')
@@ -205,7 +204,7 @@ export async function createInvite(
   ])
   if (!inserted.length)
     throw new Error(
-      'Invitation not created. Check ownership or revoke an unused invitation.',
+      'Invitation not created. Revoke an unused one and try again.',
     )
   return { id, token, email, expiresAt }
 }
@@ -237,7 +236,7 @@ export async function previewInvite(
 ) {
   verified(actor)
   if (!/^[A-Za-z0-9_-]{43}$/.test(token))
-    throw new Error('Invitation is unavailable or belongs to another email')
+    throw new Error('This invitation is unavailable or for a different email')
   const invite = await db
     .select({
       id: householdInvites.id,
@@ -255,7 +254,7 @@ export async function previewInvite(
     )
     .get()
   if (!invite)
-    throw new Error('Invitation is unavailable or belongs to another email')
+    throw new Error('This invitation is unavailable or for a different email')
   return invite
 }
 
@@ -267,9 +266,7 @@ export async function acceptInvite(
 ): Promise<Household> {
   const invite = await previewInvite(db, actor, token, now)
   if (await findMemberHousehold(db, actor.id))
-    throw new Error(
-      'You already belong to a Household. Joining never replaces your current budget.',
-    )
+    throw new Error('You already belong to a Household')
   const [inserted] = await db.batch([
     db
       .insert(householdMembers)
@@ -302,7 +299,8 @@ export async function acceptInvite(
         ),
       ),
   ])
-  if (!inserted.length) throw new Error('Invitation is no longer available')
+  if (!inserted.length)
+    throw new Error('This invitation is no longer available')
   return { id: invite.householdId, name: invite.name, role: 'member' }
 }
 
@@ -328,7 +326,7 @@ export async function removeMember(
       ),
     )
     .get()
-  if (!target) throw new Error('Choose a current Household Member')
+  if (!target) throw new Error('That person isn’t in this Household')
   const targetGuard = sql`exists (select 1 from ${householdMembers} where ${householdMembers.householdId} = ${db.householdId} and ${householdMembers.memberId} = ${memberId} and ${householdMembers.role} = 'member')`
   await db.batch([
     // Revoke rather than merely relying on missing membership: a later
@@ -385,7 +383,8 @@ export async function transferOwnership(
   memberId: string,
 ) {
   await requireOwner(db, actor)
-  if (memberId === actor.id) throw new Error('Choose another Household Member')
+  if (memberId === actor.id)
+    throw new Error('Choose someone other than yourself')
   const [promoted] = await db.batch([
     db
       .update(householdMembers)
@@ -416,5 +415,5 @@ export async function transferOwnership(
         ),
       ),
   ])
-  if (!promoted.length) throw new Error('Choose a current Household Member')
+  if (!promoted.length) throw new Error('That person isn’t in this Household')
 }

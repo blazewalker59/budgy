@@ -125,12 +125,14 @@ export function BankConnections({
 
       {open && (
         <div className="space-y-3 border-t border-border p-3">
-          <p className="text-muted">
-            SimpleFIN Bridge reads your banks; your bank logins stay with
-            Bridge. Choose which Budgy Account each bank account feeds on that
-            Account below: cards and bank accounts bring in posted purchases and
-            balances, others just their balance.
-          </p>
+          <ul className="list-disc space-y-0.5 pl-4 text-muted">
+            <li>SimpleFIN Bridge reads your banks. Your logins stay there.</li>
+            <li>Link each bank account from its Budgy account below.</li>
+            <li>
+              Cards and bank accounts bring in purchases and balances. Others
+              bring in just the balance.
+            </li>
+          </ul>
           {connections.isError && (
             <p role="alert" className="text-over">
               {connections.error.message}
@@ -200,7 +202,9 @@ function ConnectForm({
           </a>
           , connect your banks.
         </li>
-        <li>Create a new setup token there and paste it below.</li>
+        <li>
+          Create a <strong>setup token</strong> there and paste it below.
+        </li>
       </ol>
       <label className="block space-y-1 font-semibold">
         Name
@@ -223,8 +227,7 @@ function ConnectForm({
         />
       </label>
       <p className="text-muted">
-        A setup token works once. Budgy stores the access it grants encrypted,
-        and only lists accounts until you link them.
+        Each setup token works once. Accounts aren’t synced until you link them.
       </p>
       <div className="flex gap-2">
         <button
@@ -303,7 +306,7 @@ function ConnectionRow({
             onClick={() => {
               if (
                 confirm(
-                  `Disconnect ${connection.name}? Budgy forgets its access; revoke it in SimpleFIN Bridge too. Purchases already in Budgy stay.`,
+                  `Disconnect ${connection.name}? Purchases already in Budgy stay. Also revoke access in SimpleFIN Bridge.`,
                 )
               )
                 disconnect.mutate()
@@ -321,7 +324,7 @@ function ConnectionRow({
       )}
       <p className="text-muted">
         {!connection.accounts.length
-          ? 'No accounts found yet. Connect banks in Bridge, then refresh.'
+          ? 'No accounts yet. Connect banks in SimpleFIN Bridge, then refresh.'
           : unlinked.length
             ? `Not linked yet: ${unlinked.map((a) => `${a.name} (${a.institution})`).join(', ')}.`
             : `All ${connection.accounts.length} accounts are linked.`}
@@ -406,7 +409,7 @@ export function BankLink({ account }: { account: Account }) {
       </label>
       <p className="text-muted">
         {['credit', 'checking', 'savings'].includes(account.kind)
-          ? 'Posted purchases and the balance come in on each sync; nothing is added twice.'
+          ? 'Purchases and the balance come in on each sync.'
           : 'Its balance is recorded on each sync.'}
       </p>
       {link.isError && (

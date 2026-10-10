@@ -7,12 +7,12 @@ import { z } from 'zod'
 import { readLimited } from './http'
 
 const MESSAGES = {
-  claim:
-    'That setup token couldn’t be claimed; each one works only once. Make a fresh token in SimpleFIN Bridge.',
+  claim: 'That setup token didn’t work. Make a new one in SimpleFIN Bridge.',
   auth: 'SimpleFIN no longer accepts this connection. Disconnect it and connect again with a new setup token.',
-  payment: 'SimpleFIN needs an active subscription. Check your plan in Bridge.',
+  payment:
+    'SimpleFIN needs an active subscription. Check your plan in SimpleFIN Bridge.',
   network: 'SimpleFIN couldn’t be reached. Try again later.',
-  invalid: 'SimpleFIN sent something Budgy couldn’t safely read.',
+  invalid: 'SimpleFIN sent data Budgy couldn’t read. Try again later.',
 }
 
 export class SimplefinError extends Error {

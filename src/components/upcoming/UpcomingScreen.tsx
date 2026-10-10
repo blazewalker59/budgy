@@ -42,8 +42,8 @@ export function UpcomingScreen() {
           Planned bills
         </h2>
         <p className="text-xs text-muted">
-          Big known bills, budgeted on their due dates instead of inflating a
-          monthly Target.
+          Big known bills, budgeted on their due dates. They stay out of monthly
+          Targets.
         </p>
       </div>
 
@@ -118,8 +118,8 @@ export function UpcomingScreen() {
               )}
               {!book.ix.ledger.plans.length && !editing && (
                 <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
-                  No planned bills yet. Add one, or start from a suggestion
-                  below.
+                  No planned bills yet. Tap <strong>Add</strong> or pick a
+                  suggestion below.
                 </p>
               )}
             </div>
@@ -241,7 +241,7 @@ function OccurrenceRow({ o, today }: { o: Occurrence; today: string }) {
           )}
         >
           {late
-            ? `due ${relativeDays(today, o.due)}, not seen yet`
+            ? `due ${relativeDays(today, o.due)}, no payment yet`
             : relativeDays(today, o.due)}
         </p>
       </div>
@@ -403,7 +403,7 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
           className="field w-full"
         />
       </Field>
-      <Field label="Paid to (store, to spot the payment)">
+      <Field label="Paid to (optional)">
         <input
           list="plan-stores"
           value={draft.store ?? ''}

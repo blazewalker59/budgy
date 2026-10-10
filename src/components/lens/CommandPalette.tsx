@@ -306,10 +306,10 @@ function Palette({
       ),
       go(
         'rules',
-        'Filing rules',
+        'Store Rules',
         '/rules',
         <ListChecks size={I} />,
-        'store rules categorize recategorize always file move categories',
+        'filing rules categorize recategorize always file move categories',
       ),
       go('agents', 'Agents', '/agents', <Bot size={I} />, 'mcp api token'),
       {
@@ -554,7 +554,7 @@ function Palette({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="A store, person, over 50, last month… or jump"
+            placeholder="Store, person, over 50, last month, or a page"
             className="min-w-0 flex-1 bg-transparent text-[16px] font-medium outline-none placeholder:text-muted/70"
           />
           <Kbd>esc</Kbd>
@@ -562,7 +562,7 @@ function Palette({
         {lensFilters.length > 0 && (
           <div className="flex flex-wrap items-center gap-1 border-b border-border px-4 py-2">
             <span className="mr-1 text-[10px] font-bold uppercase tracking-wide text-muted">
-              In the lens
+              Active filters
             </span>
             {lensFilters.map((f) => (
               <LensChip
@@ -684,7 +684,7 @@ function Palette({
             <Kbd>⇥</Kbd> add &amp; keep typing
           </span>
           <span className="hidden items-center gap-1 sm:flex">
-            <Kbd>⌫</Kbd> drop the last filter
+            <Kbd>⌫</Kbd> remove last filter
           </span>
         </div>
       </div>

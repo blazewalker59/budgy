@@ -122,7 +122,7 @@ describe('Unified Account Updates UI', () => {
     mocks.get.mockResolvedValue([empty])
     mount()
     expect(await screen.findByText('Card')).toBeTruthy()
-    expect(screen.getByText(/No update receipt yet/)).toBeTruthy()
+    expect(screen.getByText(/No updates yet/)).toBeTruthy()
     expect(screen.getByText(/Not set up yet/)).toBeTruthy()
     await waitFor(() => expect(mocks.connections).toHaveBeenCalled())
     expect(screen.queryByText(/Connected by/)).toBeNull()
@@ -225,7 +225,7 @@ describe('Unified Account Updates UI', () => {
     mount()
     expect(await screen.findByText(/^Last updated /)).toBeTruthy()
     expect(screen.getByRole('alert').textContent).toContain(
-      'last successful update is shown above',
+      'last successful update is above',
     )
   })
   it('shows a new Shortcut token once, bound to its Account and format', async () => {

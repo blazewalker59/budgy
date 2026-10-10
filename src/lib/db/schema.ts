@@ -559,6 +559,8 @@ export const bankAccounts = sqliteTable(
     account: text('account'),
     /** False once Bridge stops listing it; its mapping is kept. */
     present: integer('present', { mode: 'boolean' }).notNull().default(true),
+    /** The last day a sync covered; the next one overlaps it. */
+    syncedThrough: text('synced_through'),
   },
   (t) => [
     primaryKey({ columns: [t.householdId, t.connectionId, t.providerId] }),

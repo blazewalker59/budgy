@@ -61,8 +61,8 @@ an update receipt even if nothing new was added. See
 [ADR 0009](docs/adr/0009-unified-account-updates.md). The Account sheet still
 supports manual balances and historical backfills. Each card or bank Account
 can also get an iPhone share-sheet Shortcut that sends its export straight to
-`/api/updates/upload`, and SimpleFIN Bridge accounts can be connected and linked
-to Budgy Accounts (syncing their purchases comes next). See
+`/api/updates/upload`, and SimpleFIN Bridge accounts can be linked to Budgy
+Accounts, syncing posted purchases and balances every six hours. See
 [ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md).
 
 Worker secrets (`wrangler secret put <NAME> --env production`):

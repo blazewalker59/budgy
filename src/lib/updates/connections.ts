@@ -1,7 +1,7 @@
 /**
  * SimpleFIN Bridge connections for a Household (docs/adr/0010): connect with
  * a one-time setup token, discover its accounts, and map each one to a Budgy
- * Account. Nothing here imports purchases; that is the sync step to come.
+ * Account. Discovery imports nothing; syncing mapped accounts is sync.ts.
  */
 import { and, eq, sql } from 'drizzle-orm'
 import { connectionKeyReady, decryptAccess, encryptAccess } from './crypto'
@@ -10,6 +10,7 @@ import {
   claimSimplefin,
   fetchSimplefin,
 } from './simplefinClient'
+import type { SimplefinAccount } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import { hashToken } from '@/lib/agents/tokens'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
@@ -95,6 +96,21 @@ export async function discoverAccounts(
   secret: string | undefined,
   transport: typeof fetch = fetch,
 ): Promise<void> {
+  await readBridge(db, id, secret, { balancesOnly: true }, transport)
+}
+
+/**
+ * One request to Bridge for a connection, within its daily allowance. What
+ * it lists refreshes the discovered accounts; a failure marks the connection
+ * as needing attention, with a safe message.
+ */
+export async function readBridge(
+  db: HouseholdDatabase,
+  id: string,
+  secret: string | undefined,
+  options: Parameters<typeof fetchSimplefin>[1],
+  transport: typeof fetch = fetch,
+): Promise<Array<SimplefinAccount>> {
   const connection = await db
     .select()
     .from(bankConnections)
@@ -110,7 +126,7 @@ export async function discoverAccounts(
       secret,
       context(db, id),
     )
-    found = await fetchSimplefin(access, { balancesOnly: true }, transport)
+    found = await fetchSimplefin(access, options, transport)
   } catch (error) {
     const message =
       error instanceof SimplefinError
@@ -167,9 +183,14 @@ export async function discoverAccounts(
       })
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id))),
   ])
+  return found.accounts
 }
 
-/** Feed a discovered account into a Budgy Account, or stop (null). */
+/**
+ * Feed a discovered account into a Budgy Account, or stop (null). Card and
+ * bank Accounts get purchases and balances; others (investments, loans) get
+ * balances only.
+ */
 export async function mapBankAccount(
   db: HouseholdDatabase,
   input: { connectionId: string; providerId: string; account: string | null },
@@ -188,8 +209,6 @@ export async function mapBankAccount(
   if (input.account !== null) {
     const account = await findAccount(db, input.account)
     if (account.closed) throw new Error('Reopen this Account before linking it')
-    if (!['credit', 'checking', 'savings'].includes(account.kind))
-      throw new Error('Only card and bank Accounts can be linked')
     if (found.currency.toUpperCase() !== 'USD')
       throw new Error('Budgy only tracks USD accounts')
     const linked = await db
@@ -254,6 +273,7 @@ export async function listConnections(db: HouseholdDatabase) {
         currency: bankAccounts.currency,
         account: bankAccounts.account,
         present: bankAccounts.present,
+        syncedThrough: bankAccounts.syncedThrough,
       })
       .from(bankAccounts)
       .where(inHousehold(db, bankAccounts))

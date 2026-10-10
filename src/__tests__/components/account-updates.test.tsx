@@ -29,6 +29,7 @@ vi.mock('@/lib/updates/server', () => ({
   refreshBankAccounts: vi.fn(),
   linkBankAccount: mocks.link,
   disconnectBank: vi.fn(),
+  syncBank: vi.fn(),
 }))
 vi.mock('@/lib/ledger/useLedger', () => ({
   LEDGER_KEY: ['ledger'],

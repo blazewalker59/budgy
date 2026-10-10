@@ -2,8 +2,8 @@
 
 ## Status
 
-Implemented: Shortcut uploads end to end; SimpleFIN connection, discovery and
-mapping. Syncing SimpleFIN purchases into mapped Accounts is the next slice.
+Implemented: Shortcut uploads; SimpleFIN connection, discovery, mapping and
+scheduled sync of purchases and balances.
 
 ## Context
 
@@ -46,21 +46,37 @@ separate update experience.
   (Bridge asks for under 24).
 - **Discovery** (balances-only) lists accounts and stores only names,
   institution and currency. **Mapping** to a Budgy Account is an explicit
-  Member choice: open card or bank Accounts, USD only, one bank account per
-  Budgy Account. Accounts Bridge stops listing are marked absent but keep
-  their mapping. Mapping imports nothing.
+  Member choice: any open Account, USD only, one bank account per Budgy
+  Account. Accounts Bridge stops listing are marked absent but keep their
+  mapping. Mapping itself imports nothing.
 - Disconnecting forgets the credential and discovered accounts. Revoking access
   in Bridge is the Member's step; purchases already in Budgy stay.
 
-## Next
+## Sync
 
-Sync mapped accounts: fetch posted transactions over an overlap window, use
-`simplefin:<connection>:<account id>` style stable source IDs with the
-existing reconciliation, skip pending rows, record receipts with source
-`simplefin`, record balances, and run on a schedule within the request cap.
+- One Bridge request per connection covers all its mapped accounts, from the
+  earliest account's last synced day minus a 10-day overlap (45 days the first
+  time, never more than 60), a day early for time zones.
+- Card and bank Accounts get posted purchases through `postTransactions`,
+  with source IDs namespaced `simplefin:<Bridge account id>`. Re-reading the
+  overlap adds nothing twice; a corrected provider purchase updates in place;
+  a purchase already uploaded by export is linked when it matches exactly one
+  (ADR 0009 reconciliation), otherwise held for review. Pending transactions
+  are skipped until they post. The date is the transaction date when Bridge
+  gives one, else the posted date, in the Household's time zone. The export
+  normalizer's payments/transfers rules decide what counts as spending.
+- Every mapped Account records Bridge's balance for its balance date. SimpleFIN
+  shows what's owed as negative; Budgy stores a card's or loan's owed balance
+  as positive. Investment and other balance-based Accounts get only balances.
+- Each purchase sync writes a receipt with source `simplefin` (including
+  no-op checks); one Account failing doesn't stop the others.
+- A Cloudflare cron runs every six hours for every Household with a mapped
+  account, each in its own Household scope; **Sync now** runs the same thing.
+  Both count toward the 20-requests-a-day cap.
 
 ## Rollout
 
-Apply `0013_uploads_and_bank_connections.sql` before the new Worker, and set
-the `BANK_CONNECTION_KEY` secret before connecting a bank. Without it, the
+Apply `0013_uploads_and_bank_connections.sql` and `0014_bank_account_sync.sql`
+before the new Worker, and set the `BANK_CONNECTION_KEY` secret before
+connecting a bank. The cron trigger is in `wrangler.jsonc` (production). Without it, the
 Shortcut flow works and bank connection setup explains what's missing.

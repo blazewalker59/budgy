@@ -50,6 +50,10 @@
       "vars": {
         "CANONICAL_HOST": "budgy.bid",
       },
+      // Sync linked SimpleFIN accounts four times a day (docs/adr/0010).
+      "triggers": {
+        "crons": ["0 */6 * * *"],
+      },
       "observability": {
         "logs": {
           "enabled": true,

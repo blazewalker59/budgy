@@ -15,6 +15,7 @@ import {
   listUploadTokens,
   revokeUploadToken,
 } from './uploads'
+import { syncConnection } from './sync'
 import type { AccountExportInput } from './ingest'
 import type { ExportFormat } from './exports'
 import { withMember } from '@/lib/auth/session'
@@ -125,4 +126,14 @@ export const disconnectBank = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(({ db }) => disconnectSimplefin(db, data.id)),
+  )
+
+export const syncBank = createServerFn({ method: 'POST' })
+  .validator((data: { id: string }) =>
+    z.object({ id: z.string().min(1).max(64) }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) =>
+      syncConnection(db, data.id, getCloudflareEnv().BANK_CONNECTION_KEY),
+    ),
   )

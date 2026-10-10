@@ -39,6 +39,28 @@ export function detectExport(text: string): ExportFormat | null {
   return null
 }
 
+/**
+ * Whether a row is spending (or a refund of it), not money moving: payments,
+ * transfers, deposits and rewards are left out. `cents` is positive for money
+ * out; a bank Account's other incoming money isn't treated as a refund.
+ */
+export function isSpending(
+  cents: number,
+  description: string,
+  kind: string,
+  debt: boolean,
+): boolean {
+  if (
+    cents === 0 ||
+    MOVING.test(kind) ||
+    /daily cash|cashback/i.test(description) ||
+    (!/^(purchase|refund|credit|return|fee|interest)$/i.test(kind) &&
+      MOVING.test(description))
+  )
+    return false
+  return debt || cents > 0 || REFUND.test(`${kind} ${description}`)
+}
+
 export function normalizeExport(
   text: string,
   format: ExportFormat,
@@ -134,13 +156,7 @@ export function normalizeExport(
       continue
     }
     dates.push(day)
-    if (
-      MOVING.test(kind) ||
-      /daily cash|cashback/i.test(desc) ||
-      (!/^(purchase|refund|credit|return|fee|interest)$/i.test(kind) &&
-        MOVING.test(desc)) ||
-      cents === 0
-    ) {
+    if (!isSpending(cents, desc, kind, debt)) {
       excluded++
       continue
     }
@@ -150,10 +166,6 @@ export function normalizeExport(
         invalid.push(index + 2)
         continue
       }
-    }
-    if (!debt && cents < 0 && !REFUND.test(`${kind} ${desc}`)) {
-      excluded++
-      continue
     }
     rows.push({
       date: day,

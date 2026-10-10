@@ -3,8 +3,18 @@ import { testDatabase } from '../../helpers/d1'
 import type { DatabaseSync } from 'node:sqlite'
 import type { CloudflareEnv } from '@/lib/db'
 import { householdDatabase } from '@/lib/households/scope'
-import { householdMembers, households, transactions } from '@/lib/db/schema'
-import { deleteAccount, saveAccount } from '@/lib/ledger/accounts'
+import {
+  balances,
+  householdMembers,
+  households,
+  transactions,
+} from '@/lib/db/schema'
+import {
+  deleteAccount,
+  postTransactions,
+  saveAccount,
+} from '@/lib/ledger/accounts'
+import { syncAll, syncConnection } from '@/lib/updates/sync'
 import {
   createUploadToken,
   listUploadTokens,
@@ -381,5 +391,249 @@ describe('SimpleFIN client', () => {
     expect(sealed).not.toContain('secret')
     expect(await decryptAccess(sealed, KEY, 'simplefin:a:1')).toBe(ACCESS)
     await expect(decryptAccess(sealed, KEY, 'simplefin:b:1')).rejects.toThrow()
+  })
+})
+
+describe('SimpleFIN sync', () => {
+  const now = Math.floor(Date.now() / 1000)
+  const daysAgo = (n: number) => now - n * 86_400
+  const txn = (
+    id: string,
+    amount: string,
+    description: string,
+    extra = {},
+  ) => ({
+    id,
+    posted: daysAgo(2),
+    amount,
+    description,
+    ...extra,
+  })
+  /** Bridge with mutable accounts, recording each accounts request. */
+  function liveBridge(accounts: Array<Record<string, unknown>>) {
+    const urls: Array<string> = []
+    const transport = ((url: string) => {
+      if (url.includes('/claim/')) return Promise.resolve(new Response(ACCESS))
+      urls.push(url)
+      return Promise.resolve(Response.json({ errors: [], accounts }))
+    }) as typeof fetch
+    return { transport, urls }
+  }
+  async function linked(accounts: Array<Record<string, unknown>>) {
+    const f = await fixture()
+    const live = liveBridge(accounts)
+    const { id } = await connectSimplefin(
+      f.a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      live.transport,
+    )
+    await mapBankAccount(f.a, {
+      connectionId: id,
+      providerId: 'ACT-1',
+      account: 'Card',
+    })
+    return { ...f, ...live, id }
+  }
+
+  it('imports posted purchases once, skips pending and payments, and records what the card owes', async () => {
+    const sapphireCard = {
+      ...sapphire,
+      transactions: [
+        txn('t1', '-12.34', 'Coffee Shop'),
+        txn('t2', '-50.00', 'Grocer', { pending: true }),
+        txn('t3', '200.00', 'Payment Thank You'),
+        txn('t4', '5.00', 'Coffee Shop refund'),
+      ],
+    }
+    const { db, a, b, id, transport, urls } = await linked([sapphireCard])
+    const results = await syncConnection(a, id, KEY, transport)
+    expect(results).toEqual([{ account: 'Card', added: 2, balance: true }])
+    const rows = await db.select().from(transactions)
+    expect(rows.map((r) => [r.description, r.amount]).sort()).toEqual([
+      ['Coffee Shop refund', -500],
+      ['Coffee Shop', 1234],
+    ])
+    expect(rows.every((r) => r.sourceKey)).toBe(true)
+    const [update] = await listAccountUpdates(a)
+    expect(update.success).toMatchObject({ source: 'simplefin', added: 2 })
+    expect(await db.select().from(balances)).toMatchObject([
+      { householdId: 'a', account: 'Card', amount: 12_050 },
+    ])
+    expect(urls.at(-1)).toMatch(/accounts\?start-date=\d+$/)
+
+    // The next sync overlaps; nothing is added twice, and a posted
+    // pending purchase arrives under its own ID.
+    sapphireCard.transactions[1] = txn('t2', '-50.00', 'Grocer')
+    expect(await syncConnection(a, id, KEY, transport)).toEqual([
+      { account: 'Card', added: 1, balance: true },
+    ])
+    expect(await db.select().from(transactions)).toHaveLength(3)
+    expect((await listAccountUpdates(b))[0].latest).toBeNull()
+  })
+
+  it('reads back to the last sync with an overlap, and 45 days the first time', async () => {
+    const { a, id, transport, urls } = await linked([sapphire])
+    const startDay = (url: string) =>
+      new Date(Number(new URL(url).searchParams.get('start-date')) * 1000)
+        .toISOString()
+        .slice(0, 10)
+    await syncConnection(a, id, KEY, transport)
+    const today = new Date().toISOString().slice(0, 10)
+    const days = (from: string) =>
+      Math.round((Date.parse(today) - Date.parse(from)) / 86_400_000)
+    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(45)
+    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(47)
+    await syncConnection(a, id, KEY, transport)
+    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(10)
+    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(12)
+  })
+
+  it('links a purchase already uploaded by export instead of adding it again', async () => {
+    const sapphireCard = {
+      ...sapphire,
+      transactions: [txn('t1', '-12.34', 'Coffee Shop')],
+    }
+    const { db, a, id, transport } = await linked([sapphireCard])
+    const date = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+    }).format(new Date(daysAgo(2) * 1000))
+    await postTransactions(a, {
+      account: 'Card',
+      rows: [{ date, description: 'Coffee Shop', amount: 12.34 }],
+      commit: true,
+      importedBy: 'Member',
+      via: 'shortcut',
+    })
+    const [result] = await syncConnection(a, id, KEY, transport)
+    expect(result.added).toBe(0)
+    expect(await db.select().from(transactions)).toHaveLength(1)
+  })
+
+  it('records only a balance for an investment Account, and leaves bank deposits out', async () => {
+    const f = await fixture()
+    await saveAccount(
+      f.a,
+      { name: 'Vanguard', ...card, kind: 'brokerage' },
+      true,
+    )
+    await saveAccount(
+      f.a,
+      { name: 'Checking', ...card, kind: 'checking' },
+      true,
+    )
+    const live = liveBridge([
+      {
+        ...sapphire,
+        id: 'VG',
+        name: 'Brokerage',
+        balance: '1000.00',
+        transactions: [txn('v1', '-100', 'Buy VTSAX')],
+      },
+      {
+        ...sapphire,
+        id: 'CHK',
+        name: 'Checking',
+        balance: '500.25',
+        transactions: [
+          txn('c1', '2000', 'Payroll ACME'),
+          txn('c2', '-40', 'Hardware Store'),
+        ],
+      },
+    ])
+    const { id } = await connectSimplefin(
+      f.a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      live.transport,
+    )
+    await mapBankAccount(f.a, {
+      connectionId: id,
+      providerId: 'VG',
+      account: 'Vanguard',
+    })
+    await mapBankAccount(f.a, {
+      connectionId: id,
+      providerId: 'CHK',
+      account: 'Checking',
+    })
+    const results = await syncConnection(f.a, id, KEY, live.transport)
+    expect(results).toEqual(
+      expect.arrayContaining([
+        { account: 'Vanguard', balance: true },
+        { account: 'Checking', added: 1, balance: true },
+      ]),
+    )
+    const saved = await f.db.select().from(balances)
+    expect(saved.map((x) => [x.account, x.amount]).sort()).toEqual([
+      ['Checking', 50_025],
+      ['Vanguard', 100_000],
+    ])
+    expect(
+      (await f.db.select().from(transactions)).map((t) => t.description),
+    ).toEqual(['Hardware Store'])
+  })
+
+  it('syncs every Household’s linked connections on schedule, each in its own scope', async () => {
+    const f = await fixture()
+    const bridgeA = liveBridge([
+      { ...sapphire, transactions: [txn('t1', '-1', 'A shop')] },
+    ])
+    const { id: idA } = await connectSimplefin(
+      f.a,
+      me,
+      { name: 'A', setupToken: SETUP },
+      KEY,
+      bridgeA.transport,
+    )
+    await mapBankAccount(f.a, {
+      connectionId: idA,
+      providerId: 'ACT-1',
+      account: 'Card',
+    })
+    const otherAccess = 'https://user:other@beta-bridge.simplefin.org/simplefin'
+    const transport = ((url: string) =>
+      Promise.resolve(
+        url.includes('/claim/')
+          ? new Response(otherAccess)
+          : Response.json({
+              accounts: [
+                { ...sapphire, transactions: [txn('t1', '-2', 'B shop')] },
+              ],
+            }),
+      )) as typeof fetch
+    const { id: idB } = await connectSimplefin(
+      f.b,
+      me,
+      { name: 'B', setupToken: SETUP },
+      KEY,
+      transport,
+    )
+    await mapBankAccount(f.b, {
+      connectionId: idB,
+      providerId: 'ACT-1',
+      account: 'Card',
+    })
+
+    await syncAll(f.env.DB, KEY, transport)
+    const rows = await f.db.select().from(transactions)
+    expect(rows.map((r) => r.householdId).sort()).toEqual(['a', 'b'])
+  })
+
+  it('needs a linked account before syncing', async () => {
+    const { a } = await fixture()
+    const { transport } = liveBridge([sapphire])
+    const { id } = await connectSimplefin(
+      a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      transport,
+    )
+    await expect(syncConnection(a, id, KEY, transport)).rejects.toThrow(
+      /Link at least one/,
+    )
   })
 })

@@ -99,6 +99,13 @@
       "when": 1791598578294,
       "tag": "0013_uploads_and_bank_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1791601769685,
+      "tag": "0014_bank_account_sync",
+      "breakpoints": true
     }
   ]
 }

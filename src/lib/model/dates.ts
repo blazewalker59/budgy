@@ -118,10 +118,15 @@ export function relativeDays(from: string, to: string): string {
 
 /** Today's date in the Household's time zone. */
 export function today(timeZone = 'America/New_York'): string {
+  return dateOn(new Date(), timeZone)
+}
+
+/** The date a moment falls on in the Household's time zone. */
+export function dateOn(at: Date, timeZone = 'America/New_York'): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(new Date())
+  }).format(at)
 }

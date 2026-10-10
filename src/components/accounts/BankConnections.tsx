@@ -1,7 +1,8 @@
 /**
  * SimpleFIN Bridge connections (docs/adr/0010): connect with a setup token,
- * see the accounts it shares, and link each to a Budgy Account. Linking
- * imports nothing yet; syncing purchases is the next step.
+ * see the accounts it shares, and link each to a Budgy Account. Linked
+ * accounts sync four times a day, or now: purchases for card and bank
+ * Accounts, balances for all.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -12,11 +13,14 @@ import {
   disconnectBank,
   linkBankAccount,
   refreshBankAccounts,
+  syncBank,
 } from '@/lib/updates/server'
 import {
   BANK_CONNECTIONS_KEY,
+  UPDATES_KEY,
   useBankConnections,
 } from '@/lib/updates/useUpdates'
+import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 
 type Connection = NonNullable<
   ReturnType<typeof useBankConnections>['data']
@@ -38,9 +42,7 @@ export function BankConnections({ accounts }: { accounts: Array<Account> }) {
       await refresh()
     },
   })
-  const linkable = accounts.filter(
-    (a) => !a.closed && ['credit', 'checking', 'savings'].includes(a.kind),
-  )
+  const linkable = accounts.filter((a) => !a.closed)
 
   return (
     <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
@@ -52,8 +54,9 @@ export function BankConnections({ accounts }: { accounts: Array<Account> }) {
           </h2>
           <p className="text-xs text-muted">
             Through SimpleFIN Bridge: read-only, and your bank login stays with
-            Bridge. Link each account to a Budgy Account; automatic purchase
-            syncing comes next.
+            Bridge. Link each account to a Budgy Account: cards and bank
+            accounts bring in posted purchases and balances, others just their
+            balance. Linked accounts sync four times a day.
           </p>
         </div>
         {!adding && (
@@ -180,10 +183,22 @@ function ConnectionRow({
     mutationFn: () => disconnectBank({ data: { id: connection.id } }),
     onSettled: onChange,
   })
+  const queryClient = useQueryClient()
+  const sync = useMutation({
+    mutationFn: () => syncBank({ data: { id: connection.id } }),
+    onSettled: () =>
+      Promise.all([
+        onChange(),
+        queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+        queryClient.invalidateQueries({ queryKey: UPDATES_KEY }),
+      ]),
+  })
+  const linked = connection.accounts.some((a) => a.account)
   const taken = new Set(
     connection.accounts.flatMap((a) => (a.account ? [a.account] : [])),
   )
   const problem =
+    sync.error?.message ??
     discover.error?.message ??
     link.error?.message ??
     disconnect.error?.message ??
@@ -231,6 +246,35 @@ function ConnectionRow({
           </button>
         </div>
       </div>
+      {linked && (
+        <button
+          type="button"
+          disabled={sync.isPending}
+          onClick={() => sync.mutate()}
+          className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background disabled:opacity-50"
+        >
+          {sync.isPending ? 'Syncing…' : 'Sync now'}
+        </button>
+      )}
+      {sync.data && (
+        <ul role="status" className="space-y-0.5">
+          {sync.data.map((r) => (
+            <li
+              key={r.account}
+              className={r.error ? 'text-over' : 'text-accent'}
+            >
+              {r.account}:{' '}
+              {r.error ??
+                [
+                  r.added !== undefined && `${r.added} new purchases`,
+                  r.balance && 'balance updated',
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+            </li>
+          ))}
+        </ul>
+      )}
       {problem && (
         <p role="alert" className="text-over">
           {problem}
@@ -257,6 +301,9 @@ function ConnectionRow({
                     ? ` · ${bank.currency} (not supported)`
                     : ''}
                   {!bank.present ? ' · no longer shared by Bridge' : ''}
+                  {bank.account && bank.syncedThrough
+                    ? ` · synced through ${bank.syncedThrough}`
+                    : ''}
                 </span>
               </span>
               <select

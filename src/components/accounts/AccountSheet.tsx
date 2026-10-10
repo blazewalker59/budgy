@@ -13,6 +13,7 @@ import { RemoveStarting } from './RemoveStarting'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { ParsedHistory } from '@/lib/import/history'
 import type { PostSummary } from '@/lib/ledger/server'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 import { uploadPurchases } from '@/lib/ledger/server'
 import { useBook } from '@/lib/ledger/book'
 import {
@@ -773,22 +774,27 @@ function BalanceList({
         )}
         <button
           type="button"
-          onClick={() => {
-            if (!confirm) return setConfirm(true)
-            recordBalances.mutate({ balances: [], replace: account.name })
-            setConfirm(false)
-          }}
-          onBlur={() => setConfirm(false)}
-          className={cn(
-            'flex-1 py-1.5',
-            confirm ? 'text-over' : 'text-muted hover:text-over',
-          )}
+          onClick={() => setConfirm(true)}
+          disabled={confirm}
+          className="flex-1 py-1.5 text-muted hover:text-over disabled:opacity-50"
         >
-          {confirm
-            ? `Tap again to clear all ${newest.length}`
-            : 'Clear history'}
+          Clear history
         </button>
       </div>
+      {confirm && (
+        <div className="border-t border-border p-2">
+          <ConfirmPanel
+            question={`Clear all ${newest.length} ${newest.length === 1 ? 'balance' : 'balances'}?`}
+            detail="This account’s balance history goes. This can’t be undone."
+            action="Clear"
+            onConfirm={() => {
+              recordBalances.mutate({ balances: [], replace: account.name })
+              setConfirm(false)
+            }}
+            onCancel={() => setConfirm(false)}
+          />
+        </div>
+      )}
     </section>
   )
 }

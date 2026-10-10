@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import { useRemoveStarting } from '@/lib/ledger/useLedger'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 
 export function RemoveStarting({
   account,
@@ -33,37 +34,15 @@ export function RemoveStarting({
       </div>
     )
   return (
-    <div
-      role="alertdialog"
-      aria-label={`Remove ${what}`}
-      className="space-y-2 rounded-lg border border-over/40 bg-over-soft p-3 text-[13px] text-foreground"
-    >
-      <p>
-        <strong>
-          Remove {what}
-          {account ? ` from ${account}` : ''}?
-        </strong>{' '}
-        Their categories and notes go too. This can’t be undone.
-      </p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            remove.mutate(account ? { account } : {})
-            setConfirming(false)
-          }}
-          className="min-h-9 rounded-full bg-over px-4 font-semibold text-surface"
-        >
-          Remove
-        </button>
-        <button
-          type="button"
-          onClick={() => setConfirming(false)}
-          className="min-h-9 rounded-full bg-surface px-4 font-semibold"
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
+    <ConfirmPanel
+      question={`Remove ${what}${account ? ` from ${account}` : ''}?`}
+      detail="Their categories and notes go too. This can’t be undone."
+      action="Remove"
+      onConfirm={() => {
+        remove.mutate(account ? { account } : {})
+        setConfirming(false)
+      }}
+      onCancel={() => setConfirming(false)}
+    />
   )
 }

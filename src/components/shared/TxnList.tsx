@@ -1,11 +1,11 @@
 /**
  * Transactions you can act on: Move one to another Category (then, if it
  * should always go there, make that the Store's rule), or note why. Laid
- * out as rows that stack on a phone. With `onPick`, a purchase's Store and
- * Account are filters to tap.
+ * out as rows that stack on a phone, newest first. With `onPick`, a
+ * purchase's Store and Account are filters to tap.
  */
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CategorySelect } from './CategorySelect'
 import type { Txn } from '@/lib/model/types'
 import type { LensFilter } from '@/lib/model/lens'
@@ -34,7 +34,15 @@ export function TxnList({
   onPick?: (f: LensFilter) => void
 }) {
   const [all, setAll] = useState(false)
-  const shown = all ? txns : txns.slice(0, limit)
+  // Newest first, the larger first on the same day.
+  const sorted = useMemo(
+    () =>
+      [...txns].sort(
+        (a, b) => b.date.localeCompare(a.date) || b.amount - a.amount,
+      ),
+    [txns],
+  )
+  const shown = all ? sorted : sorted.slice(0, limit)
   if (!txns.length)
     return <p className="px-3 py-2 text-xs text-muted">No purchases.</p>
   return (

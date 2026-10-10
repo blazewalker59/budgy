@@ -13,7 +13,12 @@ import { useBook } from '@/lib/ledger/book'
 import { newPlanId, useDeletePlan, useSavePlan } from '@/lib/ledger/useLedger'
 import { forecast } from '@/lib/model/forecast'
 import { suggestPlans } from '@/lib/model/detect'
-import { COMING_UP_DAYS, monthlySetAside, planLines } from '@/lib/model/plans'
+import {
+  COMING_UP_DAYS,
+  setAside as isSetAside,
+  monthlySetAside,
+  planLines,
+} from '@/lib/model/plans'
 import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
 import { dollars, parseDollars } from '@/lib/model/money'
 import { CADENCES, CADENCE_LABELS } from '@/lib/model/types'
@@ -38,7 +43,7 @@ export function UpcomingScreen() {
   const adding =
     editing && !book.ix.ledger.plans.some((p) => p.id === editing.id)
   const setAside = book.ix.ledger.plans
-    .filter((p) => p.active && p.cadence !== 'monthly')
+    .filter((p) => p.active)
     .reduce((n, p) => n + monthlySetAside(p), 0)
 
   return (
@@ -49,8 +54,9 @@ export function UpcomingScreen() {
             Planned bills
           </h2>
           <p className="text-xs text-muted">
-            Big known bills, budgeted on their due dates. They stay out of
-            monthly Targets.
+            Bills you know are coming. Monthly ones count toward their
+            category’s target. Less frequent ones stay out of targets and are
+            budgeted on their due dates.
             {setAside > 0 && (
               <>
                 {' '}
@@ -214,7 +220,7 @@ function PlanRow({
   today: string
   onEdit: () => void
 }) {
-  const aside = plan.cadence !== 'monthly' ? monthlySetAside(plan) : 0
+  const aside = monthlySetAside(plan)
   return (
     <li>
       <button
@@ -236,6 +242,7 @@ function PlanRow({
             {aside > 0 && (
               <span className="text-planned"> · {dollars(aside)}/mo</span>
             )}
+            {!isSetAside(plan) && ' · in target'}
             {lastPaid &&
               ` · paid ${dollars(lastPaid.amount)} ${dayLabel(lastPaid.date)}`}
           </span>
@@ -365,6 +372,11 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
             label: CADENCE_LABELS[c],
           }))}
         />
+        <span className="mt-1 block text-xs text-muted">
+          {isSetAside(draft)
+            ? 'Kept out of targets, budgeted on its due dates.'
+            : 'Counts toward the category’s target.'}
+        </span>
       </Field>
       <Field label="Next due">
         <input

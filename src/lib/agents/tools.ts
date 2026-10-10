@@ -69,12 +69,7 @@ function categoryRow(r: ReturnType<typeof monthView>['everyday'][number]) {
 }
 
 function alertsOf(book: Book) {
-  return budgetAlerts(
-    book.ix,
-    book.today,
-    book.occurrences,
-    book.plannedIds,
-  ).map((a) => ({
+  return budgetAlerts(book.ix, book.today, book.occurrences).map((a) => ({
     ...a,
     amount: a.amount === undefined ? undefined : usd(a.amount),
   }))

@@ -1,6 +1,8 @@
 /**
  * Planned Expenses on the calendar (docs/adr/0002): when each comes due,
- * which Transaction paid it, and what to set aside each month.
+ * which Transaction paid it, and what to set aside each month. Monthly ones
+ * are tracked for their due dates but count toward Targets like any
+ * purchase; the rest are set aside, outside Targets.
  */
 
 import { CADENCE_MONTHS } from './types'
@@ -14,6 +16,15 @@ export interface Occurrence {
   due: string
   /** The Transaction that paid it, once one is imported. */
   paidBy: Txn | null
+}
+
+/**
+ * Whether a Plan is budgeted on its due dates, outside Targets: anything
+ * less often than monthly. A monthly bill is part of a typical month, so its
+ * payments count toward its Category's Target.
+ */
+export function setAside(plan: Pick<Plan, 'cadence'>): boolean {
+  return CADENCE_MONTHS[plan.cadence] !== 1
 }
 
 /** Due dates of `plan` within [from, to], inclusive. */
@@ -76,17 +87,24 @@ export function schedule(
   return out.sort((a, b) => a.due.localeCompare(b.due))
 }
 
-/** Ids of Transactions that paid a Planned Expense. */
+/**
+ * Ids of Transactions that paid a set-aside Planned Expense: the ones kept
+ * out of everyday spending. A monthly bill's payments aren't among them.
+ */
 export function plannedTxnIds(occurrences: Array<Occurrence>): Set<string> {
   const ids = new Set<string>()
-  for (const o of occurrences) if (o.paidBy) ids.add(o.paidBy.id)
+  for (const o of occurrences)
+    if (o.paidBy && setAside(o.plan)) ids.add(o.paidBy.id)
   return ids
 }
 
-/** What a Plan costs per month, spread evenly: its set-aside. */
+/**
+ * What a set-aside Plan costs per month, spread evenly. Nothing for a
+ * monthly one (its Target covers it) or a one-off.
+ */
 export function monthlySetAside(plan: Plan): number {
   const step = CADENCE_MONTHS[plan.cadence]
-  return step === 0 ? 0 : Math.round(plan.amount / step)
+  return step <= 1 ? 0 : Math.round(plan.amount / step)
 }
 
 /** How far ahead a Plan counts as coming up. */

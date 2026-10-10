@@ -14,8 +14,7 @@ const TARGETS = [
 function alertsFor(txns: Parameters<typeof ledger>[0], today: string) {
   const ix = indexLedger(ledger({ targets: TARGETS, ...txns }))
   const occ = schedule(ix, '2026-01-01', '2027-12-31')
-  const ids = new Set(occ.flatMap((o) => (o.paidBy ? [o.paidBy.id] : [])))
-  return budgetAlerts(ix, today, occ, ids)
+  return budgetAlerts(ix, today, occ)
 }
 
 describe('budgetAlerts', () => {

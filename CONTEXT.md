@@ -117,15 +117,17 @@ The Everyday Targets together.
 
 **Typical month**:
 A Category's average monthly spending over the last 3, 6 or 12 full months
-(3 unless a Member picks otherwise), leaving out Planned Expense payments. A
-Category that started inside that span is averaged over the months since its
-first purchase, so a new expense isn't diluted. The fair starting point for a
-Target; its trend shows the last 12 months beside it.
+(3 unless a Member picks otherwise), leaving out set-aside Planned Expense
+payments. A Category that started inside that span is averaged over the
+months since its first purchase, so a new expense isn't diluted. The fair
+starting point for a Target; its trend shows the last 12 months beside it.
 
 **Planned Expense**:
 A known, usually lumpy bill (car insurance twice a year, an annual renewal)
-with an amount, a cadence and a due date. It is budgeted on its due dates
-instead of in a monthly Target (docs/adr/0002).
+with an amount, a cadence and a due date. Less frequent than monthly, it is
+**set aside**: budgeted on its due dates instead of in a monthly Target. A
+monthly one has its due dates tracked but counts toward its Category's Target
+(docs/adr/0002).
 _Avoid_: bill (in code), recurring
 
 **Due date**:
@@ -137,8 +139,8 @@ no Store, within 10% of the amount; within three weeks of the date).
 Due dates not yet paid, from a few days ago through the next weeks.
 
 **Set-aside**:
-A Planned Expense spread over the months between due dates: what to save
-each month so the bill is covered.
+A set-aside Planned Expense spread over the months between due dates: what
+to save each month so the bill is covered.
 
 **Selection**:
 What the Lens picks out on Spending. It is always shown inside the whole,

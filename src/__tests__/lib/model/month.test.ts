@@ -53,6 +53,41 @@ describe('monthView', () => {
     expect(v.totals.plannedPaid).toBe(121_000)
   })
 
+  it('counts a monthly bill in everyday spending, not as planned', () => {
+    const gym = txn({
+      date: '2026-09-20',
+      store: 'Gym',
+      sourceCategory: 'Kids',
+      amount: 13_500,
+    })
+    const mix = indexLedger({
+      ...l,
+      txns: [...l.txns, gym],
+      plans: [
+        ...l.plans,
+        plan({
+          name: 'Gym',
+          category: 'Kids',
+          store: 'Gym',
+          amount: 13_500,
+          cadence: 'monthly',
+          anchor: '2026-09-20',
+        }),
+      ],
+    })
+    const v = monthView(
+      mix,
+      '2026-09',
+      '2026-10-08',
+      null,
+      schedule(mix, '2026-01-01', '2027-12-31'),
+    )
+    const kids = v.everyday.find((r) => r.name === 'Kids')!
+    expect(kids.spent).toBe(13_500)
+    expect(kids.planned).toEqual([])
+    expect(v.totals.plannedPaid).toBe(121_000)
+  })
+
   it('compares spending with Targets and lists empty targeted Categories', () => {
     const v = monthView(ix, '2026-09', '2026-10-08', null, occ)
     expect(v.totals.target).toBe(80_000)

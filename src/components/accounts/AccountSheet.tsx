@@ -70,17 +70,7 @@ export function AccountSheet({
   const debt = isDebt(account)
   return (
     <Sheet title={name} onClose={onClose}>
-      <Details
-        account={account}
-        onDelete={
-          reach
-            ? undefined
-            : () => {
-                deleteAccount.mutate({ name })
-                onClose()
-              }
-        }
-      />
+      <Details account={account} />
       {account.kind === 'property' && <EquityLine name={name} />}
       <UpdateBalance account={account} today={book.today} />
       {['credit', 'checking', 'savings'].includes(account.kind) && (
@@ -124,23 +114,26 @@ export function AccountSheet({
         </p>
       )}
       <StartingHere name={name} />
+      <CloseOrDelete
+        account={account}
+        balance={own.at(-1)?.amount ?? null}
+        onDelete={
+          reach
+            ? undefined
+            : () => {
+                deleteAccount.mutate({ name })
+                onClose()
+              }
+        }
+      />
     </Sheet>
   )
 }
 
-/** Owner, kind, institution, and closing (which records a final zero). */
-function Details({
-  account,
-  onDelete,
-}: {
-  account: Account
-  /** Only for an Account without purchases. */
-  onDelete?: () => void
-}) {
-  const { today } = useBook()
+/** Owner, kind and institution, and for a loan, what it's against. */
+function Details({ account }: { account: Account }) {
   const { ix } = useBook()
   const saveAccount = useSaveAccount()
-  const recordBalances = useRecordBalances()
   const properties = ix.ledger.accounts.filter(
     (a) => a.kind === 'property' && !a.closed,
   )
@@ -197,30 +190,88 @@ function Details({
           />
         </label>
       )}
-      <label className="flex items-center gap-1 text-muted">
-        <input
-          type="checkbox"
-          checked={account.closed}
-          onChange={(e) => {
-            save({ closed: e.target.checked })
-            if (e.target.checked)
-              recordBalances.mutate({
-                balances: [{ account: account.name, date: today, amount: 0 }],
-              })
-          }}
-        />
-        Closed
-      </label>
+    </section>
+  )
+}
+
+/**
+ * At the bottom of the sheet: closing the Account (asked first; it records
+ * a final zero balance and moves to Closed accounts), or reopening it. An
+ * Account without purchases can be deleted instead.
+ */
+function CloseOrDelete({
+  account,
+  balance,
+  onDelete,
+}: {
+  account: Account
+  balance: number | null
+  /** Only for an Account without purchases. */
+  onDelete?: () => void
+}) {
+  const { today } = useBook()
+  const saveAccount = useSaveAccount()
+  const recordBalances = useRecordBalances()
+  const [asking, setAsking] = useState<'close' | 'delete' | null>(null)
+  const save = (closed: boolean) => {
+    const { sourceName: _s, ...rest } = account
+    saveAccount.mutate({ ...rest, closed, isNew: false })
+  }
+  if (asking === 'close')
+    return (
+      <ConfirmPanel
+        question={`Close ${account.name}?`}
+        detail={`Its balance${balance ? ` of ${dollars(balance)}` : ''} is set to $0 today and it moves to Closed accounts. Its history and purchases stay.`}
+        action="Close"
+        onConfirm={() => {
+          save(true)
+          recordBalances.mutate({
+            balances: [{ account: account.name, date: today, amount: 0 }],
+          })
+          setAsking(null)
+        }}
+        onCancel={() => setAsking(null)}
+      />
+    )
+  if (asking === 'delete' && onDelete)
+    return (
+      <ConfirmPanel
+        question={`Delete ${account.name}?`}
+        detail="It has no purchases. Its balances go too. This can’t be undone."
+        action="Delete"
+        onConfirm={onDelete}
+        onCancel={() => setAsking(null)}
+      />
+    )
+  return (
+    <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+      {account.closed ? (
+        <button
+          type="button"
+          onClick={() => save(false)}
+          className="min-h-9 rounded-full bg-sunken px-4 text-[13px] font-semibold"
+        >
+          Reopen account
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAsking('close')}
+          className="min-h-9 rounded-full border border-over/40 px-4 text-[13px] font-semibold text-over hover:bg-over-soft"
+        >
+          Close account
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"
-          onClick={onDelete}
-          className="inline-flex items-center gap-1 rounded px-1 text-muted hover:text-over"
+          onClick={() => setAsking('delete')}
+          className="inline-flex min-h-9 items-center gap-1 rounded-full px-3 text-[13px] font-semibold text-over hover:bg-over-soft"
         >
           <Trash2 size={13} aria-hidden /> Delete
         </button>
       )}
-    </section>
+    </div>
   )
 }
 

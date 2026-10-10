@@ -7,6 +7,7 @@ import {
   planLines,
   plannedTxnIds,
   schedule,
+  setAside,
 } from '@/lib/model/plans'
 
 describe('dueDates', () => {
@@ -102,6 +103,35 @@ describe('schedule', () => {
       monthlySetAside(plan({ amount: 120_000, cadence: 'semiannual' })),
     ).toBe(20_000)
     expect(monthlySetAside(plan({ cadence: 'once' }))).toBe(0)
+    // A monthly bill is in its Target, so there's nothing to set aside.
+    expect(monthlySetAside(plan({ cadence: 'monthly' }))).toBe(0)
+  })
+
+  it('keeps only set-aside payments out of everyday spending', () => {
+    const spotify = plan({
+      id: 'spotify',
+      store: 'Spotify',
+      category: 'Subscriptions',
+      amount: 2_200,
+      cadence: 'monthly',
+      anchor: '2026-03-11',
+    })
+    const paid = txn({
+      date: '2026-03-11',
+      store: 'Spotify',
+      sourceCategory: 'Subscriptions',
+      amount: 2_200,
+    })
+    const ix = indexLedger(
+      ledger({ txns: [paid, paidMarch], plans: [spotify, insurance] }),
+    )
+    const occ = schedule(ix, '2026-03-01', '2026-03-31')
+    // Its due date is still matched (so it isn't late)...
+    expect(occ.find((o) => o.plan.id === 'spotify')?.paidBy?.id).toBe(paid.id)
+    // ...but only the insurance payment is kept out of everyday spending.
+    expect(plannedTxnIds(occ)).toEqual(new Set([paidMarch.id]))
+    expect(setAside(spotify)).toBe(false)
+    expect(setAside(insurance)).toBe(true)
   })
 })
 

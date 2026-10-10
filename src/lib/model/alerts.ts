@@ -17,6 +17,7 @@ import { possibleDuplicates } from './duplicates'
 import { categoryOf, ownerOf } from './ledger'
 import { monthView, upcoming } from './month'
 import { dollars } from './money'
+import { setAside } from './plans'
 import type { LedgerIndex } from './ledger'
 import type { Occurrence } from './plans'
 
@@ -55,7 +56,6 @@ export function budgetAlerts(
   ix: LedgerIndex,
   today: string,
   occurrences: Array<Occurrence>,
-  plannedIds: Set<string>,
 ): Array<Alert> {
   const month = today.slice(0, 7)
   const view = monthView(ix, month, today, null, occurrences)
@@ -122,17 +122,19 @@ export function budgetAlerts(
         : `${o.plan.name} is due ${relativeDays(today, o.due)}`,
       detail: late
         ? `${dollars(o.plan.amount)} was due ${dayLabel(o.due)}. No matching payment yet.`
-        : `About ${dollars(o.plan.amount)} due ${dayLabel(o.due)} (${o.plan.category}). Planned, so it’s not in the everyday Budget.`,
+        : `About ${dollars(o.plan.amount)} due ${dayLabel(o.due)} (${o.plan.category}). ${setAside(o.plan) ? 'Planned, so it’s not in the everyday Budget.' : 'It counts toward the target.'}`,
       category: o.plan.category,
       amount: o.plan.amount,
     })
   }
 
+  // Any planned bill's payment was expected, monthly ones included.
+  const bills = new Set(occurrences.flatMap((o) => o.paidBy?.id ?? []))
   const weekAgo = addDays(today, -7)
   for (const tx of ix.ledger.txns) {
     if (tx.date < weekAgo || tx.date > today || tx.amount < LARGE_PURCHASE)
       continue
-    if (plannedIds.has(tx.id)) continue
+    if (bills.has(tx.id)) continue
     const category = categoryOf(ix, tx)
     if (ix.categories.get(category)?.group === 'housing') continue
     out.push({

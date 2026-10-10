@@ -1,8 +1,9 @@
 /**
  * One month against the Budget: what each Category spent next to its
- * Target, the Planned Expenses due, and the biggest Stores. Planned
- * Expenses are kept out of the everyday numbers (docs/adr/0002), so a car
- * insurance bill never reads as a blown Insurance budget.
+ * Target, the Planned Expenses due, and the biggest Stores. Set-aside
+ * Planned Expenses are kept out of the everyday numbers (docs/adr/0002), so
+ * a car insurance bill never reads as a blown Insurance budget; monthly ones
+ * count like any purchase.
  */
 
 import { addDays, lastDayOf } from './dates'
@@ -13,7 +14,7 @@ import {
   ownerOf,
   targetFor,
 } from './ledger'
-import { matchWindowDays } from './plans'
+import { matchWindowDays, plannedTxnIds, setAside } from './plans'
 import type { LedgerIndex } from './ledger'
 import type { Occurrence } from './plans'
 import type { Group, Owner, Tag, Txn } from './types'
@@ -23,7 +24,7 @@ export interface CategoryMonth {
   tag: Tag
   group: Group
   target: number | null
-  /** Everyday spending: everything but Planned Expense payments. */
+  /** Everyday spending: everything but set-aside Planned Expense payments. */
   spent: number
   txns: Array<Txn>
   planned: Array<Occurrence>
@@ -72,11 +73,10 @@ export function monthView(
   owner: Owner | null,
   occurrences: Array<Occurrence>,
 ): MonthView {
-  const plannedIds = new Set<string>()
+  const plannedIds = plannedTxnIds(occurrences)
   const due = owner
     ? []
-    : occurrences.filter((o) => o.due.slice(0, 7) === month)
-  for (const o of occurrences) if (o.paidBy) plannedIds.add(o.paidBy.id)
+    : occurrences.filter((o) => o.due.slice(0, 7) === month && setAside(o.plan))
 
   const rows = new Map<string, CategoryMonth>()
   const row = (name: string): CategoryMonth => {

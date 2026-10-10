@@ -1,10 +1,12 @@
 /**
- * The months ahead: everyday Targets plus Planned Expenses on their due
- * dates, so a lumpy month is visible before it arrives.
+ * The months ahead: everyday Targets plus set-aside Planned Expenses on
+ * their due dates, so a lumpy month is visible before it arrives. Monthly
+ * bills are inside the Targets already.
  */
 
 import { shiftMonth } from './dates'
 import { isHousing, targetFor } from './ledger'
+import { setAside } from './plans'
 import type { LedgerIndex } from './ledger'
 import type { Occurrence } from './plans'
 
@@ -32,7 +34,9 @@ export function forecast(
       if (isHousing(ix, name)) housing += target
       else everyday += target
     }
-    const due = occurrences.filter((o) => o.due.slice(0, 7) === month)
+    const due = occurrences.filter(
+      (o) => o.due.slice(0, 7) === month && setAside(o.plan),
+    )
     const planned = due.reduce(
       (n, o) => n + (o.paidBy ? o.paidBy.amount : o.plan.amount),
       0,

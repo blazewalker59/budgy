@@ -18,10 +18,15 @@ away doesn't show anywhere until it posts.
 - Each due date is matched to the closest unclaimed Transaction in its
   Category (same Store, or a close amount, within three weeks). A
   Transaction pays at most one due date.
-- Matched Transactions are left out of everyday spending and out of Typical
-  month averages. The month shows them as "planned, paid", and unpaid due
+- Only Planned Expenses less frequent than monthly are set aside. A monthly
+  one (a subscription, a cleaner) is part of a typical month: its due dates
+  are tracked, but its payments count toward its Category's Target like any
+  purchase. (Amended 2026-10: monthly bills had been both in the Targets
+  set from history and added on top as planned.)
+- Matched Transactions of set-aside Planned Expenses are left out of everyday
+  spending and out of Typical month averages. The month shows them as "planned, paid", and unpaid due
   dates as "to come".
-- The forecast adds Planned Expenses to Everyday Targets month by month, and
+- The forecast adds set-aside Planned Expenses to Everyday Targets month by month, and
   the Budget shows their monthly Set-aside.
 - Likely Planned Expenses are suggested from history: one Store charging a
   similar large amount every 3, 6 or 12 months. A Member decides; nothing is

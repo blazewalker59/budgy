@@ -4,7 +4,7 @@
  */
 
 import { CADENCE_MONTHS } from './types'
-import { addMonths, daysBetween, monthsBetween } from './dates'
+import { addDays, addMonths, daysBetween, monthsBetween } from './dates'
 import { categoryOf } from './ledger'
 import type { LedgerIndex } from './ledger'
 import type { Plan, Txn } from './types'
@@ -87,4 +87,65 @@ export function plannedTxnIds(occurrences: Array<Occurrence>): Set<string> {
 export function monthlySetAside(plan: Plan): number {
   const step = CADENCE_MONTHS[plan.cadence]
   return step === 0 ? 0 : Math.round(plan.amount / step)
+}
+
+/** How far ahead a Plan counts as coming up. */
+export const COMING_UP_DAYS = 90
+
+export type PlanStatus = 'late' | 'soon' | 'later' | 'paused'
+
+export interface PlanLine {
+  plan: Plan
+  status: PlanStatus
+  /** Its next unpaid due date (a late one first); null when there's none. */
+  next: string | null
+  /** Unpaid due dates after `next` within COMING_UP_DAYS (a monthly bill's). */
+  more: number
+  lastPaid: Txn | null
+}
+
+/**
+ * Each Plan once, by when it's next due: late (due, no payment yet), coming
+ * up (within COMING_UP_DAYS), later, or paused. Soonest first in each.
+ */
+export function planLines(
+  plans: Array<Plan>,
+  occurrences: Array<Occurrence>,
+  today: string,
+): Array<PlanLine> {
+  const until = addDays(today, COMING_UP_DAYS)
+  const lines = plans.map((plan): PlanLine => {
+    const mine = occurrences.filter((o) => o.plan.id === plan.id)
+    const lastPaid =
+      [...mine].reverse().find((o) => o.paidBy && o.due <= until)?.paidBy ??
+      null
+    if (!plan.active)
+      return { plan, status: 'paused', next: null, more: 0, lastPaid }
+    // As upcoming() and the late-bill alert see it: unpaid, due from a
+    // little before today (a payment can land late); late once past due.
+    const open = mine.filter(
+      (o) => !o.paidBy && o.due >= addDays(today, -matchWindowDays(plan)),
+    )
+    const next = open[0]
+    const late = next && next.due < today
+    return {
+      plan,
+      status: late ? 'late' : next && next.due <= until ? 'soon' : 'later',
+      next: next?.due ?? null,
+      more: open.filter((o) => o !== next && o.due <= until).length,
+      lastPaid,
+    }
+  })
+  const order: Record<PlanStatus, number> = {
+    late: 0,
+    soon: 1,
+    later: 2,
+    paused: 3,
+  }
+  return lines.sort(
+    (a, b) =>
+      order[a.status] - order[b.status] ||
+      (a.next ?? '9999').localeCompare(b.next ?? '9999') ||
+      a.plan.name.localeCompare(b.plan.name),
+  )
 }

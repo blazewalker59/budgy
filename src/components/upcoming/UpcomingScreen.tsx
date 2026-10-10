@@ -1,19 +1,19 @@
 /**
- * What's ahead, on Plan: Planned Expenses on their due dates, the months
- * they make heavy, and bills from history that look like they should be
- * planned.
+ * What's ahead, on Plan: the months Planned Expenses make heavy, then each
+ * Plan once, by when it's next due (late, coming up, later, paused), to
+ * see what's coming and manage them in one place; and bills from history
+ * that look like they should be planned.
  */
 
 import { useMemo, useState } from 'react'
-import { Pause, Pencil, Play, Plus, Sparkles, Trash2 } from 'lucide-react'
+import { ChevronRight, Plus, Sparkles } from 'lucide-react'
 import type { Plan } from '@/lib/model/types'
-import type { Occurrence } from '@/lib/model/plans'
+import type { PlanLine, PlanStatus } from '@/lib/model/plans'
 import { useBook } from '@/lib/ledger/book'
 import { newPlanId, useDeletePlan, useSavePlan } from '@/lib/ledger/useLedger'
 import { forecast } from '@/lib/model/forecast'
 import { suggestPlans } from '@/lib/model/detect'
-import { upcoming } from '@/lib/model/month'
-import { monthlySetAside } from '@/lib/model/plans'
+import { COMING_UP_DAYS, monthlySetAside, planLines } from '@/lib/model/plans'
 import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
 import { dollars, parseDollars } from '@/lib/model/money'
 import { CADENCES, CADENCE_LABELS } from '@/lib/model/types'
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { ForecastChart } from '@/components/charts/lazy'
 import { Dropdown } from '@/components/shared/Dropdown'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 
 export function UpcomingScreen() {
   const book = useBook()
@@ -28,160 +29,162 @@ export function UpcomingScreen() {
     () => forecast(book.ix, book.today.slice(0, 7), 12, book.occurrences),
     [book],
   )
-  const soon = useMemo(
-    () => upcoming(book.occurrences, book.today, addDays(book.today, 90)),
+  const lines = useMemo(
+    () => planLines(book.ix.ledger.plans, book.occurrences, book.today),
     [book],
   )
   const suggestions = useMemo(() => suggestPlans(book.ix, book.today), [book])
   const [editing, setEditing] = useState<Plan | null>(null)
+  const adding =
+    editing && !book.ix.ledger.plans.some((p) => p.id === editing.id)
+  const setAside = book.ix.ledger.plans
+    .filter((p) => p.active && p.cadence !== 'monthly')
+    .reduce((n, p) => n + monthlySetAside(p), 0)
 
   return (
     <div className="space-y-3">
-      <div>
-        <h2 className="text-base font-extrabold tracking-tight">
-          Planned bills
-        </h2>
-        <p className="text-xs text-muted">
-          Big known bills, budgeted on their due dates. They stay out of monthly
-          Targets.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-extrabold tracking-tight">
+            Planned bills
+          </h2>
+          <p className="text-xs text-muted">
+            Big known bills, budgeted on their due dates. They stay out of
+            monthly Targets.
+            {setAside > 0 && (
+              <>
+                {' '}
+                Set aside{' '}
+                <strong className="text-planned">
+                  {dollars(setAside)} a month
+                </strong>
+                .
+              </>
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            setEditing({
+              id: newPlanId(),
+              name: '',
+              category: 'Insurance',
+              store: null,
+              amount: 0,
+              cadence: 'semiannual',
+              anchor: addDays(book.today, 30),
+              active: true,
+            })
+          }
+          className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-full bg-foreground px-3 text-xs font-semibold text-background"
+        >
+          <Plus size={15} aria-hidden /> Add
+        </button>
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2 lg:items-start">
-        <div className="space-y-3">
-          <Forecast months={months} />
+        <Forecast months={months} />
 
-          <section>
-            <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted">
-              Next 90 days
-            </h2>
-            <div className="overflow-hidden rounded-xl border border-border bg-surface">
-              {soon.length ? (
-                <ul className="divide-y divide-border">
-                  {soon.map((o) => (
-                    <OccurrenceRow
-                      key={`${o.plan.id}-${o.due}`}
-                      o={o}
-                      today={book.today}
-                    />
-                  ))}
+        <div className="space-y-3">
+          {adding && (
+            <PlanForm plan={editing} onDone={() => setEditing(null)} />
+          )}
+          {GROUPS.map((g) => {
+            const list = lines.filter((l) => l.status === g.status)
+            if (!list.length) return null
+            return (
+              <section key={g.status}>
+                <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
+                  {g.title}{' '}
+                  <span className="ml-1 font-normal tracking-normal normal-case">
+                    {g.hint}
+                  </span>
+                </h3>
+                <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+                  {list.map((l) =>
+                    editing?.id === l.plan.id ? (
+                      <li key={l.plan.id} className="p-2">
+                        <PlanForm
+                          plan={editing}
+                          onDone={() => setEditing(null)}
+                        />
+                      </li>
+                    ) : (
+                      <PlanRow
+                        key={l.plan.id}
+                        line={l}
+                        today={book.today}
+                        onEdit={() => setEditing(l.plan)}
+                      />
+                    ),
+                  )}
                 </ul>
-              ) : (
-                <p className="px-3 py-2 text-sm text-muted">
-                  Nothing planned in the next 90 days.
-                </p>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-3">
-          <section>
-            <div className="mb-1 flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
-                Planned bills
-              </h2>
-              <button
-                type="button"
-                onClick={() =>
-                  setEditing({
-                    id: newPlanId(),
-                    name: '',
-                    category: 'Insurance',
-                    store: null,
-                    amount: 0,
-                    cadence: 'semiannual',
-                    anchor: addDays(book.today, 30),
-                    active: true,
-                  })
-                }
-                className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background"
-              >
-                <Plus size={15} aria-hidden /> Add
-              </button>
-            </div>
-            {editing &&
-              !book.ix.ledger.plans.some((p) => p.id === editing.id) && (
-                <PlanForm plan={editing} onDone={() => setEditing(null)} />
-              )}
-            <div className="space-y-2">
-              {book.ix.ledger.plans.map((p) =>
-                editing?.id === p.id ? (
-                  <PlanForm
-                    key={p.id}
-                    plan={editing}
-                    onDone={() => setEditing(null)}
-                  />
-                ) : (
-                  <PlanCard key={p.id} plan={p} onEdit={() => setEditing(p)} />
-                ),
-              )}
-              {!book.ix.ledger.plans.length && !editing && (
-                <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
-                  No planned bills yet. Tap <strong>Add</strong> or pick a
-                  suggestion below.
-                </p>
-              )}
-            </div>
-          </section>
+              </section>
+            )
+          })}
+          {!lines.length && !adding && (
+            <p className="rounded-xl border border-dashed border-border px-3 py-2 text-sm text-muted">
+              No planned bills yet. Tap <strong>Add</strong> or pick a
+              suggestion below.
+            </p>
+          )}
 
           {suggestions.length > 0 && (
             <section>
-              <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-muted">
-                <Sparkles size={18} className="text-planned" aria-hidden />
+              <h3 className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
+                <Sparkles size={14} className="text-planned" aria-hidden />
                 Looks like a planned bill
-              </h2>
+              </h3>
               <p className="mb-1 text-xs text-muted">
                 Big charges from the same store every few months.
               </p>
-              <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                <ul className="divide-y divide-border">
-                  {suggestions.map((s) => (
-                    <li
-                      key={`${s.category}-${s.store}`}
-                      className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[13px]"
+              <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+                {suggestions.map((s) => (
+                  <li
+                    key={`${s.category}-${s.store}`}
+                    className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 text-[13px]"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        {s.store}{' '}
+                        <span className="font-normal text-muted">
+                          · {s.category}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted">
+                        {CADENCE_LABELS[s.cadence]}:{' '}
+                        {s.charges
+                          .slice(-4)
+                          .map(
+                            (c) =>
+                              `${dollars(c.amount)} ${monthLabel(c.month)}`,
+                          )
+                          .join(', ')}
+                        . Next about {dayLabel(s.nextDue)}.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditing({
+                          id: newPlanId(),
+                          name: s.store,
+                          category: s.category,
+                          store: s.store,
+                          amount: s.amount,
+                          cadence: s.cadence,
+                          anchor: s.nextDue,
+                          active: true,
+                        })
+                      }
+                      className="min-h-9 rounded-full border border-border px-3 text-xs font-semibold"
                     >
-                      <div className="min-w-0">
-                        <p className="font-semibold">
-                          {s.store}{' '}
-                          <span className="font-normal text-muted">
-                            · {s.category}
-                          </span>
-                        </p>
-                        <p className="text-xs text-muted">
-                          {CADENCE_LABELS[s.cadence]}:{' '}
-                          {s.charges
-                            .slice(-4)
-                            .map(
-                              (c) =>
-                                `${dollars(c.amount)} ${monthLabel(c.month)}`,
-                            )
-                            .join(', ')}
-                          . Next about {dayLabel(s.nextDue)}.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setEditing({
-                            id: newPlanId(),
-                            name: s.store,
-                            category: s.category,
-                            store: s.store,
-                            amount: s.amount,
-                            cadence: s.cadence,
-                            anchor: s.nextDue,
-                            active: true,
-                          })
-                        }
-                        className="rounded-full border border-border px-2.5 py-0.5 text-xs font-semibold"
-                      >
-                        Plan for it
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                      Plan for it
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
         </div>
@@ -190,14 +193,85 @@ export function UpcomingScreen() {
   )
 }
 
+const GROUPS: ReadonlyArray<{
+  status: PlanStatus
+  title: string
+  hint: string
+}> = [
+  { status: 'late', title: 'Late', hint: 'due, no payment yet' },
+  { status: 'soon', title: 'Coming up', hint: `next ${COMING_UP_DAYS} days` },
+  { status: 'later', title: 'Later', hint: '' },
+  { status: 'paused', title: 'Paused', hint: 'not budgeted' },
+]
+
+/** One Plan: what it is and costs, and when it's next due. Tap to edit. */
+function PlanRow({
+  line: { plan, status, next, more, lastPaid },
+  today,
+  onEdit,
+}: {
+  line: PlanLine
+  today: string
+  onEdit: () => void
+}) {
+  const aside = plan.cadence !== 'monthly' ? monthlySetAside(plan) : 0
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onEdit}
+        aria-label={`Edit ${plan.name}`}
+        className={cn(
+          'flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left text-[13px] hover:bg-sunken',
+          status === 'paused' && 'opacity-60',
+        )}
+      >
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-semibold">
+            {plan.name}{' '}
+            <span className="font-normal text-muted">· {plan.category}</span>
+          </span>
+          <span className="block text-xs text-muted">
+            {dollars(plan.amount)} {CADENCE_LABELS[plan.cadence].toLowerCase()}
+            {aside > 0 && (
+              <span className="text-planned"> · {dollars(aside)}/mo</span>
+            )}
+            {lastPaid &&
+              ` · paid ${dollars(lastPaid.amount)} ${dayLabel(lastPaid.date)}`}
+          </span>
+        </span>
+        {next && (
+          <span className="shrink-0 text-right">
+            <span className="block font-semibold">{dayLabel(next)}</span>
+            <span
+              className={cn(
+                'block text-xs',
+                status === 'late'
+                  ? 'font-semibold text-over'
+                  : status === 'soon'
+                    ? 'text-planned'
+                    : 'text-muted',
+              )}
+            >
+              {relativeDays(today, next)}
+              {more > 0 && ` · +${more} more`}
+            </span>
+          </span>
+        )}
+        <ChevronRight size={14} className="shrink-0 text-muted" aria-hidden />
+      </button>
+    </li>
+  )
+}
+
 function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
   const [open, setOpen] = useState<string | null>(null)
   const opened = months.find((m) => m.month === open)
   return (
     <section>
-      <h2 className="mb-1 text-sm font-bold uppercase tracking-wide text-muted">
+      <h3 className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">
         Next 12 months
-      </h2>
+      </h3>
       <ForecastChart months={months} onSelect={setOpen} />
       {opened && (
         <div className="mt-1 rounded-xl border border-border bg-surface px-3 py-2 text-[13px]">
@@ -222,113 +296,12 @@ function Forecast({ months }: { months: ReturnType<typeof forecast> }) {
   )
 }
 
-function OccurrenceRow({ o, today }: { o: Occurrence; today: string }) {
-  const late = o.due < today
-  return (
-    <li className="flex items-center justify-between gap-3 px-3 py-1.5">
-      <div className="min-w-0">
-        <p className="truncate font-semibold">{o.plan.name}</p>
-        <p className="text-xs text-muted">
-          {o.plan.category} · {dayLabel(o.due)}
-        </p>
-      </div>
-      <div className="text-right">
-        <p className="font-bold">{dollars(o.plan.amount)}</p>
-        <p
-          className={cn(
-            'text-sm font-medium',
-            late ? 'text-over' : 'text-planned',
-          )}
-        >
-          {late
-            ? `due ${relativeDays(today, o.due)}, no payment yet`
-            : relativeDays(today, o.due)}
-        </p>
-      </div>
-    </li>
-  )
-}
-
-function PlanCard({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
-  const book = useBook()
-  const save = useSavePlan()
-  const remove = useDeletePlan()
-  const mine = book.occurrences.filter((o) => o.plan.id === plan.id)
-  const next = mine.find((o) => !o.paidBy && o.due >= book.today)
-  const lastPaid = [...mine].reverse().find((o) => o.paidBy)?.paidBy
-  return (
-    <div
-      className={cn(
-        'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-1.5',
-        !plan.active && 'opacity-60',
-      )}
-    >
-      <div className="min-w-0">
-        <p className="font-semibold">
-          {plan.name}{' '}
-          <span className="font-normal text-muted">· {plan.category}</span>
-        </p>
-        <p className="text-xs text-muted">
-          {dollars(plan.amount)} {CADENCE_LABELS[plan.cadence].toLowerCase()}
-          {next
-            ? ` · next ${dayLabel(next.due)} (${relativeDays(book.today, next.due)})`
-            : ''}
-          {lastPaid
-            ? ` · last paid ${dollars(lastPaid.amount)} ${dayLabel(lastPaid.date)}`
-            : ''}
-        </p>
-        {monthlySetAside(plan) > 0 && plan.cadence !== 'monthly' && (
-          <p className="text-xs text-planned">
-            Set aside {dollars(monthlySetAside(plan))} a month
-          </p>
-        )}
-      </div>
-      <div className="flex gap-1">
-        <IconButton label="Edit" onClick={onEdit}>
-          <Pencil size={16} />
-        </IconButton>
-        <IconButton
-          label={plan.active ? 'Pause' : 'Resume'}
-          onClick={() => save.mutate({ ...plan, active: !plan.active })}
-        >
-          {plan.active ? <Pause size={16} /> : <Play size={16} />}
-        </IconButton>
-        <IconButton
-          label="Delete"
-          onClick={() => remove.mutate({ id: plan.id })}
-        >
-          <Trash2 size={16} />
-        </IconButton>
-      </div>
-    </div>
-  )
-}
-
-function IconButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground"
-    >
-      {children}
-    </button>
-  )
-}
-
 function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
   const { ix } = useBook()
   const save = useSavePlan()
+  const remove = useDeletePlan()
+  const existing = ix.ledger.plans.some((p) => p.id === plan.id)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [draft, setDraft] = useState(plan)
   const [amount, setAmount] = useState(
     plan.amount ? String(plan.amount / 100) : '',
@@ -419,18 +392,58 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
           ))}
         </datalist>
       </Field>
-      <div className="flex justify-end gap-2 sm:col-span-2">
+      {confirmDelete && (
+        <div className="sm:col-span-2">
+          <ConfirmPanel
+            question={`Delete ${plan.name}?`}
+            detail="Its payments stay in Spending, counted as everyday spending again."
+            action="Delete"
+            onConfirm={() => {
+              remove.mutate({ id: plan.id })
+              onDone()
+            }}
+            onCancel={() => setConfirmDelete(false)}
+          />
+        </div>
+      )}
+      <div
+        className={cn(
+          'flex flex-wrap items-center justify-end gap-2 sm:col-span-2',
+          confirmDelete && 'hidden',
+        )}
+      >
+        {existing && (
+          <span className="mr-auto flex gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                save.mutate({ ...plan, active: !plan.active })
+                onDone()
+              }}
+              className="min-h-9 rounded-full bg-sunken px-3 text-xs font-semibold"
+            >
+              {plan.active ? 'Pause' : 'Resume'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="min-h-9 rounded-full px-3 text-xs font-semibold text-over"
+            >
+              Delete
+            </button>
+          </span>
+        )}
         <button
           type="button"
           onClick={onDone}
-          className="rounded-full px-4 py-1.5 text-sm font-medium text-muted"
+          className="min-h-9 rounded-full px-4 text-sm font-medium text-muted"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={!valid}
-          className="rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background disabled:opacity-40"
+          className="min-h-9 rounded-full bg-foreground px-4 text-xs font-semibold text-background disabled:opacity-40"
         >
           Save
         </button>

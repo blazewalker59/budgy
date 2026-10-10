@@ -4,6 +4,7 @@ import { indexLedger } from '@/lib/model/ledger'
 import {
   dueDates,
   monthlySetAside,
+  planLines,
   plannedTxnIds,
   schedule,
 } from '@/lib/model/plans'
@@ -101,5 +102,71 @@ describe('schedule', () => {
       monthlySetAside(plan({ amount: 120_000, cadence: 'semiannual' })),
     ).toBe(20_000)
     expect(monthlySetAside(plan({ cadence: 'once' }))).toBe(0)
+  })
+})
+
+describe('planLines', () => {
+  const today = '2026-10-10'
+  const lines = (plans: Array<ReturnType<typeof plan>>, txns = []) => {
+    const ix = indexLedger(ledger({ plans, txns }))
+    return planLines(plans, schedule(ix, '2026-01-01', '2027-12-31'), today)
+  }
+
+  it('puts each Plan once by when it’s next due: late, coming up, later, paused', () => {
+    const out = lines([
+      plan({ id: 'far', name: 'Far', anchor: '2027-04-01', cadence: 'annual' }),
+      plan({
+        id: 'late',
+        name: 'Late',
+        anchor: '2026-10-05',
+        cadence: 'annual',
+      }),
+      plan({
+        id: 'soon',
+        name: 'Soon',
+        anchor: '2026-11-01',
+        cadence: 'annual',
+      }),
+      plan({
+        id: 'off',
+        name: 'Off',
+        anchor: '2026-10-20',
+        cadence: 'annual',
+        active: false,
+      }),
+    ])
+    expect(out.map((l) => [l.plan.id, l.status, l.next])).toEqual([
+      ['late', 'late', '2026-10-05'],
+      ['soon', 'soon', '2026-11-01'],
+      ['far', 'later', '2027-04-01'],
+      ['off', 'paused', null],
+    ])
+  })
+
+  it('counts a monthly bill’s other due dates coming up', () => {
+    const [l] = lines([
+      plan({ id: 'm', anchor: '2026-10-15', cadence: 'monthly' }),
+    ])
+    expect(l).toMatchObject({ status: 'soon', next: '2026-10-15', more: 2 })
+  })
+
+  it('moves past a due date that’s paid, and remembers the payment', () => {
+    const p = plan({
+      id: 'ins',
+      name: 'Insurance',
+      category: 'Insurance',
+      store: null,
+      amount: 60_000,
+      anchor: '2026-10-05',
+      cadence: 'semiannual',
+    })
+    const paid = txn({
+      date: '2026-10-04',
+      amount: 60_000,
+      sourceCategory: 'Insurance',
+    })
+    const [l] = lines([p], [paid] as never)
+    expect(l).toMatchObject({ status: 'later', next: '2027-04-05' })
+    expect(l.lastPaid?.id).toBe(paid.id)
   })
 })

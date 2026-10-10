@@ -37,6 +37,8 @@ jobs:
         run: bun run check
       - name: Type check
         run: bun run typecheck
+      - name: Check migrations
+        run: bun run db:check
       - name: Build
         run: bun run build
       - name: Upload build artifact

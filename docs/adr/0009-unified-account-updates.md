@@ -53,14 +53,18 @@ create multiple inconsistent update experiences.
   retries/reconnections. Plain MCP posts don't claim connector identity.
 - Different source IDs on the same Account/day for the same amount remain
   separate purchases. A known source ID may update its date, amount and
-  description without changing its ID, Move, note or source Category.
+  description without changing its ID, Store, Move, note or source Category.
 - A previously unidentified purchase may acquire a source ID only when there
   is exactly one unused date/amount/normalized-Store match. It keeps its ID and
   filing and becomes owned by an Account import, not removable starting data.
   Ambiguous matches and possible posting-date shifts are held for review, with
   details in the receipt. They are
-  neither arbitrarily paired nor added again. Resolving such ambiguity is part
-  of the connector review UX to come.
+  neither arbitrarily paired nor added again.
+- A connector purchase the bank names differently from an upload's ("ACH PMT
+  NEWREZ-SHELLPOINT" beside "Shellpoint") is added, then offered on Accounts →
+  Updates as a possible duplicate: same Account and amount, within three days.
+  A Member merges it (the upload's purchase keeps its ID, Store and filing and
+  takes the source ID) or keeps both, remembered per Household. Never guessed.
 - Export rows lacking bank IDs retain deterministic occurrence-based IDs and
   one-to-one matching. Date/amount alone no longer collapses purchases from
   unrelated stores. Overlapping exports should include complete date ranges;

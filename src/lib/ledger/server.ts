@@ -14,6 +14,7 @@ import {
   noteTransaction,
 } from './queries'
 import { RULES_KEY, loadImportRules } from './importer'
+import { keepBoth, mergeDuplicate } from './duplicates'
 import {
   clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
@@ -415,6 +416,21 @@ export const removeStartingPurchases = createServerFn({ method: 'POST' })
   .handler(({ data }) =>
     withMember(({ db }) => removeStarting(db, data.account)),
   )
+
+const pairInput = z.object({
+  synced: z.string().min(1).max(16),
+  other: z.string().min(1).max(16),
+})
+
+/** A possible duplicate: the synced one merges into the one already here. */
+export const mergeDuplicatePair = createServerFn({ method: 'POST' })
+  .validator((data: { synced: string; other: string }) => pairInput.parse(data))
+  .handler(({ data }) => withMember(({ db }) => mergeDuplicate(db, data)))
+
+/** A possible duplicate that isn't one: keep both, and stop asking. */
+export const keepDuplicatePair = createServerFn({ method: 'POST' })
+  .validator((data: { synced: string; other: string }) => pairInput.parse(data))
+  .handler(({ data }) => withMember(({ db }) => keepBoth(db, data)))
 
 export const getImportRules = createServerFn({ method: 'GET' }).handler(() =>
   withMember(({ db }) => loadImportRules(db)),

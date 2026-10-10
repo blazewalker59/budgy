@@ -44,7 +44,6 @@ export async function prepareIdentified(input: {
     date: string
     amount: number
     description: string
-    store: string
   }> = []
   const keys = new Map<string, string>()
   const conflicts: Array<{
@@ -87,13 +86,14 @@ export async function prepareIdentified(input: {
         previous.amount !== Math.round(row.amount * 100) ||
         previous.description !== row.description
       ) {
+        // The bank's text, not its Store: Store Rules file by the name
+        // it was first given, which a merged upload's purchase keeps.
         changes.push({
           id: previous.id,
           sourceKey,
           date: row.date,
           amount: Math.round(row.amount * 100),
           description: row.description,
-          store: storeName(row.description, input.rules),
         })
       } else prepared.alreadyHad++
       continue

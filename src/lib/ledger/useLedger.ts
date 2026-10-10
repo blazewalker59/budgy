@@ -14,6 +14,8 @@ import {
   deletePlan,
   getLedger,
   getSession,
+  keepDuplicatePair,
+  mergeDuplicatePair,
   moveTxn,
   noteTxn,
   recordBalances,
@@ -39,6 +41,7 @@ import type {
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
+import { pairKey } from '@/lib/model/duplicates'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -271,6 +274,38 @@ export function useRemoveStarting() {
           !t.starting || (v.account !== undefined && t.account !== v.account),
       ),
     }),
+  )
+}
+
+/** The synced one goes; the one already here keeps its filing. */
+export function useMergeDuplicate() {
+  return useEdit(
+    (v: { synced: string; other: string }) => mergeDuplicatePair({ data: v }),
+    (l, v) => {
+      const synced = l.txns.find((t) => t.id === v.synced)
+      return {
+        ...l,
+        txns: l.txns
+          .filter((t) => t.id !== v.synced)
+          .map((t) =>
+            t.id === v.other
+              ? {
+                  ...t,
+                  synced: true,
+                  category: t.category ?? synced?.category ?? null,
+                  note: t.note ?? synced?.note ?? null,
+                }
+              : t,
+          ),
+      }
+    },
+  )
+}
+
+export function useKeepDuplicate() {
+  return useEdit(
+    (v: { synced: string; other: string }) => keepDuplicatePair({ data: v }),
+    (l, v) => ({ ...l, kept: [...l.kept, pairKey(v.synced, v.other)] }),
   )
 }
 

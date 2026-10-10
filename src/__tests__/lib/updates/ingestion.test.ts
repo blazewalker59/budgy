@@ -23,6 +23,9 @@ import {
 import { listAccountUpdates } from '@/lib/updates/queries'
 import { acquireUpdate, releaseUpdate } from '@/lib/updates/receipts'
 import { ingestAccountExport } from '@/lib/updates/ingest'
+import { keepBoth, mergeDuplicate } from '@/lib/ledger/duplicates'
+import { possibleDuplicates } from '@/lib/model/duplicates'
+import { indexLedger } from '@/lib/model/ledger'
 
 const open: Array<DatabaseSync> = []
 afterEach(() => {
@@ -382,5 +385,92 @@ describe('Unified account ingestion', () => {
     expect((await listAccountUpdates(b))[0].success?.status).toBe('succeeded')
     expect(await db.select().from(accountUpdates)).toHaveLength(1)
     expect(await db.select().from(transactions)).toHaveLength(0)
+  })
+})
+
+describe('Possible duplicates from a bank sync', () => {
+  const uploaded = {
+    date: '2026-10-01',
+    description: 'Shellpoint',
+    amount: 2100,
+  }
+  const fromBank = {
+    ...uploaded,
+    description: 'ACH PMT NEWREZ-SHELLPOINT',
+    sourceId: 'bank-1',
+  }
+  const sync = { ...post(), sourceNamespace: 'simplefin:acct' }
+
+  it('adds a purchase the bank names differently, and offers it for review', async () => {
+    const { a } = await fixture()
+    await postTransactions(a, { ...post(), rows: [uploaded] })
+    expect(
+      await postTransactions(a, { ...sync, rows: [fromBank] }),
+    ).toMatchObject({ added: 1, linked: 0 })
+    const pairs = possibleDuplicates(indexLedger(await loadLedger(a)))
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].other.store).toBe('Shellpoint')
+    expect(pairs[0].synced.synced).toBe(true)
+  })
+
+  it('merges into the one already here, keeping its Store and filing, and never re-adds it', async () => {
+    const { a } = await fixture()
+    await postTransactions(a, { ...post(), rows: [uploaded] })
+    const id = (await loadLedger(a)).txns[0].id
+    await moveTransaction(a, id, 'Housing')
+    await postTransactions(a, { ...sync, rows: [fromBank] })
+    const synced = (await loadLedger(a)).txns.find((t) => t.id !== id)!
+    await noteTransaction(a, synced.id, 'October')
+
+    await mergeDuplicate(a, { synced: synced.id, other: id })
+    const after = await loadLedger(a)
+    expect(after.txns).toEqual([
+      expect.objectContaining({
+        id,
+        store: 'Shellpoint',
+        category: 'Housing',
+        note: 'October',
+        synced: true,
+      }),
+    ])
+    // The next sync knows it by the bank's ID: nothing added, Store kept.
+    expect(
+      await postTransactions(a, { ...sync, rows: [fromBank] }),
+    ).toMatchObject({ added: 0, updated: 1 })
+    expect((await loadLedger(a)).txns).toEqual([
+      expect.objectContaining({
+        id,
+        store: 'Shellpoint',
+        description: 'ACH PMT NEWREZ-SHELLPOINT',
+      }),
+    ])
+  })
+
+  it('keeps both when asked, and stops offering them', async () => {
+    const { a, b } = await fixture()
+    await postTransactions(a, { ...post(), rows: [uploaded] })
+    await postTransactions(a, { ...sync, rows: [fromBank] })
+    const [pair] = possibleDuplicates(indexLedger(await loadLedger(a)))
+    const ids = { synced: pair.synced.id, other: pair.other.id }
+    await keepBoth(a, ids)
+    await keepBoth(a, ids)
+    const after = await loadLedger(a)
+    expect(after.kept).toEqual([pair.key])
+    expect(after.txns).toHaveLength(2)
+    expect(possibleDuplicates(indexLedger(after))).toEqual([])
+    expect((await loadLedger(b)).kept).toEqual([])
+  })
+
+  it('refuses to merge two purchases that aren’t a synced one and another', async () => {
+    const { a } = await fixture()
+    await postTransactions(a, {
+      ...post(),
+      rows: [uploaded, { ...uploaded, description: 'Other' }],
+    })
+    const [x, y] = (await loadLedger(a)).txns
+    await expect(
+      mergeDuplicate(a, { synced: x.id, other: y.id }),
+    ).rejects.toThrow('can’t be merged')
+    expect((await loadLedger(a)).txns).toHaveLength(2)
   })
 })

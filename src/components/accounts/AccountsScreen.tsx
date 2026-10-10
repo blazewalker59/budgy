@@ -15,6 +15,7 @@ import { RulesTab } from './RulesTab'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
+import { Duplicates } from '@/components/accounts/Duplicates'
 import { filtersOf } from '@/lib/model/lens'
 import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
@@ -90,7 +91,10 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
       {tab === 'rules' ? (
         <RulesTab />
       ) : tab === 'updates' ? (
-        <AccountUpdates />
+        <>
+          <Duplicates />
+          <AccountUpdates />
+        </>
       ) : (
         <AccountsList lens={lens} />
       )}

@@ -122,6 +122,8 @@ export interface Txn {
    * Account's own upload replaces it.
    */
   starting?: boolean
+  /** Came from a bank sync, which knows it by its own ID. */
+  synced?: boolean
 }
 
 /** How often a paycheck comes. */
@@ -199,4 +201,6 @@ export interface Ledger {
   rules: Array<StoreRule>
   targets: Array<Target>
   plans: Array<Plan>
+  /** Possible duplicates a Member kept both of (`pairKey`s). */
+  kept: Array<string>
 }

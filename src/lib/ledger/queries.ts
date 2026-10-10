@@ -16,6 +16,7 @@ import {
   paySchedules,
   plannedExpenses,
   savedLenses,
+  settings,
   storeRules,
   transactions,
 } from '@/lib/db/schema'
@@ -25,7 +26,7 @@ import { readLens } from '@/lib/model/lens'
 
 /** Every row of the Ledger, as the browser and the tools read it. */
 export async function loadLedger(db: Database): Promise<Ledger> {
-  const [cats, accts, txns, pay, rules, targets, plans, held, lenses] =
+  const [cats, accts, txns, pay, rules, targets, plans, held, lenses, kept] =
     await Promise.all([
       db.select().from(categories).where(inHousehold(db, categories)),
       db.select().from(accounts).where(inHousehold(db, accounts)),
@@ -42,6 +43,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
           category: transactions.category,
           note: transactions.note,
           starting: sql<number>`${imports.account} is null`,
+          synced: sql<number>`${transactions.sourceKey} is not null`,
         })
         .from(transactions)
         .leftJoin(
@@ -83,6 +85,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
         .from(savedLenses)
         .where(inHousehold(db, savedLenses))
         .orderBy(savedLenses.name),
+      loadKept(db),
     ])
   return {
     categories: cats.map(({ name, tag, group }) => ({ name, tag, group })),
@@ -102,9 +105,11 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       ...l,
       lens: readLens(l.lens as Record<string, unknown>),
     })),
-    txns: txns.map(({ starting, ...t }) =>
-      starting ? { ...t, starting: true } : t,
-    ),
+    txns: txns.map(({ starting, synced, ...t }) => ({
+      ...t,
+      ...(starting ? { starting: true } : {}),
+      ...(synced ? { synced: true } : {}),
+    })),
     pay: pay.map(({ id, name, amount, cadence, anchor, secondDay }) => ({
       id,
       name,
@@ -127,7 +132,21 @@ export async function loadLedger(db: Database): Promise<Ledger> {
         active,
       }),
     ),
+    kept,
   }
+}
+
+/** Where the possible duplicates a Member kept both of are remembered. */
+export const KEPT_KEY = 'kept-duplicates'
+
+export async function loadKept(db: Database): Promise<Array<string>> {
+  const row = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(inHousehold(db, settings, eq(settings.key, KEPT_KEY)))
+    .get()
+  const kept: unknown = row ? JSON.parse(row.value) : []
+  return Array.isArray(kept) ? kept.filter((k) => typeof k === 'string') : []
 }
 
 /** A Category named in an edit exists from then on. */

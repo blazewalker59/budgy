@@ -13,6 +13,7 @@ import {
   relativeDays,
 } from './dates'
 import { coverageGaps } from './coverage'
+import { possibleDuplicates } from './duplicates'
 import { categoryOf, ownerOf } from './ledger'
 import { monthView, upcoming } from './month'
 import { dollars } from './money'
@@ -27,6 +28,7 @@ export type AlertKind =
   | 'bill-late'
   | 'large-purchase'
   | 'missing-imports'
+  | 'possible-duplicates'
 
 export type Severity = 'high' | 'medium' | 'info'
 
@@ -149,6 +151,19 @@ export function budgetAlerts(
       severity: 'medium',
       title: `${g.account} looks out of date`,
       detail: `Nothing imported after ${g.last ? dayLabel(g.last) : 'the start of the month'}, so recent spending is undercounted. Import a newer export.`,
+    })
+
+  const duplicates = possibleDuplicates(ix).length
+  if (duplicates)
+    out.push({
+      kind: 'possible-duplicates',
+      severity: 'medium',
+      title:
+        duplicates === 1
+          ? 'A synced purchase may be a duplicate'
+          : `${duplicates} synced purchases may be duplicates`,
+      detail:
+        'A bank sync added purchases that look like ones already here under another name, so spending may be counted twice. Merge or keep them on Accounts → Updates.',
     })
 
   return out.sort(

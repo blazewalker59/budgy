@@ -1,12 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { validateLensSearch } from '@/lib/ledger/search'
+import { validatePlanSearch } from '@/lib/ledger/search'
 import { PlanScreen } from '@/components/budget/PlanScreen'
 
 export const Route = createFileRoute('/plan')({
-  validateSearch: validateLensSearch,
+  validateSearch: validatePlanSearch,
   component: PlanRoute,
 })
 
 function PlanRoute() {
-  return <PlanScreen lens={Route.useSearch()} />
+  const { tab, ...lens } = Route.useSearch()
+  return <PlanScreen lens={lens} tab={tab ?? 'budget'} />
 }

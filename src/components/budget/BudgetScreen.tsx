@@ -202,7 +202,7 @@ export function BudgetScreen({ owner }: { owner?: string }) {
 
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <p className="min-w-0 text-[11px] text-muted">
-          Typical = {windowLabel} average, without planned bills
+          Typical = {windowLabel} average, without set-aside bills
           {gaps.length > 0 && (
             <span
               className="ml-1 inline-flex items-center gap-0.5 text-nice"

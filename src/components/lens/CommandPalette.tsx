@@ -20,6 +20,7 @@ import {
 import { createPortal } from 'react-dom'
 import {
   Bot,
+  CalendarClock,
   CircleDollarSign,
   CornerDownLeft,
   Filter,
@@ -296,7 +297,14 @@ function Palette({
         'Plan',
         '/plan',
         <LayoutList size={I} />,
-        'budget targets take-home pay planned bills upcoming forecast',
+        'budget targets take-home pay',
+      ),
+      go(
+        'bills',
+        'Planned bills',
+        '/upcoming',
+        <CalendarClock size={I} />,
+        'plan bills upcoming forecast subscriptions due',
       ),
       go(
         'accounts',

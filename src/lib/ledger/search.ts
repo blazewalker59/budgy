@@ -45,6 +45,17 @@ export function validateOverviewSearch(
   return out
 }
 
+export interface PlanSearch extends Lens {
+  /** Planned bills, instead of the Budget. */
+  tab?: 'bills'
+}
+
+export function validatePlanSearch(s: Record<string, unknown>): PlanSearch {
+  const out: PlanSearch = validateLensSearch(s)
+  if (s.tab === 'bills') out.tab = s.tab
+  return out
+}
+
 export function validateAccountsSearch(
   s: Record<string, unknown>,
 ): AccountsSearch {

@@ -1,8 +1,8 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-/** Upcoming is part of Plan now; old links and installed shortcuts land there. */
+/** Upcoming is Plan's Bills tab now; old links and shortcuts land there. */
 export const Route = createFileRoute('/upcoming')({
   beforeLoad: () => {
-    throw redirect({ to: '/plan' })
+    throw redirect({ to: '/plan', search: { tab: 'bills' } })
   },
 })

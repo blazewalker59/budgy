@@ -8,7 +8,7 @@
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { readBridge } from './connections'
 import { isSpending } from './exports'
-import type { SimplefinAccount } from './simplefinClient'
+import type { SimplefinTransaction } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { PostedRow } from '@/lib/import/posted'
 import { dbFromD1 } from '@/lib/db'
@@ -41,16 +41,16 @@ const day = (seconds: number) => dateOn(new Date(seconds * 1000))
 
 /** A posted SimpleFIN transaction as a purchase row, or null if it isn't one. */
 export function purchaseRow(
-  t: NonNullable<SimplefinAccount['transactions']>[number],
+  t: SimplefinTransaction,
   debt: boolean,
 ): PostedRow | 'excluded' | null {
-  if (t.pending || t.posted === 0) return null
+  if (t.pending || !t.posted) return null
   // SimpleFIN amounts are negative for money out; Budgy's are positive.
   const cents = -Math.round(Number(t.amount) * 100)
-  const description = t.description.trim().slice(0, 200) || 'Unnamed purchase'
+  const description = t.description.slice(0, 200) || 'Unnamed purchase'
   if (!isSpending(cents, description, '', debt)) return 'excluded'
   return {
-    date: day(t.transacted_at ?? t.posted),
+    date: day(t.transactedAt ?? t.posted),
     description,
     amount: cents / 100,
     sourceId: t.id,
@@ -118,7 +118,7 @@ export async function syncConnection(
       if (SPENDING_KINDS.includes(account.kind)) {
         const rows: Array<PostedRow> = []
         let excluded = 0
-        for (const t of source.transactions ?? []) {
+        for (const t of source.transactions) {
           const row = purchaseRow(t, debt)
           if (row === 'excluded') excluded++
           else if (row) rows.push(row)
@@ -142,7 +142,7 @@ export async function syncConnection(
         [
           {
             account: account.name,
-            date: day(source['balance-date']),
+            date: source.balanceDate ? day(source.balanceDate) : until,
             amount: debt ? -cents : cents,
           },
         ],

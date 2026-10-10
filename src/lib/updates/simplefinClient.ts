@@ -91,39 +91,112 @@ export async function claimSimplefin(
   }
 }
 
-const timestamp = z.number().int().min(0).max(4_102_444_800)
+/** Optional fields may be missing or null; both mean absent. */
+const maybe = <T extends z.ZodType>(type: T) =>
+  type.nullish().transform((value) => value ?? undefined)
+const timestamp = z.number().min(0).max(4_102_444_800).transform(Math.floor)
 const numeric = z
-  .string()
-  .regex(/^-?\d+(\.\d+)?$/)
-  .max(40)
-const text = z.string().min(1).max(200)
+  .union([z.string(), z.number()])
+  .transform((value) => String(value).trim())
+  .pipe(
+    z
+      .string()
+      .regex(/^[+-]?\d+(\.\d+)?$/)
+      .max(40),
+  )
+const label = maybe(z.string().max(1000))
 const transaction = z.object({
-  id: text,
-  posted: timestamp,
+  id: z.string().min(1).max(200),
+  posted: maybe(timestamp),
   amount: numeric,
-  description: z.string().max(400),
-  pending: z.boolean().optional(),
-  transacted_at: timestamp.optional(),
+  description: label,
+  payee: label,
+  memo: label,
+  pending: maybe(z.boolean()),
+  transacted_at: maybe(timestamp),
 })
 const providerAccount = z.object({
-  id: text,
-  name: text,
-  org: z
-    .object({
-      domain: z.string().max(200).optional(),
-      name: z.string().max(200).optional(),
-    })
-    .refine((org) => org.domain || org.name),
-  currency: text,
+  id: z.string().min(1).max(200),
+  name: label,
+  /** Protocol 1: the institution, on each account. */
+  org: maybe(z.object({ domain: label, name: label })),
+  /** Protocol 2: a key into the response's `connections`. */
+  conn_id: label,
+  currency: maybe(z.string().max(2048)),
   balance: numeric,
-  'balance-date': timestamp,
-  transactions: z.array(transaction).max(20_000).optional(),
+  'balance-date': maybe(timestamp),
+  transactions: maybe(z.array(transaction).max(20_000)),
 })
 const accountSet = z.object({
-  errors: z.array(z.string().max(1000)).max(100).default([]),
-  accounts: z.array(providerAccount).max(100),
+  errors: maybe(z.array(z.unknown()).max(1000)),
+  errlist: maybe(z.array(z.unknown()).max(1000)),
+  connections: maybe(
+    z
+      .array(
+        z.object({
+          conn_id: label,
+          name: label,
+          org_name: label,
+          org_url: label,
+        }),
+      )
+      .max(1000),
+  ),
+  accounts: z.array(providerAccount).max(500),
 })
-export type SimplefinAccount = z.infer<typeof providerAccount>
+
+/** One account as Budgy uses it, whichever protocol version Bridge spoke. */
+export interface SimplefinAccount {
+  id: string
+  name: string
+  institution: string
+  currency: string
+  /** Decimal string, as Bridge sent it: negative for what's owed. */
+  balance: string
+  /** Unix seconds; null when Bridge didn't say. */
+  balanceDate: number | null
+  transactions: Array<SimplefinTransaction>
+}
+export interface SimplefinTransaction {
+  id: string
+  /** Unix seconds; 0 or null while pending. */
+  posted: number | null
+  transactedAt: number | null
+  /** Decimal string: negative for money out. */
+  amount: string
+  description: string
+  pending: boolean
+}
+
+function normalize(set: z.infer<typeof accountSet>): Array<SimplefinAccount> {
+  const connections = new Map(
+    (set.connections ?? []).map((c) => [c.conn_id, c]),
+  )
+  return set.accounts.map((a) => {
+    const connection = a.conn_id ? connections.get(a.conn_id) : undefined
+    return {
+      id: a.id,
+      name: a.name?.trim() || 'Unnamed account',
+      institution:
+        a.org?.name ??
+        a.org?.domain ??
+        connection?.org_name ??
+        connection?.name ??
+        'Unknown institution',
+      currency: a.currency ?? 'USD',
+      balance: a.balance,
+      balanceDate: a['balance-date'] ?? null,
+      transactions: (a.transactions ?? []).map((t) => ({
+        id: t.id,
+        posted: t.posted ?? null,
+        transactedAt: t.transacted_at ?? null,
+        amount: t.amount,
+        description: (t.description || t.payee || t.memo || '').trim(),
+        pending: t.pending ?? false,
+      })),
+    }
+  })
+}
 
 /**
  * Bridge's accounts. `attention` means it also reported a problem (often an
@@ -166,12 +239,29 @@ export async function fetchSimplefin(
     throw new SimplefinError('auth')
   if (response.status === 402) throw new SimplefinError('payment')
   if (!response.ok) throw new SimplefinError('network')
+  let body: unknown
   try {
-    const parsed = accountSet.parse(
-      JSON.parse(await readLimited(response.body, 5 * 1024 * 1024)),
-    )
-    return { accounts: parsed.accounts, attention: parsed.errors.length > 0 }
+    body = JSON.parse(await readLimited(response.body, 5 * 1024 * 1024))
   } catch {
+    console.error('SimpleFIN response was not JSON within the size limit')
     throw new SimplefinError('invalid')
+  }
+  const parsed = accountSet.safeParse(body)
+  if (!parsed.success) {
+    // Paths and types only: never values, which are financial data.
+    console.error(
+      'SimpleFIN response did not match:',
+      parsed.error.issues
+        .slice(0, 10)
+        .map((i) => `${i.path.join('.')}: ${i.code} (${i.message})`)
+        .join('; '),
+    )
+    throw new SimplefinError('invalid')
+  }
+  return {
+    accounts: normalize(parsed.data),
+    attention:
+      (parsed.data.errors?.length ?? 0) + (parsed.data.errlist?.length ?? 0) >
+      0,
   }
 }

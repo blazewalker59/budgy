@@ -397,6 +397,83 @@ describe('SimpleFIN client', () => {
     )
   })
 
+  it('reads protocol 2 responses and tolerates null or missing optional fields', async () => {
+    const transport = (() =>
+      Promise.resolve(
+        Response.json({
+          errlist: [],
+          connections: [{ conn_id: 'CON-1', name: 'Chase', org_id: 'x' }],
+          accounts: [
+            {
+              id: 'ACT-1',
+              name: 'Sapphire',
+              conn_id: 'CON-1',
+              currency: 'USD',
+              balance: -120.5,
+              'balance-date': 1791590000.5,
+              'available-balance': null,
+              transactions: [
+                {
+                  id: 't1',
+                  posted: 1791500000,
+                  amount: '-12.30',
+                  description: null,
+                  payee: 'Coffee Shop',
+                  transacted_at: null,
+                  pending: null,
+                  extra: { category: 'Food' },
+                },
+              ],
+              holdings: [],
+            },
+          ],
+        }),
+      )) as typeof fetch
+    const { accounts, attention } = await fetchSimplefin(ACCESS, {}, transport)
+    expect(attention).toBe(false)
+    expect(accounts).toEqual([
+      {
+        id: 'ACT-1',
+        name: 'Sapphire',
+        institution: 'Chase',
+        currency: 'USD',
+        balance: '-120.5',
+        balanceDate: 1791590000,
+        transactions: [
+          {
+            id: 't1',
+            posted: 1791500000,
+            transactedAt: null,
+            amount: '-12.30',
+            description: 'Coffee Shop',
+            pending: false,
+          },
+        ],
+      },
+    ])
+  })
+
+  it('logs where a response failed to match, never its values', async () => {
+    const errors: Array<string> = []
+    const original = console.error
+    console.error = (...args: Array<unknown>) => errors.push(args.join(' '))
+    try {
+      const transport = (() =>
+        Promise.resolve(
+          Response.json({
+            accounts: [{ id: 'ACT-1', balance: 'secret-balance-9999' }],
+          }),
+        )) as typeof fetch
+      await expect(fetchSimplefin(ACCESS, {}, transport)).rejects.toThrow(
+        SimplefinError,
+      )
+    } finally {
+      console.error = original
+    }
+    expect(errors.join()).toContain('accounts.0.balance')
+    expect(errors.join()).not.toContain('secret-balance-9999')
+  })
+
   it('rejects an access URL from a claim that points elsewhere', async () => {
     const transport = (() =>
       Promise.resolve(

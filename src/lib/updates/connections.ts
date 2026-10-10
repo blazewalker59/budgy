@@ -146,7 +146,7 @@ export async function readBridge(
           connectionId: id,
           providerId: a.id,
           name: a.name,
-          institution: a.org.name ?? a.org.domain ?? 'Unknown institution',
+          institution: a.institution,
           currency: a.currency,
           present: true,
         }),
@@ -159,7 +159,7 @@ export async function readBridge(
         ],
         set: {
           name: a.name,
-          institution: a.org.name ?? a.org.domain ?? 'Unknown institution',
+          institution: a.institution,
           currency: a.currency,
           present: true,
         },

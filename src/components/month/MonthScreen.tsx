@@ -96,7 +96,8 @@ export function MonthScreen({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* Relative: the GapChip's list opens across this row, not off screen. */}
+      <div className="relative flex flex-wrap items-center justify-between gap-2">
         <MonthPicker
           month={month}
           months={months}
@@ -377,7 +378,7 @@ function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
   const [open, setOpen] = useState(false)
   if (!gaps.length || dismissed) return null
   return (
-    <div className="relative">
+    <div>
       <span className="inline-flex items-center rounded-full border border-nice/40 bg-surface text-xs font-semibold text-nice">
         <button
           type="button"
@@ -407,7 +408,7 @@ function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
         </button>
       </span>
       {open && (
-        <div className="absolute left-0 z-20 mt-1 w-64 max-w-[calc(100vw-2rem)] sm:left-auto sm:right-0 space-y-1 rounded-xl border border-border bg-surface p-2.5 text-xs shadow-lg">
+        <div className="absolute inset-x-0 top-full z-20 mt-1 space-y-1 rounded-xl sm:left-auto sm:w-72 border border-border bg-surface p-2.5 text-xs shadow-lg">
           <p className="text-muted">
             No purchases lately where there usually are, so this month may look
             cheaper than it was:

@@ -101,7 +101,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="flex rounded-full bg-sunken p-0.5"
+      className="flex w-fit rounded-full bg-sunken p-0.5"
     >
       {options.map((o) => (
         <button

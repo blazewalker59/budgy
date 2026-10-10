@@ -5,7 +5,8 @@
  */
 
 import { addDays, lastDayOf, shiftMonth } from './dates'
-import type { Ledger } from './types'
+import { everyTxn } from './ledger'
+import type { LedgerIndex } from './ledger'
 
 /** Purchases in three months that make an Account one we'd miss. */
 const REGULAR_USE = 6
@@ -17,7 +18,7 @@ export interface Gap {
 }
 
 export function coverageGaps(
-  ledger: Ledger,
+  ix: LedgerIndex,
   month: string,
   today: string,
 ): Array<Gap> {
@@ -25,8 +26,9 @@ export function coverageGaps(
   const recent = shiftMonth(month, -3)
   const last = new Map<string, string>()
   // Purchases in the three months before: an Account in regular use.
+  // Transfers count: they come in with its exports like any purchase.
   const before = new Map<string, number>()
-  for (const t of ledger.txns) {
+  for (const t of everyTxn(ix)) {
     if (t.date <= end && (last.get(t.account) ?? '') < t.date)
       last.set(t.account, t.date)
     if (t.month >= recent && t.month < month)

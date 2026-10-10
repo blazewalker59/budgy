@@ -73,7 +73,7 @@ export function MonthScreen({
     [scope, month, book.today],
   )
   const gaps = useMemo(
-    () => coverageGaps(book.ix.ledger, month, book.today),
+    () => coverageGaps(book.ix, month, book.today),
     [book, month],
   )
   const soon = useMemo(

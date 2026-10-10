@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ledger, plan, txn } from '@test/factories'
-import { indexLedger } from '@/lib/model/ledger'
+import { TRANSFER, indexLedger } from '@/lib/model/ledger'
 import { suggestPlans } from '@/lib/model/detect'
 import { forecast } from '@/lib/model/forecast'
 import { schedule } from '@/lib/model/plans'
@@ -103,8 +103,25 @@ describe('coverageGaps', () => {
         txn({ date: '2026-06-30', account: 'Joint Checking (0001)' }),
       ],
     })
-    expect(coverageGaps(l, '2026-09', '2026-10-08')).toEqual([
+    expect(coverageGaps(indexLedger(l), '2026-09', '2026-10-08')).toEqual([
       { account: 'Alex Apple Card', last: '2026-08-04' },
     ])
+  })
+
+  it('counts Transfers as an Account still coming in', () => {
+    const l = ledger({
+      txns: [
+        ...['06-03', '06-20', '07-02', '07-15', '07-30', '08-04'].map((d) =>
+          txn({ date: `2026-${d}`, account: 'Joint Checking' }),
+        ),
+        // Its only September activity: a payment into a 529.
+        txn({
+          date: '2026-09-25',
+          account: 'Joint Checking',
+          category: TRANSFER,
+        }),
+      ],
+    })
+    expect(coverageGaps(indexLedger(l), '2026-09', '2026-10-08')).toEqual([])
   })
 })

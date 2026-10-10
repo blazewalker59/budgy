@@ -143,7 +143,7 @@ export function budgetAlerts(
     })
   }
 
-  for (const g of coverageGaps(ix.ledger, month, today))
+  for (const g of coverageGaps(ix, month, today))
     out.push({
       kind: 'missing-imports',
       severity: 'medium',

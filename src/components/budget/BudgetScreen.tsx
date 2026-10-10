@@ -77,7 +77,7 @@ export function BudgetScreen({ owner }: { owner?: string }) {
       window
         .map((m) => ({
           month: m,
-          gaps: coverageGaps(ix.ledger, m, book.today),
+          gaps: coverageGaps(ix, m, book.today),
         }))
         .filter((g) => g.gaps.length),
     [ix, window, book.today],

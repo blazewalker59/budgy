@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   createToken: vi.fn(),
   connections: vi.fn(),
   link: vi.fn(),
+  accounts: [
+    { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
+  ] as Array<{ name: string; owner: string; kind: string; closed: boolean }>,
 }))
 vi.mock('@/lib/updates/server', () => ({
   getAccountUpdates: mocks.get,
@@ -45,9 +48,7 @@ vi.mock('@/lib/ledger/book', () => ({
   useBook: () => ({
     ix: {
       ledger: {
-        accounts: [
-          { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
-        ],
+        accounts: mocks.accounts,
         balances: [],
       },
     },
@@ -308,5 +309,76 @@ describe('Unified Account Updates UI', () => {
     fireEvent.click(screen.getByRole('button', { name: /Bank connections/ }))
     expect(screen.getByText(/Vanguard needs attention/)).toBeTruthy()
     expect(screen.getByText(/Not linked yet: Sapphire \(Chase\)/)).toBeTruthy()
+  })
+  it('puts Accounts needing action above those already set up, and keeps an open card in place', async () => {
+    mocks.accounts.push(
+      { name: 'Checking', owner: 'Joint', kind: 'checking', closed: false },
+      { name: 'Apple', owner: 'Joint', kind: 'credit', closed: false },
+    )
+    try {
+      mocks.get.mockResolvedValue([
+        empty,
+        { ...empty, account: 'Checking' },
+        { ...empty, account: 'Apple' },
+      ])
+      mocks.tokens.mockResolvedValue([{ id: 't', account: 'Apple' }])
+      mocks.connections.mockResolvedValue([
+        {
+          id: 'c1',
+          name: 'SimpleFIN',
+          createdBy: 'me@example.com',
+          status: 'ready',
+          lastError: null,
+          lastFetchedAt: null,
+          createdAt: new Date('2026-10-01'),
+          accounts: [
+            {
+              connectionId: 'c1',
+              providerId: 'p1',
+              name: 'Joint Checking',
+              institution: 'Peach State',
+              currency: 'USD',
+              account: 'Checking',
+              present: true,
+              syncedThrough: '2026-10-09',
+            },
+          ],
+        },
+      ])
+      mount()
+      const needs = (await screen.findByText(/Needs action · 1/)).parentElement!
+      const done = screen.getByText(/Set up · 2/).parentElement!
+      expect(needs.textContent).toContain('Card')
+      expect(done.textContent).toContain('Checking')
+      expect(done.textContent).toContain('Apple')
+      expect(done.textContent).toContain(
+        'Updates automatically from Joint Checking',
+      )
+
+      // Setting up a Shortcut for Card: it stays put until closed.
+      mocks.createToken.mockResolvedValue({
+        id: 't2',
+        token: 'bu_new',
+        account: 'Card',
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Set up updates' }))
+      fireEvent.click(
+        screen.getByRole('button', { name: /From your iPhone’s share sheet/ }),
+      )
+      mocks.tokens.mockResolvedValue([
+        { id: 't', account: 'Apple' },
+        { id: 't2', account: 'Card' },
+      ])
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Create Shortcut token' }),
+      )
+      expect(await screen.findByText('Bearer bu_new')).toBeTruthy()
+      expect(screen.getByText(/Needs action · 1/)).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+      expect(await screen.findByText('All set up')).toBeTruthy()
+      expect(screen.queryByText(/Needs action/)).toBeNull()
+    } finally {
+      mocks.accounts.splice(1)
+    }
   })
 })

@@ -28,16 +28,6 @@ type Connection = NonNullable<
 >[number]
 export type BankAccount = Connection['accounts'][number]
 
-/** The bank account feeding a Budgy Account, if one is linked. */
-export function useBankLink(account: string): BankAccount | null {
-  const connections = useBankConnections()
-  return (
-    connections.data
-      ?.flatMap((c) => c.accounts)
-      .find((a) => a.account === account) ?? null
-  )
-}
-
 export function BankConnections({
   open,
   onOpenChange,

@@ -5,6 +5,7 @@ import { Check, FileUp, Landmark, Share } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { Account } from '@/lib/model/types'
 import type { ExportFormat } from '@/lib/updates/exports'
+import type { BankAccount } from '@/components/accounts/BankConnections'
 import {
   EXPORT_FORMATS,
   EXPORT_LABELS,
@@ -24,7 +25,6 @@ import { dollars } from '@/lib/model/money'
 import {
   BankConnections,
   BankLink,
-  useBankLink,
 } from '@/components/accounts/BankConnections'
 import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
 
@@ -43,12 +43,15 @@ const SOURCE_LABELS = {
 export function AccountUpdates() {
   const { ix } = useBook()
   const updates = useAccountUpdates()
+  const connections = useBankConnections()
+  const tokens = useUploadTokens()
   const [selected, setSelected] = useState<{
     account: string
     panel: Panel
+    /** The group it was in when opened, so it doesn't move while open. */
+    needsAction: boolean
   } | null>(null)
   const [banksOpen, setBanksOpen] = useState(false)
-  const accounts = ix.ledger.accounts.filter((a) => !a.closed)
   if (updates.isPending)
     return (
       <p role="status" className="text-sm text-muted">
@@ -61,6 +64,47 @@ export function AccountUpdates() {
         {updates.error.message}
       </p>
     )
+  const banks = connections.data?.flatMap((c) => c.accounts) ?? []
+  const cards = ix.ledger.accounts
+    .filter((a) => !a.closed)
+    .map((account) => {
+      const state = updates.data.find((u) => u.account === account.name)
+      const situation = situate(account, state, banks, tokens.data ?? [])
+      const open = selected?.account === account.name ? selected : null
+      return {
+        account,
+        state,
+        situation,
+        panel: open?.panel ?? null,
+        needsAction: open ? open.needsAction : situation.needsAction,
+      }
+    })
+  const card = (c: (typeof cards)[number]) => (
+    <AccountCard
+      key={c.account.name}
+      account={c.account}
+      state={c.state}
+      situation={c.situation}
+      panel={c.panel}
+      onPanel={(panel) =>
+        setSelected(
+          panel
+            ? {
+                account: c.account.name,
+                panel,
+                needsAction: c.needsAction,
+              }
+            : null,
+        )
+      }
+      onConnectBank={() => {
+        setBanksOpen(true)
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }}
+    />
+  )
+  const needing = cards.filter((c) => c.needsAction)
+  const settled = cards.filter((c) => !c.needsAction)
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
@@ -70,32 +114,64 @@ export function AccountUpdates() {
         guarantee the source has every transaction through today.
       </p>
       <BankConnections open={banksOpen} onOpenChange={setBanksOpen} />
-      {!accounts.length && (
+      {!cards.length && (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
           Add an Account on the Accounts tab first, then choose how it updates
           here.
         </p>
       )}
-      {accounts.map((account) => (
-        <AccountCard
-          key={account.name}
-          account={account}
-          state={updates.data.find((u) => u.account === account.name)}
-          panel={selected?.account === account.name ? selected.panel : null}
-          onPanel={(panel) =>
-            setSelected(panel ? { account: account.name, panel } : null)
-          }
-          onConnectBank={() => {
-            setBanksOpen(true)
-            window.scrollTo({ top: 0, behavior: 'smooth' })
-          }}
-        />
-      ))}
+      {!!needing.length && (
+        <section className="space-y-2">
+          <h2 className="pt-1 text-sm font-bold uppercase tracking-wide text-muted">
+            Needs action · {needing.length}
+          </h2>
+          {needing.map(card)}
+        </section>
+      )}
+      {!!settled.length && (
+        <section className="space-y-2">
+          <h2 className="pt-1 text-sm font-bold uppercase tracking-wide text-muted">
+            {needing.length ? `Set up · ${settled.length}` : 'All set up'}
+          </h2>
+          {settled.map(card)}
+        </section>
+      )}
     </div>
   )
 }
 
 type Method = 'bank' | 'shortcut' | 'manual'
+type Situation = ReturnType<typeof situate>
+
+/**
+ * How an Account updates today, and whether it needs the Member: not set
+ * up, a better way available, or its last update failed or needs review.
+ */
+function situate(
+  account: Account,
+  state: UpdateState | undefined,
+  banks: Array<BankAccount>,
+  tokens: Array<{ account: string }>,
+) {
+  const spending = ['credit', 'checking', 'savings'].includes(account.kind)
+  const bank = banks.find((b) => b.account === account.name) ?? null
+  const unlinkedBanks = banks.filter(
+    (b) => !b.account && b.present && b.currency.toUpperCase() === 'USD',
+  ).length
+  const method: Method = bank
+    ? 'bank'
+    : tokens.some((t) => t.account === account.name)
+      ? 'shortcut'
+      : 'manual'
+  const latest = state?.latest?.status
+  const needsAction =
+    (spending && method === 'manual') ||
+    (!spending && !bank && unlinkedBanks > 0) ||
+    (bank !== null && !bank.present) ||
+    latest === 'failed' ||
+    latest === 'attention'
+  return { spending, bank, unlinkedBanks, method, needsAction }
+}
 
 /** Which way of updating suits an Account best, given what's set up. */
 function recommend(account: Account, bankAvailable: boolean): Panel {
@@ -106,41 +182,33 @@ function recommend(account: Account, bankAvailable: boolean): Panel {
 function AccountCard({
   account,
   state,
+  situation,
   panel,
   onPanel,
   onConnectBank,
 }: {
   account: Account
   state?: UpdateState
+  situation: Situation
   panel: Panel | null
   onPanel: (panel: Panel | null) => void
   onConnectBank: () => void
 }) {
   const { ix } = useBook()
   const connections = useBankConnections()
-  const tokens = useUploadTokens()
-  const bank = useBankLink(account.name)
-  const spending = ['credit', 'checking', 'savings'].includes(account.kind)
+  const { spending, bank, unlinkedBanks, method } = situation
   const lastBalance = ix.ledger.balances
     .filter((b) => b.account === account.name)
     .at(-1)
-  const unlinkedBanks =
-    connections.data
-      ?.flatMap((c) => c.accounts)
-      .filter(
-        (b) => !b.account && b.present && b.currency.toUpperCase() === 'USD',
-      ) ?? []
-  const method: Method = bank
-    ? 'bank'
-    : tokens.data?.some((t) => t.account === account.name)
-      ? 'shortcut'
-      : 'manual'
-  const best = recommend(account, unlinkedBanks.length > 0)
+  const best = recommend(account, unlinkedBanks > 0)
 
   // What the card says, and the one thing it asks for (if anything).
   let summary: string
   let primary: { label: string; panel?: Panel; record?: boolean } | null = null
-  if (bank) {
+  if (bank && !bank.present) {
+    summary = `SimpleFIN no longer shares ${bank.name}. Check it in Bridge, or link another account.`
+    primary = { label: 'Fix link', panel: 'link' }
+  } else if (bank) {
     summary = `Updates automatically from ${bank.name} (${bank.institution}).`
   } else if (method === 'shortcut') {
     summary =
@@ -150,7 +218,7 @@ function AccountCard({
       ? 'Updated by uploading exports. Set up an easier way so it stays current.'
       : 'Not set up yet. Choose how its purchases come into Budgy.'
     primary = { label: 'Set up updates', panel: 'choose' }
-  } else if (unlinkedBanks.length) {
+  } else if (unlinkedBanks) {
     summary =
       'Its balance is entered by hand. Link its bank to keep it current.'
     primary = { label: 'Link bank', panel: 'link' }

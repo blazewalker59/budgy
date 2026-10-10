@@ -6,7 +6,18 @@ year) before they land. Domain language lives in [CONTEXT.md](./CONTEXT.md);
 decisions in [docs/adr](./docs/adr).
 
 Deployed as a single Cloudflare Worker (TanStack Start + D1), the same setup
-as sportsline. Google sign-in, limited to the Household's emails.
+as sportsline. During rollout, Google sign-in admits allowlisted creators,
+invitees and existing Members; explicit Household membership isolates each
+Ledger. Creation and invitation details are in
+[ADR 0008](docs/adr/0008-household-creation-and-invitations.md); migration
+and the next sync slices are in [ADR 0007](docs/adr/0007-household-isolation.md).
+
+New creators name their Household after signing in, then choose **Household**
+in the account menu to create and copy a partner's invitation link. The
+partner signs in with the invited Google email and explicitly accepts. Links
+expire after seven days; Budgy does not email them automatically. Owners can
+revoke links, remove Members and transfer ownership. Public signup is not on:
+add a friend's creator email to `ALLOWED_EMAILS`; partners need only an invite.
 
 ## Develop
 

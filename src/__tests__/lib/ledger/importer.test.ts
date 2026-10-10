@@ -10,6 +10,7 @@ describe('rowsPerInsert', () => {
   it('keeps a full insert of purchases within D1’s variable limit', () => {
     const n = rowsPerInsert(transactions)
     const row = {
+      householdId: 'hh_test',
       id: 'abc',
       date: '2026-10-07',
       month: '2026-10',
@@ -37,6 +38,7 @@ describe('rowsPerInsert', () => {
       .insert(balances)
       .values(
         Array.from({ length: n }, (_, i) => ({
+          householdId: 'hh_test',
           account: 'Card',
           date: `2026-01-${String(i + 1).padStart(2, '0')}`,
           amount: 100,

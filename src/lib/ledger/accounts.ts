@@ -10,9 +10,10 @@ import {
   loadImportRules,
   rowsPerInsert,
 } from './importer'
-import type { Database } from '@/lib/db'
+import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Account, Balance } from '@/lib/model/types'
 import type { PostedRow, Prepared } from '@/lib/import/posted'
+import { householdRow, inHousehold } from '@/lib/households/scope'
 import {
   accounts,
   balances,
@@ -28,7 +29,7 @@ export async function findAccount(
   db: Database,
   name: string,
 ): Promise<Account> {
-  const all = await db.select().from(accounts)
+  const all = await db.select().from(accounts).where(inHousehold(db, accounts))
   const found = all.find(
     (a) => a.name.toLowerCase() === name.trim().toLowerCase(),
   )
@@ -49,10 +50,18 @@ export async function saveAccount(
     const taken = await db
       .select({ name: accounts.name })
       .from(accounts)
-      .where(sql`lower(${accounts.name}) = ${a.name.toLowerCase()}`)
+      .where(
+        inHousehold(
+          db,
+          accounts,
+          sql`lower(${accounts.name}) = ${a.name.toLowerCase()}`,
+        ),
+      )
     if (taken.length)
       throw new Error(`There's already an account named ${a.name}.`)
-    await db.insert(accounts).values({ ...a, sourceName: a.name })
+    await db
+      .insert(accounts)
+      .values(householdRow(db, { ...a, sourceName: a.name }))
     return
   }
   await db
@@ -64,7 +73,7 @@ export async function saveAccount(
       closed: a.closed,
       securedBy: a.kind === 'loan' ? a.securedBy : null,
     })
-    .where(eq(accounts.name, a.name))
+    .where(inHousehold(db, accounts, eq(accounts.name, a.name)))
 }
 
 /** Remove an Account and its Balances; only one without purchases. */
@@ -72,12 +81,16 @@ export async function deleteAccount(db: Database, name: string): Promise<void> {
   const used = await db
     .select({ id: transactions.id })
     .from(transactions)
-    .where(eq(transactions.account, name))
+    .where(inHousehold(db, transactions, eq(transactions.account, name)))
     .limit(1)
   if (used.length) throw new Error(`${name} has purchases; close it instead.`)
   await db.batch([
-    db.delete(balances).where(eq(balances.account, name)),
-    db.delete(accounts).where(eq(accounts.name, name)),
+    db
+      .delete(balances)
+      .where(inHousehold(db, balances, eq(balances.account, name))),
+    db
+      .delete(accounts)
+      .where(inHousehold(db, accounts, eq(accounts.name, name))),
   ])
 }
 
@@ -92,13 +105,19 @@ export async function recordBalances(
 ): Promise<void> {
   const statements = []
   const perInsert = rowsPerInsert(balances)
+  for (const account of new Set(rows.map((b) => b.account)))
+    await findAccount(db, account)
   for (let i = 0; i < rows.length; i += perInsert)
     statements.push(
       db
         .insert(balances)
-        .values(rows.slice(i, i + perInsert).map((b) => ({ ...b, recordedBy })))
+        .values(
+          rows
+            .slice(i, i + perInsert)
+            .map((b) => householdRow(db, { ...b, recordedBy })),
+        )
         .onConflictDoUpdate({
-          target: [balances.account, balances.date],
+          target: [balances.householdId, balances.account, balances.date],
           set: {
             amount: sql`excluded.amount`,
             recordedBy: sql`excluded.recorded_by`,
@@ -116,7 +135,9 @@ export async function clearBalances(
   db: Database,
   account: string,
 ): Promise<void> {
-  await db.delete(balances).where(eq(balances.account, account))
+  await db
+    .delete(balances)
+    .where(inHousehold(db, balances, eq(balances.account, account)))
 }
 
 export async function deleteBalance(
@@ -126,7 +147,13 @@ export async function deleteBalance(
 ): Promise<void> {
   await db
     .delete(balances)
-    .where(and(eq(balances.account, account), eq(balances.date, date)))
+    .where(
+      inHousehold(
+        db,
+        balances,
+        and(eq(balances.account, account), eq(balances.date, date)),
+      ),
+    )
 }
 
 export interface PostSummary extends Omit<Prepared, 'fresh'> {
@@ -168,13 +195,17 @@ export async function postTransactions(
   const dates = input.rows.map((r) => r.date).sort()
   const [rules, cats, history, inRange] = await Promise.all([
     loadImportRules(db),
-    db.select({ name: categories.name }).from(categories),
+    db
+      .select({ name: categories.name })
+      .from(categories)
+      .where(inHousehold(db, categories)),
     db
       .select({
         store: transactions.store,
         sourceCategory: transactions.sourceCategory,
       })
-      .from(transactions),
+      .from(transactions)
+      .where(inHousehold(db, transactions)),
     dates.length
       ? db
           .select({
@@ -189,9 +220,16 @@ export async function postTransactions(
             starting: isStarting,
           })
           .from(transactions)
-          .leftJoin(imports, eq(imports.id, transactions.importId))
+          .leftJoin(
+            imports,
+            and(
+              eq(imports.id, transactions.importId),
+              eq(imports.householdId, transactions.householdId),
+            ),
+          )
           .where(
             and(
+              inHousehold(db, transactions),
               eq(transactions.account, account.name),
               between(transactions.date, dates[0], dates[dates.length - 1]),
             ),
@@ -238,9 +276,13 @@ export async function postTransactions(
   for (let i = 0; i < replacing.length; i += IDS_PER_DELETE)
     statements.push(
       db.delete(transactions).where(
-        inArray(
-          transactions.id,
-          replacing.slice(i, i + IDS_PER_DELETE).map((t) => t.id),
+        inHousehold(
+          db,
+          transactions,
+          inArray(
+            transactions.id,
+            replacing.slice(i, i + IDS_PER_DELETE).map((t) => t.id),
+          ),
         ),
       ),
     )
@@ -248,7 +290,10 @@ export async function postTransactions(
   for (const t of prepared.fresh) if (t.category) categoryNames.add(t.category)
   for (const name of categoryNames)
     statements.push(
-      db.insert(categories).values(newCategory(name)).onConflictDoNothing(),
+      db
+        .insert(categories)
+        .values(householdRow(db, newCategory(name)))
+        .onConflictDoNothing(),
     )
   const perInsert = rowsPerInsert(transactions)
   for (let i = 0; i < prepared.fresh.length; i += perInsert)
@@ -260,6 +305,7 @@ export async function postTransactions(
             .slice(i, i + perInsert)
             .map(({ accountSource: _s, filed: _f, ...t }) => ({
               ...t,
+              householdId: db.householdId,
               importId,
             })),
         )
@@ -267,6 +313,7 @@ export async function postTransactions(
     )
   statements.push(
     db.insert(imports).values({
+      householdId: db.householdId,
       id: importId,
       fileName: `${input.via ?? 'posted'} to ${account.name}`,
       account: account.name,
@@ -296,7 +343,7 @@ export async function removeStarting(
   const starting = db
     .select({ id: imports.id })
     .from(imports)
-    .where(isNull(imports.account))
+    .where(inHousehold(db, imports, isNull(imports.account)))
   const where = account
     ? and(
         inArray(transactions.importId, starting),
@@ -305,15 +352,16 @@ export async function removeStarting(
     : inArray(transactions.importId, starting)
   const gone = await db
     .delete(transactions)
-    .where(where)
+    .where(inHousehold(db, transactions, where))
     .returning({ id: transactions.id })
   // A starting import with nothing left is history no one needs.
   await db
     .delete(imports)
     .where(
       and(
+        inHousehold(db, imports),
         isNull(imports.account),
-        sql`not exists (select 1 from ${transactions} where ${transactions.importId} = ${imports.id})`,
+        sql`not exists (select 1 from ${transactions} where ${transactions.importId} = ${imports.id} and ${transactions.householdId} = ${imports.householdId})`,
       ),
     )
   return gone.length

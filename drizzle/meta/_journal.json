@@ -71,6 +71,20 @@
       "when": 1791543881809,
       "tag": "0009_import_account",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791592589277,
+      "tag": "0010_household_isolation",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1791593459101,
+      "tag": "0011_household_invitations",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,14 @@
 /**
  * API tokens for Agents (docs/adr/0004): a Member creates one, sees it
  * once, and gives it to their Agent; we keep only its SHA-256 hash. A token
- * works only while its Member is still on the allowlist.
+ * belongs to one Household and works only while its creator remains a
+ * Member; the MCP endpoint also enforces rollout admission rules.
  */
 
 import { and, eq, isNull } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
-import { apiTokens } from '@/lib/db/schema'
+import type { HouseholdDatabase } from '@/lib/households/scope'
+import { apiTokens, householdMembers } from '@/lib/db/schema'
 
 /** Marks a Budgy token, so a leaked one is easy to spot and scan for. */
 const TOKEN_PREFIX = 'bg_'
@@ -47,7 +49,7 @@ export function bearerToken(header: string | null): string | null {
 
 /** Store a new token for a Member; returns it, the only time it's seen. */
 export async function createToken(
-  db: Database,
+  db: HouseholdDatabase,
   member: { id: string; email: string },
   name: string,
   scopes: Array<TokenScope> = ['read'],
@@ -56,6 +58,7 @@ export async function createToken(
   const token = newToken()
   const id = crypto.randomUUID()
   await db.insert(apiTokens).values({
+    householdId: db.householdId,
     id,
     memberId: member.id,
     memberEmail: member.email,
@@ -69,6 +72,7 @@ export async function createToken(
 }
 
 export interface Caller {
+  householdId: string
   tokenId: string
   /** What the Member called the token: how its Agent is named to them. */
   agentName: string
@@ -94,6 +98,17 @@ export async function verifyToken(
     )
     .get()
   if (!row) return null
+  const membership = await db
+    .select({ memberId: householdMembers.memberId })
+    .from(householdMembers)
+    .where(
+      and(
+        eq(householdMembers.householdId, row.householdId),
+        eq(householdMembers.memberId, row.memberId),
+      ),
+    )
+    .get()
+  if (!membership) return null
   const lastUsed = row.lastUsedAt ? Date.parse(row.lastUsedAt) : 0
   if (now.getTime() - lastUsed > TOUCH_EVERY_MS) {
     await db
@@ -102,6 +117,7 @@ export async function verifyToken(
       .where(eq(apiTokens.id, row.id))
   }
   return {
+    householdId: row.householdId,
     tokenId: row.id,
     agentName: row.name,
     memberId: row.memberId,

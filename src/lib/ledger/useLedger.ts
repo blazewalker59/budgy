@@ -43,17 +43,30 @@ import { ANY_SOURCE } from '@/lib/model/ledger'
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
 
+/** Never reuse another login's or Household's cached Ledger. */
+function useLedgerKey() {
+  const { data: session } = useSession()
+  return [
+    ...LEDGER_KEY,
+    session?.status === 'member' ? session.member.id : null,
+    session?.status === 'member' ? session.household.id : null,
+  ] as const
+}
+
 export function useSession() {
   return useQuery({
     queryKey: SESSION_KEY,
     queryFn: () => getSession(),
-    staleTime: 5 * 60_000,
+    staleTime: 15_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   })
 }
 
 export function useLedgerQuery(enabled: boolean) {
+  const queryKey = useLedgerKey()
   return useQuery({
-    queryKey: LEDGER_KEY,
+    queryKey,
     queryFn: () => getLedger(),
     enabled,
     staleTime: 15_000,
@@ -73,18 +86,19 @@ function useEdit<TVars>(
   patch: (ledger: Ledger, vars: TVars) => Ledger,
 ) {
   const queryClient = useQueryClient()
+  const queryKey = useLedgerKey()
   return useMutation({
     mutationFn: send,
     onMutate: async (vars: TVars) => {
-      await queryClient.cancelQueries({ queryKey: LEDGER_KEY })
-      const previous = queryClient.getQueryData<Ledger>(LEDGER_KEY)
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<Ledger>(queryKey)
       if (previous)
-        queryClient.setQueryData<Ledger>(LEDGER_KEY, patch(previous, vars))
-      return { previous }
+        queryClient.setQueryData<Ledger>(queryKey, patch(previous, vars))
+      return { previous, queryKey }
     },
     onError: (_error, _vars, context) => {
       if (context?.previous)
-        queryClient.setQueryData(LEDGER_KEY, context.previous)
+        queryClient.setQueryData(context.queryKey, context.previous)
     },
   })
 }

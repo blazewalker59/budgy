@@ -12,6 +12,7 @@ import {
   getApiTokens,
   revokeApiToken,
 } from '@/lib/agents/server'
+import { useSession } from '@/lib/ledger/useLedger'
 
 const TOKENS_KEY = ['api-tokens']
 
@@ -47,8 +48,13 @@ function CopyLine({ text, label }: { text: string; label: string }) {
 
 export function AgentsScreen() {
   const queryClient = useQueryClient()
+  const { data: session } = useSession()
   const tokens = useQuery({
-    queryKey: TOKENS_KEY,
+    queryKey: [
+      ...TOKENS_KEY,
+      session?.status === 'member' ? session.member.id : null,
+      session?.status === 'member' ? session.household.id : null,
+    ],
     queryFn: () => getApiTokens(),
   })
   const [name, setName] = useState('')

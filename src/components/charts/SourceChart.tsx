@@ -72,7 +72,7 @@ export function SourceChart({
 
   return (
     <ChartCard
-      legend={['Blaze', 'Alex', 'Joint'].map((o) => ({
+      legend={[...new Set(sources.map((s) => s.owner))].map((o) => ({
         label: o,
         color: ownerColor(o),
       }))}

@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountsRouteImport } from './routes/accounts'
 import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as BudgetRouteImport } from './routes/budget'
+import { Route as HouseholdRouteImport } from './routes/household'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as SpendingRouteImport } from './routes/spending'
 import { Route as UpcomingRouteImport } from './routes/upcoming'
+import { Route as JoinTokenRouteImport } from './routes/join.$token'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,6 +39,11 @@ const AgentsRoute = AgentsRouteImport.update({
 const BudgetRoute = BudgetRouteImport.update({
   id: '/budget',
   path: '/budget',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HouseholdRoute = HouseholdRouteImport.update({
+  id: '/household',
+  path: '/household',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ImportRoute = ImportRouteImport.update({
@@ -64,28 +71,37 @@ const UpcomingRoute = UpcomingRouteImport.update({
   path: '/upcoming',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinTokenRoute = JoinTokenRouteImport.update({
+  id: '/join/$token',
+  path: '/join/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
+  '/household': typeof HouseholdRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
+  '/join/$token': typeof JoinTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
+  '/household': typeof HouseholdRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
+  '/join/$token': typeof JoinTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -93,11 +109,13 @@ export interface FileRoutesById {
   '/accounts': typeof AccountsRoute
   '/agents': typeof AgentsRoute
   '/budget': typeof BudgetRoute
+  '/household': typeof HouseholdRoute
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
+  '/join/$token': typeof JoinTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -106,33 +124,39 @@ export interface FileRouteTypes {
     | '/accounts'
     | '/agents'
     | '/budget'
+    | '/household'
     | '/import'
     | '/plan'
     | '/rules'
     | '/spending'
     | '/upcoming'
+    | '/join/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/accounts'
     | '/agents'
     | '/budget'
+    | '/household'
     | '/import'
     | '/plan'
     | '/rules'
     | '/spending'
     | '/upcoming'
+    | '/join/$token'
   id:
     | '__root__'
     | '/'
     | '/accounts'
     | '/agents'
     | '/budget'
+    | '/household'
     | '/import'
     | '/plan'
     | '/rules'
     | '/spending'
     | '/upcoming'
+    | '/join/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -140,11 +164,13 @@ export interface RootRouteChildren {
   AccountsRoute: typeof AccountsRoute
   AgentsRoute: typeof AgentsRoute
   BudgetRoute: typeof BudgetRoute
+  HouseholdRoute: typeof HouseholdRoute
   ImportRoute: typeof ImportRoute
   PlanRoute: typeof PlanRoute
   RulesRoute: typeof RulesRoute
   SpendingRoute: typeof SpendingRoute
   UpcomingRoute: typeof UpcomingRoute
+  JoinTokenRoute: typeof JoinTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -175,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/budget'
       fullPath: '/budget'
       preLoaderRoute: typeof BudgetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/household': {
+      id: '/household'
+      path: '/household'
+      fullPath: '/household'
+      preLoaderRoute: typeof HouseholdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/import': {
@@ -212,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UpcomingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/join/$token': {
+      id: '/join/$token'
+      path: '/join/$token'
+      fullPath: '/join/$token'
+      preLoaderRoute: typeof JoinTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -220,11 +260,13 @@ const rootRouteChildren: RootRouteChildren = {
   AccountsRoute: AccountsRoute,
   AgentsRoute: AgentsRoute,
   BudgetRoute: BudgetRoute,
+  HouseholdRoute: HouseholdRoute,
   ImportRoute: ImportRoute,
   PlanRoute: PlanRoute,
   RulesRoute: RulesRoute,
   SpendingRoute: SpendingRoute,
   UpcomingRoute: UpcomingRoute,
+  JoinTokenRoute: JoinTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

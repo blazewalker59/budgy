@@ -9,6 +9,7 @@ import {
   Receipt,
   Search,
   Sun,
+  Users,
   Wallet,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -200,6 +201,13 @@ function MemberMenu({ member }: { member: Member }) {
             className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
           >
             <Bot size={15} aria-hidden /> Agents
+          </Link>
+          <Link
+            to="/household"
+            onClick={() => setOpen(false)}
+            className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
+          >
+            <Users size={15} aria-hidden /> Household
           </Link>
           <button
             type="button"

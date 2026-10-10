@@ -27,7 +27,8 @@ import {
   netWorthByMonth,
   ownerNames,
 } from '@/lib/model/accounts'
-import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, OWNERS } from '@/lib/model/types'
+import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
+import { useHousehold } from '@/lib/households/useHousehold'
 import { dayLabel, daysBetween, monthRange } from '@/lib/model/dates'
 import { dollars } from '@/lib/model/money'
 import { ownerColor } from '@/lib/format'
@@ -424,7 +425,13 @@ export function OwnerInput({
   className?: string
 }) {
   const { ix } = useBook()
-  const names = ownerNames(ix.ledger.accounts, OWNERS)
+  const household = useHousehold()
+  const names = ownerNames(ix.ledger.accounts, [
+    'Joint',
+    ...(household.data?.members
+      .map((m) => m.name?.split(' ')[0])
+      .filter((name): name is string => Boolean(name)) ?? []),
+  ])
   return (
     <>
       <input

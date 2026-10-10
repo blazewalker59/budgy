@@ -1,7 +1,7 @@
 /**
  * Server functions for the Household's Ledger. Every Member reads and edits
- * the same rows; each call checks the session against the allowlist first
- * (docs/adr/0001).
+ * the same rows within their Household; each call checks both the session
+ * allowlist and Household membership (docs/adr/0007).
  */
 
 import { createServerFn } from '@tanstack/react-start'
@@ -51,6 +51,7 @@ import { CADENCES, TAGS } from '@/lib/model/types'
 import { payInput } from '@/lib/model/pay'
 import { importRulesSchema } from '@/lib/import/rules'
 import { postedRowInput } from '@/lib/import/posted'
+import { householdRow, inHousehold } from '@/lib/households/scope'
 
 export type { PostSummary } from './accounts'
 
@@ -119,6 +120,7 @@ export const setStoreRule = createServerFn({ method: 'POST' })
     withMember(async ({ db }) => {
       const key = and(
         eq(storeRules.sourceCategory, data.sourceCategory),
+        inHousehold(db, storeRules),
         eq(storeRules.store, data.store),
       )
       const current = await db.select().from(storeRules).where(key).get()
@@ -139,9 +141,13 @@ export const setStoreRule = createServerFn({ method: 'POST' })
       }
       await db
         .insert(storeRules)
-        .values(next)
+        .values(householdRow(db, next))
         .onConflictDoUpdate({
-          target: [storeRules.sourceCategory, storeRules.store],
+          target: [
+            storeRules.householdId,
+            storeRules.sourceCategory,
+            storeRules.store,
+          ],
           set: { category: next.category, tag: next.tag },
         })
       // A store-wide rule makes Moves of that Store to the same place
@@ -153,6 +159,7 @@ export const setStoreRule = createServerFn({ method: 'POST' })
           .where(
             and(
               sql`lower(${transactions.store}) = lower(${data.store})`,
+              inHousehold(db, transactions),
               eq(transactions.category, next.category),
             ),
           )
@@ -175,6 +182,7 @@ export const setTarget = createServerFn({ method: 'POST' })
     withMember(async ({ db }) => {
       const key = and(
         eq(budgetTargets.category, data.category),
+        inHousehold(db, budgetTargets),
         eq(budgetTargets.startsMonth, data.startsMonth),
       )
       if (data.amount === null) {
@@ -184,9 +192,13 @@ export const setTarget = createServerFn({ method: 'POST' })
       await ensureCategory(db, data.category)
       await db
         .insert(budgetTargets)
-        .values({ ...data, amount: data.amount })
+        .values(householdRow(db, { ...data, amount: data.amount }))
         .onConflictDoUpdate({
-          target: [budgetTargets.category, budgetTargets.startsMonth],
+          target: [
+            budgetTargets.householdId,
+            budgetTargets.category,
+            budgetTargets.startsMonth,
+          ],
           set: { amount: data.amount },
         })
     }),
@@ -207,9 +219,9 @@ export const saveCategory = createServerFn({ method: 'POST' })
     withMember(async ({ db }) => {
       await db
         .insert(categories)
-        .values(data)
+        .values(householdRow(db, data))
         .onConflictDoUpdate({
-          target: categories.name,
+          target: [categories.householdId, categories.name],
           set: { tag: data.tag, group: data.group },
         })
     }),
@@ -233,9 +245,9 @@ export const saveLens = createServerFn({ method: 'POST' })
     withMember(async ({ db, member }) => {
       await db
         .insert(savedLenses)
-        .values({ ...data, createdBy: member.email })
+        .values(householdRow(db, { ...data, createdBy: member.email }))
         .onConflictDoUpdate({
-          target: savedLenses.id,
+          target: [savedLenses.householdId, savedLenses.id],
           set: { name: data.name, lens: data.lens },
         })
     }),
@@ -247,7 +259,9 @@ export const deleteLens = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(async ({ db }) => {
-      await db.delete(savedLenses).where(eq(savedLenses.id, data.id))
+      await db
+        .delete(savedLenses)
+        .where(inHousehold(db, savedLenses, eq(savedLenses.id, data.id)))
     }),
   )
 
@@ -309,8 +323,11 @@ export const savePlan = createServerFn({ method: 'POST' })
       const { id, ...rest } = data
       await db
         .insert(plannedExpenses)
-        .values(data)
-        .onConflictDoUpdate({ target: plannedExpenses.id, set: rest })
+        .values(householdRow(db, data))
+        .onConflictDoUpdate({
+          target: [plannedExpenses.householdId, plannedExpenses.id],
+          set: rest,
+        })
     }),
   )
 
@@ -320,7 +337,11 @@ export const deletePlan = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(async ({ db }) => {
-      await db.delete(plannedExpenses).where(eq(plannedExpenses.id, data.id))
+      await db
+        .delete(plannedExpenses)
+        .where(
+          inHousehold(db, plannedExpenses, eq(plannedExpenses.id, data.id)),
+        )
     }),
   )
 
@@ -332,8 +353,11 @@ export const savePay = createServerFn({ method: 'POST' })
       const { id, ...rest } = data
       await db
         .insert(paySchedules)
-        .values(data)
-        .onConflictDoUpdate({ target: paySchedules.id, set: rest })
+        .values(householdRow(db, data))
+        .onConflictDoUpdate({
+          target: [paySchedules.householdId, paySchedules.id],
+          set: rest,
+        })
     }),
   )
 
@@ -343,7 +367,9 @@ export const deletePay = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(async ({ db }) => {
-      await db.delete(paySchedules).where(eq(paySchedules.id, data.id))
+      await db
+        .delete(paySchedules)
+        .where(inHousehold(db, paySchedules, eq(paySchedules.id, data.id)))
     }),
   )
 
@@ -405,7 +431,10 @@ export const setImportRules = createServerFn({ method: 'POST' })
       const value = JSON.stringify(data)
       await db
         .insert(settings)
-        .values({ key: RULES_KEY, value })
-        .onConflictDoUpdate({ target: settings.key, set: { value } })
+        .values(householdRow(db, { key: RULES_KEY, value }))
+        .onConflictDoUpdate({
+          target: [settings.householdId, settings.key],
+          set: { value },
+        })
     }),
   )

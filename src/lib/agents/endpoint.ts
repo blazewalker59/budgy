@@ -9,8 +9,9 @@ import { handleMcp, parseError } from './mcp'
 import { bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
 import { dbFromD1 } from '@/lib/db'
-import { isAllowed } from '@/lib/auth/allowlist'
+import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { today } from '@/lib/model/dates'
+import { householdDatabase } from '@/lib/households/scope'
 
 export const MCP_PATH = '/mcp'
 /** A year of CSV export fits comfortably. */
@@ -36,8 +37,18 @@ export async function serveMcp(
   const db = dbFromD1(env.DB)
   const token = bearerToken(request.headers.get('authorization'))
   const caller = token ? await verifyToken(db, token) : null
-  // A token stops working when its Member leaves the allowlist.
-  if (!caller || !isAllowed(caller.memberEmail, env.ALLOWED_EMAILS)) {
+  // Membership is checked by verifyToken; admission also preserves the
+  // original Household's rollout allowlist without blocking invited partners.
+  if (
+    !caller ||
+    !(await canSignIn(db, caller.memberEmail, env.ALLOWED_EMAILS)) ||
+    !(await canUseHousehold(
+      db,
+      caller.memberEmail,
+      caller.householdId,
+      env.ALLOWED_EMAILS,
+    ))
+  ) {
     return new Response('A Budgy API token is required', {
       status: 401,
       headers: { 'www-authenticate': 'Bearer realm="budgy"' },
@@ -58,7 +69,7 @@ export async function serveMcp(
   try {
     const reply = await handleMcp(
       message,
-      budgyTools(db, caller, today()),
+      budgyTools(householdDatabase(db, caller.householdId), caller, today()),
       caller.scopes.includes('write')
         ? `${INSTRUCTIONS} ${WRITE_INSTRUCTIONS}`
         : INSTRUCTIONS,

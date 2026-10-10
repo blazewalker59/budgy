@@ -9,13 +9,7 @@
 import { z } from 'zod'
 import { addDays, lastDayOf, monthLabel, shiftMonth } from './dates'
 import { categoryOf, ownerOf, tagOf } from './ledger'
-import {
-  ACCOUNT_KINDS,
-  ACCOUNT_KIND_LABELS,
-  OWNERS,
-  TAGS,
-  TAG_LABELS,
-} from './types'
+import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS, TAGS, TAG_LABELS } from './types'
 import type { LedgerIndex } from './ledger'
 import type { AccountKind, Tag, Txn } from './types'
 
@@ -376,7 +370,7 @@ const TAG_WORDS: Record<Tag, Array<string>> = {
 /** Everything the palette can turn into a filter, from the Ledger. */
 export function vocabulary(ix: LedgerIndex): Array<Term> {
   const terms: Array<Term> = []
-  const people = new Set<string>(OWNERS)
+  const people = new Set<string>(['Joint'])
   for (const a of ix.ledger.accounts) people.add(a.owner)
   for (const p of people)
     terms.push({

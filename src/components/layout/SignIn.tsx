@@ -17,7 +17,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function SignIn() {
+export function SignIn({ callbackURL = '/' }: { callbackURL?: string }) {
   return (
     <Frame>
       <h1 className="text-2xl font-extrabold tracking-tight">Budgy</h1>
@@ -26,9 +26,7 @@ export function SignIn() {
       </p>
       <button
         type="button"
-        onClick={() =>
-          void signIn.social({ provider: 'google', callbackURL: '/' })
-        }
+        onClick={() => void signIn.social({ provider: 'google', callbackURL })}
         className="mt-6 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-sm font-semibold text-background"
       >
         Sign in with Google
@@ -40,9 +38,10 @@ export function SignIn() {
 export function NotAllowed({ email }: { email: string }) {
   return (
     <Frame>
-      <h1 className="text-xl font-bold">This budget is private</h1>
+      <h1 className="text-xl font-bold">Budgy is invite-only</h1>
       <p className="mt-2 text-sm text-muted">
-        {email} isn’t on the list of people who can use it.
+        {email} doesn’t have access yet. Sign in with the Google account your
+        invitation was sent to, or ask a Household owner for an invitation.
       </p>
       <button
         type="button"

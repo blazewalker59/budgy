@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { createToken } from './tokens'
 import { apiTokens } from '@/lib/db/schema'
 import { withMember } from '@/lib/auth/session'
+import { inHousehold } from '@/lib/households/scope'
 
 /** Enough for a few Agents; more is likely tokens nobody revoked. */
 const MAX_ACTIVE_TOKENS = 10
@@ -36,7 +37,11 @@ export const getApiTokens = createServerFn({ method: 'GET' }).handler(() =>
       })
       .from(apiTokens)
       .where(
-        and(eq(apiTokens.memberId, member.id), isNull(apiTokens.revokedAt)),
+        and(
+          inHousehold(db, apiTokens),
+          eq(apiTokens.memberId, member.id),
+          isNull(apiTokens.revokedAt),
+        ),
       )
       .orderBy(desc(apiTokens.createdAt)),
   ),
@@ -58,7 +63,11 @@ export const createApiToken = createServerFn({ method: 'POST' })
         .select({ id: apiTokens.id })
         .from(apiTokens)
         .where(
-          and(eq(apiTokens.memberId, member.id), isNull(apiTokens.revokedAt)),
+          and(
+            inHousehold(db, apiTokens),
+            eq(apiTokens.memberId, member.id),
+            isNull(apiTokens.revokedAt),
+          ),
         )
       if (active.length >= MAX_ACTIVE_TOKENS) {
         throw new Error(
@@ -85,7 +94,11 @@ export const revokeApiToken = createServerFn({ method: 'POST' })
         .update(apiTokens)
         .set({ revokedAt: new Date().toISOString() })
         .where(
-          and(eq(apiTokens.id, data.id), eq(apiTokens.memberId, member.id)),
+          and(
+            inHousehold(db, apiTokens),
+            eq(apiTokens.id, data.id),
+            eq(apiTokens.memberId, member.id),
+          ),
         )
     }),
   )

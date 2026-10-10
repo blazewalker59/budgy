@@ -3,6 +3,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  useRouterState,
 } from '@tanstack/react-router'
 import appCss from '../styles.css?url'
 import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
@@ -12,6 +13,7 @@ import { BookProvider } from '@/lib/ledger/book'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotAllowed, SignIn } from '@/components/layout/SignIn'
 import { useServiceWorker } from '@/lib/pwa'
+import { Onboarding } from '@/components/households/Onboarding'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -57,10 +59,17 @@ function Gate() {
   useServiceWorker()
   const session = useSession()
   const state = session.data
-  const ledger = useLedgerQuery(state?.status === 'member')
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const invitation = /^\/join\/[^/]+$/.test(pathname)
+  const ledger = useLedgerQuery(state?.status === 'member' && !invitation)
   if (session.isPending) return <Splash />
+  if (session.isError) return <Crashed error={session.error} />
   if (state?.status === 'not-allowed') return <NotAllowed email={state.email} />
-  if (state?.status !== 'member') return <SignIn />
+  if (state?.status !== 'member' && state?.status !== 'no-household')
+    return <SignIn callbackURL={invitation ? pathname : '/'} />
+  if (invitation) return <Outlet />
+  if (state.status === 'no-household')
+    return <Onboarding member={state.member} />
   if (ledger.isError) return <Crashed error={ledger.error} />
   if (!ledger.data) return <Splash />
   return (

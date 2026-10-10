@@ -15,7 +15,11 @@ export const TAG_BG: Record<Tag, string> = {
 export function ownerColor(owner: string): string {
   if (owner === 'Blaze') return '#2f6db5'
   if (owner === 'Alex') return '#c2417a'
-  return '#8a8f93'
+  if (owner === 'Joint') return '#8a8f93'
+  let hash = 0
+  for (const char of owner)
+    hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0
+  return MIX_COLORS[hash % MIX_COLORS.length]
 }
 
 /** Tag names short enough for a narrow select. */

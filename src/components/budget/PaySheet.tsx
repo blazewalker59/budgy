@@ -167,7 +167,7 @@ function PayForm({
           value={draft.name}
           onChange={(e) => update({ name: e.target.value })}
           onBlur={() => save(draft)}
-          placeholder={isNew ? 'Whose pay (e.g. Blaze)' : 'Name'}
+          placeholder={isNew ? 'Whose pay' : 'Name'}
           maxLength={60}
           aria-label="Whose pay"
           className="field min-w-0 flex-1 font-semibold"

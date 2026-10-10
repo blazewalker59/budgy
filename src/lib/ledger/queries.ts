@@ -3,9 +3,10 @@
  * functions and the Agents' MCP tools (docs/adr/0004). Server-only.
  */
 
-import { eq, sql } from 'drizzle-orm'
-import type { Database } from '@/lib/db'
+import { and, eq, sql } from 'drizzle-orm'
+import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Ledger } from '@/lib/model/types'
+import { householdRow, inHousehold } from '@/lib/households/scope'
 import {
   accounts,
   balances,
@@ -25,8 +26,8 @@ import { readLens } from '@/lib/model/lens'
 export async function loadLedger(db: Database): Promise<Ledger> {
   const [cats, accts, txns, pay, rules, targets, plans, held, lenses] =
     await Promise.all([
-      db.select().from(categories),
-      db.select().from(accounts),
+      db.select().from(categories).where(inHousehold(db, categories)),
+      db.select().from(accounts).where(inHousehold(db, accounts)),
       db
         .select({
           id: transactions.id,
@@ -42,12 +43,27 @@ export async function loadLedger(db: Database): Promise<Ledger> {
           starting: sql<number>`${imports.account} is null`,
         })
         .from(transactions)
-        .leftJoin(imports, eq(imports.id, transactions.importId))
+        .leftJoin(
+          imports,
+          and(
+            eq(imports.id, transactions.importId),
+            eq(imports.householdId, transactions.householdId),
+          ),
+        )
+        .where(inHousehold(db, transactions))
         .orderBy(transactions.date),
-      db.select().from(paySchedules).orderBy(paySchedules.createdAt),
-      db.select().from(storeRules),
-      db.select().from(budgetTargets),
-      db.select().from(plannedExpenses).orderBy(plannedExpenses.createdAt),
+      db
+        .select()
+        .from(paySchedules)
+        .where(inHousehold(db, paySchedules))
+        .orderBy(paySchedules.createdAt),
+      db.select().from(storeRules).where(inHousehold(db, storeRules)),
+      db.select().from(budgetTargets).where(inHousehold(db, budgetTargets)),
+      db
+        .select()
+        .from(plannedExpenses)
+        .where(inHousehold(db, plannedExpenses))
+        .orderBy(plannedExpenses.createdAt),
       db
         .select({
           account: balances.account,
@@ -55,6 +71,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
           amount: balances.amount,
         })
         .from(balances)
+        .where(inHousehold(db, balances))
         .orderBy(balances.date),
       db
         .select({
@@ -63,6 +80,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
           lens: savedLenses.lens,
         })
         .from(savedLenses)
+        .where(inHousehold(db, savedLenses))
         .orderBy(savedLenses.name),
     ])
   return {
@@ -94,8 +112,8 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       anchor,
       secondDay,
     })),
-    rules,
-    targets,
+    rules: rules.map(({ householdId: _h, ...rule }) => rule),
+    targets: targets.map(({ householdId: _h, ...target }) => target),
     plans: plans.map(
       ({ id, name, category, store, amount, cadence, anchor, active }) => ({
         id,
@@ -116,7 +134,10 @@ export async function ensureCategory(
   db: Database,
   name: string,
 ): Promise<void> {
-  await db.insert(categories).values(newCategory(name)).onConflictDoNothing()
+  await db
+    .insert(categories)
+    .values(householdRow(db, newCategory(name)))
+    .onConflictDoNothing()
 }
 
 /** Move one Transaction to a Category (null: back to its Store's). */
@@ -126,7 +147,10 @@ export async function moveTransaction(
   category: string | null,
 ): Promise<void> {
   if (category) await ensureCategory(db, category)
-  await db.update(transactions).set({ category }).where(eq(transactions.id, id))
+  await db
+    .update(transactions)
+    .set({ category })
+    .where(inHousehold(db, transactions, eq(transactions.id, id)))
 }
 
 export async function noteTransaction(
@@ -137,5 +161,5 @@ export async function noteTransaction(
   await db
     .update(transactions)
     .set({ note: note?.trim() || null })
-    .where(eq(transactions.id, id))
+    .where(inHousehold(db, transactions, eq(transactions.id, id)))
 }

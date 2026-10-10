@@ -554,7 +554,7 @@ function Palette({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Kroger, Alex, over 50, last month… or jump"
+            placeholder="A store, person, over 50, last month… or jump"
             className="min-w-0 flex-1 bg-transparent text-[16px] font-medium outline-none placeholder:text-muted/70"
           />
           <Kbd>esc</Kbd>

@@ -19,8 +19,9 @@ export interface CloudflareEnv {
   BETTER_AUTH_URL?: string
   GOOGLE_CLIENT_ID?: string
   GOOGLE_CLIENT_SECRET?: string
-  /** Who may sign in: comma-separated emails (docs/adr/0001). A secret, so
-   * the Household's addresses stay out of the repository. */
+  /** Initial creators and migrated initial-Household sign-ins during closed
+   * rollout (docs/adr/0008). Partners are admitted by invitation. A secret so
+   * personal addresses stay out of the repository. */
   ALLOWED_EMAILS?: string
   /** Production's one host; every other host redirects to it. Unset locally. */
   CANONICAL_HOST?: string

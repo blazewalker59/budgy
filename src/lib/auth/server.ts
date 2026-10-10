@@ -1,13 +1,13 @@
 /**
  * Better Auth server, configured as sportsline: Google sign-in only, Drizzle
- * adapter on D1. Unlike sportsline, only allowlisted emails get an account
- * (docs/adr/0001).
+ * adapter on D1. Closed rollout admits allowlisted creators, invitees and
+ * existing Members, not arbitrary new sign-ins (docs/adr/0008).
  */
 
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { isAllowed } from './allowlist'
 import type { CloudflareEnv } from '@/lib/db'
+import { canSignIn } from '@/lib/households/admission'
 import { dbFromD1 } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 
@@ -31,9 +31,10 @@ export function getAuth(env: CloudflareEnv, baseURL?: string) {
     databaseHooks: {
       user: {
         create: {
-          // A stranger's Google sign-in ends here: no user row, no session.
+          // Invitation admission allows first-time partner sign-in without
+          // changing deployment secrets; it does not join their Household.
           before: (user) =>
-            Promise.resolve(isAllowed(user.email, env.ALLOWED_EMAILS)),
+            canSignIn(dbFromD1(env.DB), user.email, env.ALLOWED_EMAILS),
         },
       },
     },

@@ -11,7 +11,7 @@ import { z } from 'zod'
 import { tool } from './mcp'
 import type { McpTool } from './mcp'
 import type { Caller } from './tokens'
-import type { Database } from '@/lib/db'
+import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Book } from '@/lib/model/book'
 import {
   loadLedger,
@@ -41,16 +41,16 @@ import { categoryOf, ownerOf, targetFor } from '@/lib/model/ledger'
 import { monthlySetAside } from '@/lib/model/plans'
 import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
-import { CADENCE_LABELS, OWNERS, PAY_CADENCE_LABELS } from '@/lib/model/types'
+import { CADENCE_LABELS, PAY_CADENCE_LABELS } from '@/lib/model/types'
 
-export const INSTRUCTIONS = `Budgy is a household budget (two people, Blaze and Alex, plus Joint accounts). All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Purchases arrive per account (a Member's upload of that account's export, or an Agent's add_transactions), so data is only as fresh as each account's latest: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have an account's new purchases (say, the day's Apple Card activity), add them with add_transactions (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
+export const INSTRUCTIONS = `Budgy is a household budget. Your token accesses only its own Household. Discover account owners from the Ledger rather than assuming their names. All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are big known bills (car insurance twice a year) budgeted on their due dates, so they are kept out of everyday totals and Targets. "Typical" is the average month without planned bills. Purchases arrive per account (a Member's upload of that account's export, or an Agent's add_transactions), so data is only as fresh as each account's latest: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have an account's new purchases (say, the day's Apple Card activity), add them with add_transactions (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
 
 export const WRITE_INSTRUCTIONS =
   'This token may also change the Ledger: add_transactions adds purchases you read yourself to one account (for a daily Apple Card upload: the day’s purchases, commit true); record_balances records account balances, one or a whole history; update_transaction moves a purchase to another Category or notes it. Preview purchases with commit false first unless asked for a scheduled one. Say what you changed.'
 
 const MONTH = z.string().regex(/^\d{4}-\d{2}$/, 'A month as YYYY-MM')
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'A date as YYYY-MM-DD')
-const OWNER = z.enum(OWNERS as unknown as [string, ...Array<string>])
+const OWNER = z.string().trim().min(1).max(60)
 
 const usd = (cents: number) => Math.round(cents) / 100
 
@@ -85,6 +85,8 @@ export function budgyTools(
   caller: Caller,
   today: string,
 ): Array<McpTool> {
+  if (db.householdId !== caller.householdId)
+    throw new Error('Household scope mismatch')
   let cached: Promise<Book> | null = null
   const book = () =>
     (cached ??= loadLedger(db).then((ledger) => buildBook(ledger, today)))
@@ -477,7 +479,7 @@ export function budgyTools(
           reach.set(t.account, r)
         }
         return {
-          owners: OWNERS,
+          owners: [...new Set(b.ix.ledger.accounts.map((a) => a.owner))].sort(),
           accounts: b.ix.ledger.accounts.map((a) => ({
             account: a.name,
             owner: a.owner,

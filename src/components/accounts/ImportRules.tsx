@@ -5,6 +5,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getImportRules, setImportRules } from '@/lib/ledger/server'
+import { useSession } from '@/lib/ledger/useLedger'
 
 const RULES_KEY = ['import-rules'] as const
 
@@ -15,9 +16,14 @@ const RULES_KEY = ['import-rules'] as const
  */
 export function ImportRules() {
   const queryClient = useQueryClient()
+  const { data: session } = useSession()
   const [open, setOpen] = useState(false)
   const rules = useQuery({
-    queryKey: RULES_KEY,
+    queryKey: [
+      ...RULES_KEY,
+      session?.status === 'member' ? session.household.id : null,
+      session?.status === 'member' ? session.member.id : null,
+    ],
     queryFn: () => getImportRules(),
     enabled: open,
   })

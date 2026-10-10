@@ -5,8 +5,9 @@
 
 import { eq, getTableColumns } from 'drizzle-orm'
 import type { Table } from 'drizzle-orm'
-import type { Database } from '@/lib/db'
+import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { ImportRules } from '@/lib/import/rules'
+import { inHousehold } from '@/lib/households/scope'
 import { settings } from '@/lib/db/schema'
 import { parseImportRules } from '@/lib/import/rules'
 
@@ -29,7 +30,7 @@ export async function loadImportRules(db: Database): Promise<ImportRules> {
   const row = await db
     .select({ value: settings.value })
     .from(settings)
-    .where(eq(settings.key, RULES_KEY))
+    .where(inHousehold(db, settings, eq(settings.key, RULES_KEY)))
     .get()
   return parseImportRules(row?.value)
 }

@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Superseded by [0007](./0007-household-isolation.md) and
+[0008](./0008-household-creation-and-invitations.md): explicit membership scopes
+Ledger access; closed registration admits allowlisted creators and invitees.
+The original Household retains an additional rollout gate for migrated users.
 
 ## Context
 

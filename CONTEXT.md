@@ -7,11 +7,17 @@ not a spec.
 ## Language
 
 **Household**:
-The people who share one Ledger. Budgy has exactly one.
+The people who share one Ledger. Each Household's Ledger is isolated from
+every other Household (docs/adr/0007).
 
 **Member**:
-Someone in the Household, allowed in by email (docs/adr/0001). Every Member
-sees and edits everything.
+Someone in the Household, admitted through explicit membership
+(docs/adr/0007). Registration is closed to allowlisted creators and invitees
+during rollout (docs/adr/0008). Every Member sees
+and edits everything in their Household, never another Household's Ledger.
+An owner manages membership; this is separate from an Account's spending Owner.
+A person belongs to one Household. An invitation is email-bound, expires
+after seven days, and is accepted explicitly; it never merges Ledgers.
 _Avoid_: user, viewer
 
 **Ledger**:
@@ -163,4 +169,3 @@ whose imports look out of date.
 One day's purchases across every Account, by person, Account and Category,
 with the month so far and the current Budget Alerts: what a scheduled Agent
 sends each morning.
-

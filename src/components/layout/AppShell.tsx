@@ -21,6 +21,7 @@ import { keepLens } from '@/lib/ledger/search'
 import { openPalette } from '@/lib/ledger/useLens'
 import { cn } from '@/lib/utils'
 import { CommandPalette } from '@/components/lens/CommandPalette'
+import { LedgerSaveError } from '@/components/shared/LedgerSaveError'
 
 /** Four places; the Lens (the filters) follows from one to the next. */
 const NAV = [
@@ -71,7 +72,10 @@ export function AppShell({
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-3 pt-3">{children}</main>
+      <main className="mx-auto max-w-6xl px-3 pt-3">
+        <LedgerSaveError />
+        {children}
+      </main>
       <BottomBar />
     </div>
   )

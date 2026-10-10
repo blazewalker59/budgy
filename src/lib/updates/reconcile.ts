@@ -21,6 +21,7 @@ export async function prepareIdentified(input: {
   categories: Array<string>
   history: Parameters<typeof preparePosted>[0]['history']
   rules: ImportRules
+  owners?: ReadonlyArray<string>
 }) {
   if (
     !input.namespace ||

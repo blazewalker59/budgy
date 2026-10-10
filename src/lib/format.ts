@@ -11,11 +11,11 @@ export const TAG_BG: Record<Tag, string> = {
   fluff: 'bg-fluff',
 }
 
-/** Whose Account, as a dot color. */
+/**
+ * Whose Account, as a dot color. The same name always maps to the same
+ * palette color; no Household's people are special-cased.
+ */
 export function ownerColor(owner: string): string {
-  if (owner === 'Blaze') return '#2f6db5'
-  if (owner === 'Alex') return '#c2417a'
-  if (owner === 'Joint') return '#8a8f93'
   let hash = 0
   for (const char of owner)
     hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0

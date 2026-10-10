@@ -16,12 +16,17 @@ const BookContext = createContext<Book | null>(null)
 
 export function BookProvider({
   ledger,
+  timeZone,
   children,
 }: {
   ledger: Ledger
+  timeZone: string
   children: ReactNode
 }) {
-  const book = useMemo(() => buildBook(ledger, today()), [ledger])
+  const book = useMemo(
+    () => buildBook(ledger, today(timeZone)),
+    [ledger, timeZone],
+  )
   return <BookContext.Provider value={book}>{children}</BookContext.Provider>
 }
 

@@ -40,8 +40,10 @@ export const CADENCE_LABELS: Record<Cadence, string> = {
   annual: 'Once a year',
 }
 
-/** Who an Account's spending belongs to. */
-export const OWNERS = ['Joint', 'Blaze', 'Alex'] as const
+/**
+ * Who an Account's spending belongs to: Joint, or a name this Household
+ * uses. There is no global list of people.
+ */
 export type Owner = string
 
 export interface Category {

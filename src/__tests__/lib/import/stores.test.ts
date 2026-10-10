@@ -7,9 +7,13 @@ import { bucketCategory, isSpending, storeName } from '@/lib/import/stores'
 const RULES: ImportRules = {
   stores: [['Green Lawn', 'Green Lawn Care']],
   upkeep: 'Green Lawn|^Bug Guys$',
+  hardware: ["Lowe's", 'Home Depot', 'Ace Hardware'],
+  upkeepExclude: 'golf',
   mortgage: 'Homeloan Servicing',
+  mortgageCategory: 'Mortgage and Utilities',
   notSpending: 'Index Fund',
 }
+const OWNERS = ['Joint', 'Blaze', 'Sam']
 
 describe('storeName', () => {
   it('strips processor prefixes and reference numbers', () => {
@@ -28,7 +32,8 @@ describe('storeName', () => {
 
 describe('bucketCategory', () => {
   it('re-files home upkeep, mortgage, utilities and personal spending', () => {
-    expect(bucketCategory('Shopping', "Lowe's #123", "Lowe's")).toBe(
+    expect(bucketCategory('Shopping', "Lowe's #123", "Lowe's")).toBe('Shopping')
+    expect(bucketCategory('Shopping', "Lowe's #123", "Lowe's", RULES)).toBe(
       'Home upkeep',
     )
     expect(bucketCategory('Other', 'Bug Guys', 'Bug Guys', RULES)).toBe(
@@ -45,12 +50,25 @@ describe('bucketCategory', () => {
     expect(
       bucketCategory('Mortgage and Utilities', 'Spectrum', 'x', RULES),
     ).toBe('Utilities & phones')
-    expect(bucketCategory('Blaze', 'x', 'x')).toBe('Blaze personal')
+    expect(bucketCategory('Mortgage and Utilities', 'Spectrum', 'x')).toBe(
+      'Mortgage and Utilities',
+    )
+    expect(bucketCategory('Blaze', 'x', 'x')).toBe('Blaze')
+    expect(bucketCategory('Blaze', 'x', 'x', EMPTY_RULES, OWNERS)).toBe(
+      'Blaze personal',
+    )
+    expect(bucketCategory('Sam', 'x', 'x', EMPTY_RULES, OWNERS)).toBe(
+      'Sam personal',
+    )
+    expect(bucketCategory('Joint', 'x', 'x', EMPTY_RULES, OWNERS)).toBe('Joint')
     expect(bucketCategory('Other', 'CHECK 1', 'Paper checks')).toBe(
       'Checks & cash',
     )
-    expect(bucketCategory('Entertainment', 'Home Depot golf', 'x')).toBe(
+    expect(bucketCategory('Entertainment', 'Home Depot golf', 'x', RULES)).toBe(
       'Entertainment',
+    )
+    expect(bucketCategory('Entertainment', 'Home Depot', 'x', RULES)).toBe(
+      'Home upkeep',
     )
   })
 

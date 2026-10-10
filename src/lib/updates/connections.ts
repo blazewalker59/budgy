@@ -16,6 +16,7 @@ import { hashToken } from '@/lib/agents/tokens'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
+import { householdTimeZone } from '@/lib/households/locale'
 import { today } from '@/lib/model/dates'
 
 /** Bridge asks clients to stay under 24 requests a day per connection. */
@@ -65,7 +66,7 @@ export async function connectSimplefin(
 
 /** Count a Bridge request against today's allowance, or refuse it. */
 async function spendRequest(db: HouseholdDatabase, id: string) {
-  const day = today()
+  const day = today(await householdTimeZone(db))
   const spent = await db
     .update(bankConnections)
     .set({

@@ -1,8 +1,9 @@
 /** Household creation and membership changes. Authorization is enforced here,
  * as well as in server functions, so other entry points cannot bypass it. */
 import { and, eq, gt, isNull, sql } from 'drizzle-orm'
-import { inHousehold } from './scope'
+import { DEFAULT_OWNERS } from './locale'
 import { findMemberHousehold, memberHousehold } from './membership'
+import { inHousehold } from './scope'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from './scope'
 import { hashToken } from '@/lib/agents/tokens'
@@ -14,6 +15,7 @@ import {
   households,
   user,
 } from '@/lib/db/schema'
+import { DEFAULT_TIME_ZONE } from '@/lib/model/dates'
 import { DEFAULT_CATEGORIES } from '@/lib/model/defaults'
 import { rowsPerInsert } from '@/lib/ledger/importer'
 
@@ -22,7 +24,13 @@ export interface HouseholdActor {
   email: string
   emailVerified: boolean
 }
-export type Household = { id: string; name: string; role: 'owner' | 'member' }
+export type Household = {
+  id: string
+  name: string
+  role: 'owner' | 'member'
+  timeZone: string
+  owners: Array<string>
+}
 
 export const normalizeEmail = (email: string) => email.trim().toLowerCase()
 const stamp = sql`cast(unixepoch('subsecond') * 1000 as integer)`
@@ -82,13 +90,24 @@ export async function createHousehold(
       db.insert(categories).values(defaults.slice(i, i + perInsert)),
     )
   await db.batch([
-    db.insert(households).values({ id, name }),
+    db.insert(households).values({
+      id,
+      name,
+      timeZone: DEFAULT_TIME_ZONE,
+      owners: JSON.stringify(DEFAULT_OWNERS),
+    }),
     db
       .insert(householdMembers)
       .values({ householdId: id, memberId: actor.id, role: 'owner' }),
     ...categoryInserts,
   ])
-  return { id, name, role: 'owner' }
+  return {
+    id,
+    name,
+    role: 'owner',
+    timeZone: DEFAULT_TIME_ZONE,
+    owners: [...DEFAULT_OWNERS],
+  }
 }
 
 export async function householdDetails(
@@ -301,7 +320,10 @@ export async function acceptInvite(
   ])
   if (!inserted.length)
     throw new Error('This invitation is no longer available')
-  return { id: invite.householdId, name: invite.name, role: 'member' }
+  const joined = await findMemberHousehold(db, actor.id)
+  if (!joined || joined.id !== invite.householdId)
+    throw new Error('This invitation is no longer available')
+  return joined
 }
 
 export async function removeMember(

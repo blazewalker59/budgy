@@ -12,6 +12,7 @@ import {
   revokeApiToken,
 } from '@/lib/agents/server'
 import { useSession } from '@/lib/ledger/useLedger'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 import { CopyLine } from '@/components/shared/CopyLine'
 
 const TOKENS_KEY = ['api-tokens']
@@ -32,6 +33,7 @@ export function AgentsScreen() {
   const [name, setName] = useState('')
   const [write, setWrite] = useState(true)
   const [created, setCreated] = useState<string | null>(null)
+  const [revoking, setRevoking] = useState<string | null>(null)
   const create = useMutation({
     mutationFn: (v: { name: string; write: boolean }) =>
       createApiToken({ data: v }),
@@ -161,37 +163,53 @@ export function AgentsScreen() {
         ) : (
           <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
             {tokens.data.map((t) => (
-              <li
-                key={t.id}
-                className="flex items-center gap-2 px-3 py-1.5 text-[13px]"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-semibold">{t.name}</span>
-                  <span className="block truncate text-[11px] text-muted">
-                    <span className="font-mono">{t.prefix}…</span> ·{' '}
-                    {t.scopes.includes('write')
-                      ? 'read, import, edit'
-                      : 'read only'}{' '}
-                    ·{' '}
-                    {t.lastUsedAt
-                      ? `used ${new Date(t.lastUsedAt).toLocaleString()}`
-                      : 'never used'}
-                  </span>
-                </span>
-                <button
-                  type="button"
-                  disabled={revoke.isPending}
-                  onClick={() => {
-                    if (confirm(`Revoke “${t.name}”? Its agent stops working.`))
+              <li key={t.id} className="px-3 py-1.5 text-[13px]">
+                {revoking === t.id ? (
+                  <ConfirmPanel
+                    question={`Revoke “${t.name}”?`}
+                    detail="Its agent stops working."
+                    action="Revoke"
+                    onConfirm={() => {
                       revoke.mutate(t.id)
-                  }}
-                  className="rounded-full px-2 py-0.5 text-xs font-semibold text-muted hover:text-over disabled:opacity-50"
-                >
-                  Revoke
-                </button>
+                      setRevoking(null)
+                    }}
+                    onCancel={() => setRevoking(null)}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">
+                        {t.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted">
+                        <span className="font-mono">{t.prefix}…</span> ·{' '}
+                        {t.scopes.includes('write')
+                          ? 'read, import, edit'
+                          : 'read only'}{' '}
+                        ·{' '}
+                        {t.lastUsedAt
+                          ? `used ${new Date(t.lastUsedAt).toLocaleString()}`
+                          : 'never used'}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      disabled={revoke.isPending}
+                      onClick={() => setRevoking(t.id)}
+                      className="rounded-full px-2 py-0.5 text-xs font-semibold text-muted hover:text-over disabled:opacity-50"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
+        )}
+        {revoke.isError && (
+          <p role="alert" className="mt-2 text-xs text-over">
+            {revoke.error.message}
+          </p>
         )}
       </section>
     </div>

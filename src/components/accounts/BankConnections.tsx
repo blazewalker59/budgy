@@ -22,6 +22,7 @@ import {
   useBankConnections,
 } from '@/lib/updates/useUpdates'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
+import { ConfirmPanel } from '@/components/shared/Confirm'
 import { Dropdown } from '@/components/shared/Dropdown'
 
 type Connection = NonNullable<
@@ -269,6 +270,7 @@ function ConnectionRow({
     mutationFn: () => disconnectBank({ data: { id: connection.id } }),
     onSettled: onChange,
   })
+  const [confirming, setConfirming] = useState(false)
   const unlinked = connection.accounts.filter((a) => !a.account && a.present)
   const problem =
     discover.error?.message ??
@@ -303,20 +305,25 @@ function ConnectionRow({
           <button
             type="button"
             disabled={disconnect.isPending}
-            onClick={() => {
-              if (
-                confirm(
-                  `Disconnect ${connection.name}? Purchases already in Budgy stay. Also revoke access in SimpleFIN Bridge.`,
-                )
-              )
-                disconnect.mutate()
-            }}
+            onClick={() => setConfirming(true)}
             className="min-h-11 rounded-full px-2 font-semibold text-muted hover:text-over disabled:opacity-50"
           >
             Disconnect
           </button>
         </div>
       </div>
+      {confirming && (
+        <ConfirmPanel
+          question={`Disconnect ${connection.name}?`}
+          detail="Purchases already in Budgy stay. Also revoke access in SimpleFIN Bridge."
+          action="Disconnect"
+          onConfirm={() => {
+            setConfirming(false)
+            disconnect.mutate()
+          }}
+          onCancel={() => setConfirming(false)}
+        />
+      )}
       {problem && (
         <p role="alert" className="text-over">
           {problem}

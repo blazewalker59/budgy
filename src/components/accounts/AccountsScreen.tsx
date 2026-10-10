@@ -489,6 +489,7 @@ export function OwnerInput({
   const household = useHousehold()
   const names = ownerNames(ix.ledger.accounts, [
     'Joint',
+    ...(household.data?.household.owners ?? []),
     ...(household.data?.members
       .map((m) => m.name?.split(' ')[0])
       .filter((name): name is string => Boolean(name)) ?? []),

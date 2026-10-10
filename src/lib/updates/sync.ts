@@ -19,6 +19,7 @@ import {
   postTransactions,
   recordBalances,
 } from '@/lib/ledger/accounts'
+import { householdTimeZone } from '@/lib/households/locale'
 import { addDays, dateOn, today } from '@/lib/model/dates'
 import { isDebt } from '@/lib/model/accounts'
 
@@ -37,12 +38,11 @@ export interface SyncedAccount {
   error?: string
 }
 
-const day = (seconds: number) => dateOn(new Date(seconds * 1000))
-
 /** A posted SimpleFIN transaction as a purchase row, or null if it isn't one. */
 export function purchaseRow(
   t: SimplefinTransaction,
   debt: boolean,
+  timeZone: string,
 ): PostedRow | 'excluded' | null {
   if (t.pending || !t.posted) return null
   // SimpleFIN amounts are negative for money out; Budgy's are positive.
@@ -50,7 +50,7 @@ export function purchaseRow(
   const description = t.description.slice(0, 200) || 'Unnamed purchase'
   if (!isSpending(cents, description, '', debt)) return 'excluded'
   return {
-    date: day(t.transactedAt ?? t.posted),
+    date: dateOn(new Date((t.transactedAt ?? t.posted) * 1000), timeZone),
     description,
     amount: cents / 100,
     sourceId: t.id,
@@ -75,7 +75,8 @@ export async function syncConnection(
     )
   if (!mapped.length)
     throw new Error('Link a bank account to a Budgy account first.')
-  const until = today()
+  const timeZone = await householdTimeZone(db)
+  const until = today(timeZone)
   const from = mapped
     .map((m) =>
       m.syncedThrough
@@ -119,7 +120,7 @@ export async function syncConnection(
         const rows: Array<PostedRow> = []
         let excluded = 0
         for (const t of source.transactions) {
-          const row = purchaseRow(t, debt)
+          const row = purchaseRow(t, debt, timeZone)
           if (row === 'excluded') excluded++
           else if (row) rows.push(row)
         }
@@ -142,7 +143,9 @@ export async function syncConnection(
         [
           {
             account: account.name,
-            date: source.balanceDate ? day(source.balanceDate) : until,
+            date: source.balanceDate
+              ? dateOn(new Date(source.balanceDate * 1000), timeZone)
+              : until,
             amount: debt ? -cents : cents,
           },
         ],

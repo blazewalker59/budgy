@@ -25,7 +25,7 @@ const NICE = [
   'Other',
 ]
 const FLUFF = ['Drinks & dining', 'Entertainment', 'Personal spending']
-export const HOUSING = ['Mortgage', 'Utilities & phones', 'Home upkeep']
+const HOUSING = ['Mortgage', 'Utilities & phones', 'Home upkeep']
 
 export const DEFAULT_CATEGORIES: ReadonlyArray<Category> = [
   ...NEEDS.map((name) => ({

@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { HOUSEHOLD_INVITE_KEY } from '@/lib/households/useHousehold'
 import { getHouseholdInvite, joinHousehold } from '@/lib/households/server'
 import { useSession } from '@/lib/ledger/useLedger'
 import { signOut } from '@/lib/auth/client'
@@ -12,7 +13,7 @@ export function JoinHousehold({ token }: { token: string }) {
       ? session.member
       : null
   const invite = useQuery({
-    queryKey: ['household-invite', token, member?.id],
+    queryKey: [...HOUSEHOLD_INVITE_KEY, token, member?.id],
     queryFn: () => getHouseholdInvite({ data: { token } }),
     enabled: Boolean(member),
     retry: false,

@@ -1,0 +1,27 @@
+name: Setup
+description: Install Bun (and Node, when a version is given) and the lockfile
+
+inputs:
+  node-version:
+    description: Node.js version to install before Bun. Leave empty to skip Node.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v6
+      if: inputs.node-version != ''
+      with:
+        node-version: ${{ inputs.node-version }}
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.5
+    - uses: actions/cache@v6
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
+    - shell: bash
+      run: bun install --frozen-lockfile

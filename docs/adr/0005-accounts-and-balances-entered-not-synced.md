@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Superseded by [0010](./0010-shortcut-uploads-and-simplefin-connections.md):
+SimpleFIN sync writes Balances and posted purchases for mapped Accounts.
+Members can still enter Accounts and Balances by hand, and Apple Card still
+arrives as an export rather than a live sync.
 
 ## Context
 

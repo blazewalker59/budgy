@@ -57,7 +57,7 @@ export default {
     if (url.pathname === UPLOAD_PATH) return serveUpload(request, env)
 
     if (url.pathname.startsWith('/api/auth')) {
-      return getAuth(env, url.origin).handler(request)
+      return getAuth(env).handler(request)
     }
 
     return serverRequestContext.run({ headers: request.headers, env }, () =>

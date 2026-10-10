@@ -40,7 +40,7 @@ export interface SyncedAccount {
 const day = (seconds: number) => dateOn(new Date(seconds * 1000))
 
 /** A posted SimpleFIN transaction as a purchase row, or null if it isn't one. */
-export function purchaseRow(
+function purchaseRow(
   t: SimplefinTransaction,
   debt: boolean,
 ): PostedRow | 'excluded' | null {

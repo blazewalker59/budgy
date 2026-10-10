@@ -8,6 +8,7 @@
 
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
+import { ImportRules } from './ImportRules'
 import type { StoreRule } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
 import { useSetStoreRule } from '@/lib/ledger/useLedger'
@@ -17,7 +18,6 @@ import { dayLabel } from '@/lib/model/dates'
 import { TAG_LABELS } from '@/lib/model/types'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { TxnList } from '@/components/shared/TxnList'
-import { ImportRules } from '@/components/accounts/ImportRules'
 
 export function RulesTab() {
   const { ix } = useBook()

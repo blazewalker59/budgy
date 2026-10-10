@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted; implemented, not yet deployed.
+Accepted. Implemented and deployed: Google sign-in, Household creation, and
+email-bound invitations are in production.
 
 ## Decision
 

@@ -14,7 +14,7 @@ import type { LedgerIndex } from './ledger'
 import type { MonthView } from './month'
 import type { PaySchedule } from './types'
 
-export interface BillLine {
+interface BillLine {
   name: string
   /** Cents: what was paid, what's due, or (usual) about what's to come. */
   amount: number
@@ -34,14 +34,14 @@ export interface MonthBills {
 }
 
 /** Months of history that decide what a Housing Category usually costs. */
-export const USUAL_MONTHS = 6
+const USUAL_MONTHS = 6
 /** Months of those it must post in to count as a monthly bill. */
-export const REGULAR_MONTHS = 4
+const REGULAR_MONTHS = 4
 /**
  * How far a bill's months may spread (standard deviation over the mean):
  * utilities move with the seasons; home upkeep swings too much to expect.
  */
-export const STEADY = 0.5
+const STEADY = 0.5
 
 export function monthBills(
   ix: LedgerIndex,

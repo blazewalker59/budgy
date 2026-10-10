@@ -11,15 +11,39 @@ import { canSignIn } from '@/lib/households/admission'
 import { dbFromD1 } from '@/lib/db'
 import * as schema from '@/lib/db/schema'
 
-export function getAuth(env: CloudflareEnv, baseURL?: string) {
+/**
+ * Google OAuth credentials. Production must have both secrets. Vite dev and
+ * Vitest may omit them (DEV_MEMBER_EMAIL, or auth mocked in tests) and still
+ * boot; a half-set pair is a misconfiguration in every environment.
+ */
+function googleCredentials(env: CloudflareEnv): {
+  clientId: string
+  clientSecret: string
+} {
+  const clientId = env.GOOGLE_CLIENT_ID
+  const clientSecret = env.GOOGLE_CLIENT_SECRET
+  if (clientId && clientSecret) return { clientId, clientSecret }
+  if (
+    (import.meta.env.DEV || import.meta.env.MODE === 'test') &&
+    !clientId &&
+    !clientSecret
+  ) {
+    return { clientId: '', clientSecret: '' }
+  }
+  throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must both be set')
+}
+
+export function getAuth(env: CloudflareEnv) {
+  const google = googleCredentials(env)
   return betterAuth({
-    baseURL: baseURL ?? env.BETTER_AUTH_URL,
+    // Same base URL session reads. The request host is not a second source.
+    baseURL: env.BETTER_AUTH_URL,
     secret: env.BETTER_AUTH_SECRET,
     database: drizzleAdapter(dbFromD1(env.DB), { provider: 'sqlite', schema }),
     socialProviders: {
       google: {
-        clientId: env.GOOGLE_CLIENT_ID ?? '',
-        clientSecret: env.GOOGLE_CLIENT_SECRET ?? '',
+        clientId: google.clientId,
+        clientSecret: google.clientSecret,
       },
     },
     account: {

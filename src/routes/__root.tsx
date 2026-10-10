@@ -6,8 +6,8 @@ import {
   useRouterState,
 } from '@tanstack/react-router'
 import appCss from '../styles.css?url'
-import { THEME_BOOT, THEME_COLOR_BOOT } from '../lib/theme'
 import type { QueryClient } from '@tanstack/react-query'
+import { THEME_BOOT, THEME_COLOR_BOOT } from '@/lib/theme'
 import { useLedgerQuery, useSession } from '@/lib/ledger/useLedger'
 import { BookProvider } from '@/lib/ledger/book'
 import { AppShell } from '@/components/layout/AppShell'

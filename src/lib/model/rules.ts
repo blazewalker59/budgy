@@ -48,7 +48,7 @@ export interface RuleSuggestion {
 }
 
 /** A Store needs at least this many Moves to one Category to suggest a rule. */
-export const MIN_MOVES = 2
+const MIN_MOVES = 2
 
 /**
  * Rules the Moves suggest: each Store whose purchases were Moved to one

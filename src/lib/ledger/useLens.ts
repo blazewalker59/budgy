@@ -12,7 +12,7 @@ import { NO_LENS, isEmpty, readLens, withFilter } from '@/lib/model/lens'
 export type LensPage = '/' | '/spending' | '/plan' | '/accounts'
 
 /** What each screen honors of the Lens (Overview: all but the dates). */
-export const HONORS: Record<LensPage, Array<keyof Lens> | 'all'> = {
+const HONORS: Record<LensPage, Array<keyof Lens> | 'all'> = {
   '/': 'all',
   '/spending': 'all',
   '/plan': ['people'],

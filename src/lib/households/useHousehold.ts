@@ -3,6 +3,7 @@ import { getHousehold } from './server'
 import { useSession } from '@/lib/ledger/useLedger'
 
 export const HOUSEHOLD_KEY = ['household'] as const
+export const HOUSEHOLD_INVITE_KEY = ['household-invite'] as const
 
 export function useHousehold() {
   const { data: session } = useSession()

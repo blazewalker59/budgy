@@ -150,9 +150,9 @@ export async function loadLedger(db: Database): Promise<Ledger> {
 }
 
 /** Where the net worth baseline is kept (a YYYY-MM-DD day). */
-export const BASELINE_KEY = 'worth-baseline'
+const BASELINE_KEY = 'worth-baseline'
 
-export async function loadBaseline(db: Database): Promise<string | null> {
+async function loadBaseline(db: Database): Promise<string | null> {
   const row = await db
     .select({ value: settings.value })
     .from(settings)

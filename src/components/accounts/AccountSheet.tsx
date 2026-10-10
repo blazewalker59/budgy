@@ -32,6 +32,7 @@ import {
 import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
 import { dayLabel, monthLabel, monthRange } from '@/lib/model/dates'
 import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
+import { everyTxn } from '@/lib/model/ledger'
 import { cn } from '@/lib/utils'
 import { Sheet } from '@/components/shared/Sheet'
 import { WorthChart } from '@/components/charts/lazy'
@@ -371,7 +372,7 @@ function ImportHistory({
   const startingHere = useMemo(() => {
     if (!bought.length) return 0
     const dates = bought.map((r) => r.date).sort()
-    return ix.ledger.txns.filter(
+    return everyTxn(ix).filter(
       (t) =>
         t.starting &&
         t.account === account.name &&
@@ -701,7 +702,7 @@ function StartingHere({ name }: { name: string }) {
   const removeStarting = useRemoveStarting()
   const [confirm, setConfirm] = useState(false)
   const n = useMemo(
-    () => ix.ledger.txns.filter((t) => t.starting && t.account === name).length,
+    () => everyTxn(ix).filter((t) => t.starting && t.account === name).length,
     [ix, name],
   )
   if (!n) return null

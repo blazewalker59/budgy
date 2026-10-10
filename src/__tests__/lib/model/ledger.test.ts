@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { ledger, txn } from '@test/factories'
 import {
+  TRANSFER,
+  allCategoryNames,
   categoryOf,
+  everyTxn,
   indexLedger,
   ownerOf,
   storeCategory,
@@ -57,5 +60,42 @@ describe('resolving a Transaction', () => {
   it('reads the owner from the Account, Joint when unknown', () => {
     expect(ownerOf(ix, chewy)).toBe('Blaze')
     expect(ownerOf(ix, txn({ account: 'Mystery card' }))).toBe('Joint')
+  })
+})
+
+describe('Transfers', () => {
+  const payment = txn({ store: 'NY 529 Plan', sourceCategory: 'Transfers' })
+  const marked = txn({ store: 'Venmo', category: TRANSFER })
+  const groceries = txn({ store: 'Kroger', sourceCategory: 'Groceries' })
+  const ix = indexLedger(
+    ledger({
+      txns: [payment, marked, groceries],
+      rules: [
+        {
+          sourceCategory: '*',
+          store: 'NY 529 Plan',
+          category: TRANSFER,
+          tag: null,
+        },
+      ],
+    }),
+  )
+
+  it('sets aside Transactions a Store Rule or a Move files as a Transfer', () => {
+    expect(ix.ledger.txns).toEqual([groceries])
+    expect(ix.transfers).toEqual([payment, marked])
+    expect(everyTxn(ix)).toHaveLength(3)
+  })
+
+  it('never makes Transfer a Category', () => {
+    expect(ix.categories.has(TRANSFER)).toBe(false)
+    expect(allCategoryNames(ix)).not.toContain(TRANSFER)
+  })
+
+  it('leaves the Ledger alone when nothing is a Transfer', () => {
+    const plain = ledger({ txns: [groceries] })
+    const pix = indexLedger(plain)
+    expect(pix.ledger).toBe(plain)
+    expect(everyTxn(pix)).toBe(plain.txns)
   })
 })

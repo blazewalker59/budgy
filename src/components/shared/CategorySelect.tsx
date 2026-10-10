@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useBook } from '@/lib/ledger/book'
-import { allCategoryNames } from '@/lib/model/ledger'
+import { TRANSFER, allCategoryNames } from '@/lib/model/ledger'
 import { cn } from '@/lib/utils'
 
 const NEW = '__new'
 
-/** Pick a Category, or type a new one. */
+/** Pick a Category (or Transfer), or type a new one. */
 export function CategorySelect({
   value,
   defaultValue,
@@ -66,6 +66,10 @@ export function CategorySelect({
           {n === defaultValue && value !== defaultValue ? ' (usual)' : ''}
         </option>
       ))}
+      <option value={TRANSFER}>
+        Transfer, not spending
+        {TRANSFER === defaultValue && value !== defaultValue ? ' (usual)' : ''}
+      </option>
       <option value={NEW}>New category…</option>
     </select>
   )

@@ -38,7 +38,7 @@ import type {
   Tag,
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
-import { ANY_SOURCE } from '@/lib/model/ledger'
+import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -77,7 +77,8 @@ export function useLedgerQuery(enabled: boolean) {
 
 /** Name a Category in an edit and it exists from then on. */
 function withCategory(l: Ledger, name: string | null | undefined): Ledger {
-  if (!name || l.categories.some((c) => c.name === name)) return l
+  if (!name || name === TRANSFER || l.categories.some((c) => c.name === name))
+    return l
   return { ...l, categories: [...l.categories, newCategory(name)] }
 }
 

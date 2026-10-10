@@ -14,6 +14,7 @@ import { useMoveTxn, useNoteTxn, useSetStoreRule } from '@/lib/ledger/useLedger'
 import {
   ANY_SOURCE,
   categoryOf,
+  everyTxn,
   ownerOf,
   ruleKey,
   storeCategory,
@@ -187,7 +188,7 @@ function AlwaysFile({
   onDismiss: () => void
 }) {
   const { ix } = useBook()
-  const others = ix.ledger.txns.filter(
+  const others = everyTxn(ix).filter(
     (t) =>
       t.store.toLowerCase() === store.toLowerCase() &&
       !t.category &&

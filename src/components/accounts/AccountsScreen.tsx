@@ -32,6 +32,7 @@ import { ACCOUNT_KINDS, ACCOUNT_KIND_LABELS } from '@/lib/model/types'
 import { useHousehold } from '@/lib/households/useHousehold'
 import { dayLabel, daysBetween, monthRange } from '@/lib/model/dates'
 import { dollars } from '@/lib/model/money'
+import { everyTxn } from '@/lib/model/ledger'
 import { ownerColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Segmented, Stat } from '@/components/shared/Layout'
@@ -231,7 +232,7 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
   const [confirm, setConfirm] = useState(false)
   const byAccount = useMemo(() => {
     const by = new Map<string, number>()
-    for (const t of ix.ledger.txns)
+    for (const t of everyTxn(ix))
       if (t.starting) by.set(t.account, (by.get(t.account) ?? 0) + 1)
     return [...by].sort((a, b) => b[1] - a[1])
   }, [ix])

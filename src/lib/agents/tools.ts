@@ -37,7 +37,7 @@ import { agentTxn, dailyDigest } from '@/lib/model/digest'
 import { breakdown, inSelection } from '@/lib/model/breakdown'
 import { categoryHistory, monthView, upcoming } from '@/lib/model/month'
 import { percentOf, takeHome } from '@/lib/model/pay'
-import { categoryOf, ownerOf, targetFor } from '@/lib/model/ledger'
+import { categoryOf, everyTxn, ownerOf, targetFor } from '@/lib/model/ledger'
 import { monthlySetAside } from '@/lib/model/plans'
 import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
@@ -628,7 +628,7 @@ export function budgyTools(
       name: 'update_transaction',
       title: 'Move or note a purchase',
       description:
-        'Move one purchase to another category (null puts it back where its store usually goes) and/or set its note (null clears it). Take the id from get_transactions or get_daily_digest.',
+        'Move one purchase to another category ("Transfer" leaves it out of spending as money moving between the household’s own accounts; null puts it back where its store usually goes) and/or set its note (null clears it). Take the id from get_transactions or get_daily_digest.',
       input: z.object({
         id: z.string().min(1).max(16),
         category: z.string().trim().min(1).max(60).nullable().optional(),
@@ -636,13 +636,13 @@ export function budgyTools(
       }),
       call: async ({ id, category, note }) => {
         const b = await book()
-        const t = b.ix.ledger.txns.find((x) => x.id === id)
+        const t = everyTxn(b.ix).find((x) => x.id === id)
         if (!t) throw new Error(`No purchase with id ${id}`)
         if (category !== undefined) await moveTransaction(db, id, category)
         if (note !== undefined) await noteTransaction(db, id, note)
         cached = null
         const after = (await book()).ix
-        const updated = after.ledger.txns.find((x) => x.id === id)!
+        const updated = everyTxn(after).find((x) => x.id === id)!
         return {
           ...agentTxn(after, updated, new Set()),
           owner: ownerOf(after, updated),

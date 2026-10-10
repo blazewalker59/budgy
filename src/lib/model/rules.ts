@@ -4,7 +4,7 @@
  * again and again should be filed there every time).
  */
 
-import { ANY_SOURCE, categoryOf, ruleFor, ruleKey } from './ledger'
+import { ANY_SOURCE, categoryOf, everyTxn, ruleFor, ruleKey } from './ledger'
 import type { LedgerIndex } from './ledger'
 import type { StoreRule } from './types'
 
@@ -21,7 +21,7 @@ export function ruleUses(ix: LedgerIndex): Array<RuleUse> {
   const uses = new Map<StoreRule, RuleUse>()
   for (const rule of ix.ledger.rules)
     uses.set(rule, { rule, purchases: 0, last: null })
-  for (const t of ix.ledger.txns) {
+  for (const t of everyTxn(ix)) {
     if (t.category) continue
     const rule = ruleFor(ix, t)
     const use = rule && uses.get(rule)
@@ -60,7 +60,7 @@ export function suggestRules(ix: LedgerIndex): Array<RuleSuggestion> {
     string,
     { store: string; moves: Map<string, number>; purchases: number }
   >()
-  for (const t of ix.ledger.txns) {
+  for (const t of everyTxn(ix)) {
     const key = t.store.toLowerCase()
     const s = byStore.get(key) ?? {
       store: t.store,
@@ -78,7 +78,7 @@ export function suggestRules(ix: LedgerIndex): Array<RuleSuggestion> {
     const [category, moved] = first
     const has = ix.rules.get(ruleKey(ANY_SOURCE, s.store))?.category
     if (has === category) continue
-    const changes = ix.ledger.txns.filter(
+    const changes = everyTxn(ix).filter(
       (t) =>
         t.store.toLowerCase() === s.store.toLowerCase() &&
         !t.category &&

@@ -21,6 +21,13 @@ import type {
  */
 export const ANY_SOURCE = '*'
 
+/**
+ * Not a Category: where a Transaction goes when it's money moving between
+ * the Household's own Accounts (a payment into a 529). Moved or filed there
+ * by a Store Rule like any Category, it leaves spending and the Budget.
+ */
+export const TRANSFER = 'Transfer'
+
 /** Store names match in any case ("KROGER" is "Kroger"). */
 export function ruleKey(sourceCategory: string, store: string): string {
   return `${sourceCategory}\u0000${store.toLowerCase()}`
@@ -33,6 +40,8 @@ export interface LedgerIndex {
   owners: Map<string, Owner>
   /** Per Category, Targets newest first. */
   targets: Map<string, Array<Target>>
+  /** Transactions filed as a Transfer, kept out of `ledger.txns`. */
+  transfers: Array<Txn>
 }
 
 export function indexLedger(ledger: Ledger): LedgerIndex {
@@ -44,15 +53,33 @@ export function indexLedger(ledger: Ledger): LedgerIndex {
   }
   for (const list of targets.values())
     list.sort((a, b) => b.startsMonth.localeCompare(a.startsMonth))
-  return {
+  const ix: LedgerIndex = {
     ledger,
-    categories: new Map(ledger.categories.map((c) => [c.name, c])),
+    categories: new Map(
+      ledger.categories
+        .filter((c) => c.name !== TRANSFER)
+        .map((c) => [c.name, c]),
+    ),
     rules: new Map(
       ledger.rules.map((r) => [ruleKey(r.sourceCategory, r.store), r]),
     ),
     owners: new Map(ledger.accounts.map((a) => [a.name, a.owner])),
     targets,
+    transfers: [],
   }
+  // Every total reads `ledger.txns`, so Transfers are set aside here once.
+  const spending: Array<Txn> = []
+  for (const t of ledger.txns)
+    (categoryOf(ix, t) === TRANSFER ? ix.transfers : spending).push(t)
+  if (ix.transfers.length) ix.ledger = { ...ledger, txns: spending }
+  return ix
+}
+
+/** Every Transaction, Transfers too: for filing, not for totals. */
+export function everyTxn(ix: LedgerIndex): Array<Txn> {
+  return ix.transfers.length
+    ? [...ix.ledger.txns, ...ix.transfers]
+    : ix.ledger.txns
 }
 
 /** The Store Rule for a purchase: one for its own import Category first. */

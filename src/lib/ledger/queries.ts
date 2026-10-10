@@ -20,6 +20,7 @@ import {
   transactions,
 } from '@/lib/db/schema'
 import { newCategory } from '@/lib/model/defaults'
+import { TRANSFER } from '@/lib/model/ledger'
 import { readLens } from '@/lib/model/lens'
 
 /** Every row of the Ledger, as the browser and the tools read it. */
@@ -134,6 +135,7 @@ export async function ensureCategory(
   db: Database,
   name: string,
 ): Promise<void> {
+  if (name === TRANSFER) return
   await db
     .insert(categories)
     .values(householdRow(db, newCategory(name)))

@@ -2,7 +2,8 @@
  * The Rules tab on Accounts: where each Store's purchases go, past and
  * future (every upload is filed by them). Rules the Moves suggest come
  * first, then every rule to change or remove, then a new one, then the
- * Import Rules. A Move on one purchase still wins over its Store's rule.
+ * Transfers they and the Moves left out of spending, then the Import Rules.
+ * A Move on one purchase still wins over its Store's rule.
  */
 
 import { useMemo, useState } from 'react'
@@ -10,11 +11,12 @@ import { X } from 'lucide-react'
 import type { StoreRule } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
 import { useSetStoreRule } from '@/lib/ledger/useLedger'
-import { ANY_SOURCE } from '@/lib/model/ledger'
+import { ANY_SOURCE, everyTxn } from '@/lib/model/ledger'
 import { ruleUses, suggestRules } from '@/lib/model/rules'
 import { dayLabel } from '@/lib/model/dates'
 import { TAG_LABELS } from '@/lib/model/types'
 import { CategorySelect } from '@/components/shared/CategorySelect'
+import { TxnList } from '@/components/shared/TxnList'
 import { ImportRules } from '@/components/accounts/ImportRules'
 
 export function RulesTab() {
@@ -30,6 +32,7 @@ export function RulesTab() {
       {suggestions.length > 0 && <Suggestions list={suggestions} />}
       <RuleList uses={uses} />
       <AddRule />
+      <Transfers />
       <ImportRules />
     </div>
   )
@@ -240,7 +243,7 @@ function AddRule() {
   // Every Store, busiest first, under the name the Ledger uses.
   const stores = useMemo(() => {
     const by = new Map<string, { name: string; n: number }>()
-    for (const t of ix.ledger.txns) {
+    for (const t of everyTxn(ix)) {
       const k = t.store.toLowerCase()
       const s = by.get(k) ?? { name: t.store, n: 0 }
       s.n++
@@ -292,5 +295,29 @@ function AddRule() {
         Add rule
       </button>
     </form>
+  )
+}
+
+/**
+ * Money moving between the Household's own Accounts, newest first: left out
+ * of spending and the Budget. Moving one to a Category counts it again.
+ */
+function Transfers() {
+  const { ix } = useBook()
+  const txns = useMemo(
+    () => [...ix.transfers].sort((a, b) => b.date.localeCompare(a.date)),
+    [ix],
+  )
+  if (!txns.length) return null
+  return (
+    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+      <h2 className="border-b border-border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+        Transfers · {txns.length}
+        <span className="ml-1.5 font-normal normal-case tracking-normal">
+          money moving between your own accounts, left out of spending
+        </span>
+      </h2>
+      <TxnList txns={txns} limit={20} />
+    </section>
   )
 }

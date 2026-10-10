@@ -19,6 +19,7 @@ import {
   postTransactions,
   recordBalances,
 } from '@/lib/ledger/accounts'
+import { clientMessage } from '@/lib/errors'
 import { addDays, dateOn, today } from '@/lib/model/dates'
 import { isDebt } from '@/lib/model/accounts'
 
@@ -166,10 +167,10 @@ export async function syncConnection(
     } catch (error) {
       results.push({
         account: accountName,
-        error:
-          error instanceof Error && !error.message.startsWith('Failed query')
-            ? error.message
-            : 'This sync didn’t finish. Budgy will try again.',
+        error: clientMessage(
+          error,
+          'This sync didn’t finish. Budgy will try again.',
+        ),
       })
     }
   }

@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod'
+import { clientMessage } from '@/lib/errors'
 
 /** Newest first; a client asking for one we don't know gets the newest. */
 const PROTOCOL_VERSIONS = [
@@ -125,7 +126,7 @@ export async function handleMcp(
       try {
         return ok(toolResult(await t.call(args.data)))
       } catch (e) {
-        return ok(toolError(e instanceof Error ? e.message : String(e)))
+        return ok(toolError(clientMessage(e, 'That didn’t work. Try again.')))
       }
     }
     default:

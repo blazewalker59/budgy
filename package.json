@@ -2,6 +2,9 @@
   "name": "budgy",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",

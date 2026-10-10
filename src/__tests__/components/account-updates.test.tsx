@@ -159,6 +159,7 @@ describe('Unified Account Updates UI', () => {
     const confirm = await screen.findByRole('button', {
       name: 'Confirm update',
     })
+    expect(screen.queryByText('Choose an export format.')).toBeNull()
     expect(mocks.update).toHaveBeenCalledWith({
       data: { account: 'Card', text: csv, format: 'apple-card', commit: false },
     })

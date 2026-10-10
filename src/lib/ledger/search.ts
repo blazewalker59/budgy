@@ -5,7 +5,7 @@
  */
 
 import type { Lens } from '@/lib/model/lens'
-import { readLens } from '@/lib/model/lens'
+import { NO_LENS, readLens } from '@/lib/model/lens'
 
 export type Period = 'month' | '3' | '6' | '12'
 
@@ -79,4 +79,20 @@ export function validateSpendingSearch(
 /** Only the Lens out of a screen's search, for a link to another screen. */
 export function keepLens(prev: Record<string, unknown>): Lens {
   return readLens(prev)
+}
+
+/**
+ * Search for opening `to` on `lens`. Staying on the screen keeps its own
+ * settings (a month, a period, a tab); leaving drops them. `patch` wins,
+ * so a jump can set the tab it lands on.
+ */
+export function withLensSearch(
+  page: string | null,
+  search: Record<string, unknown>,
+  lens: Lens,
+  to: string,
+  patch?: Record<string, unknown>,
+): Record<string, unknown> {
+  const keep = page === to ? search : {}
+  return { ...keep, ...NO_LENS, ...lens, ...patch }
 }

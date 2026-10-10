@@ -5,6 +5,8 @@
  * again adds nothing twice.
  */
 
+import { digestHex } from '@/lib/secret'
+
 export interface ParsedTxn {
   id: string
   date: string
@@ -17,14 +19,8 @@ export interface ParsedTxn {
   amount: number
 }
 
-export async function sha1Hex(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-1',
-    new TextEncoder().encode(text),
-  )
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+export function sha1Hex(text: string): Promise<string> {
+  return digestHex('SHA-1', text)
 }
 
 /** Python's `f"{x:.2f}"` for amounts with at most two decimals. */

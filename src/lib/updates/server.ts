@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
-import { EXPORT_FORMATS, MAX_EXPORT_BYTES } from './exports'
+import { EXPORT_FORMATS, EXPORT_TOO_LARGE, withinExportLimit } from './exports'
 import { listAccountUpdates } from './queries'
 import { ingestAccountExport } from './ingest'
 import {
@@ -30,7 +30,7 @@ export const updateAccountExport = createServerFn({ method: 'POST' })
     z
       .object({
         account: z.string().min(1).max(60),
-        text: z.string().min(1).max(MAX_EXPORT_BYTES),
+        text: z.string().min(1).refine(withinExportLimit, EXPORT_TOO_LARGE),
         format: z.enum(EXPORT_FORMATS),
         commit: z.boolean(),
       })

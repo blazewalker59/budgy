@@ -17,6 +17,12 @@ export const EXPORT_LABELS: Record<ExportFormat, string> = {
   'debit-credit': 'Bank CSV — separate Debit and Credit columns',
 }
 export const MAX_EXPORT_BYTES = 2 * 1024 * 1024
+/** Shown wherever an export is refused for size. */
+export const EXPORT_TOO_LARGE = `That file is over ${MAX_EXPORT_BYTES / (1024 * 1024)} MB. Choose a smaller CSV export.`
+
+export function withinExportLimit(text: string): boolean {
+  return new TextEncoder().encode(text).length <= MAX_EXPORT_BYTES
+}
 /** Where the share-sheet Shortcut sends an export (uploadEndpoint.ts). */
 export const UPLOAD_PATH = '/api/updates/upload'
 const MOVING =
@@ -66,8 +72,7 @@ export function normalizeExport(
   format: ExportFormat,
   debt: boolean,
 ) {
-  if (new TextEncoder().encode(text).length > MAX_EXPORT_BYTES)
-    throw new Error('That file is over 2 MB. Choose a smaller CSV export.')
+  if (!withinExportLimit(text)) throw new Error(EXPORT_TOO_LARGE)
   const cells = parseCsv(text.replace(/^\uFEFF/, '')).filter((r) =>
     r.some((c) => c.trim()),
   )

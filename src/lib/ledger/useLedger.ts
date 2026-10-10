@@ -41,6 +41,7 @@ import type {
   Tag,
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
+import { clientMessage } from '@/lib/errors'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
 
@@ -56,19 +57,8 @@ function publishSaveError(next: string | null) {
   for (const listener of saveErrorListeners) listener()
 }
 
-/** What a Member should read when a save fails. SQL text stays off screen. */
-export function saveErrorText(error: unknown): string {
-  if (
-    error instanceof Error &&
-    error.message &&
-    !error.message.startsWith('Failed query')
-  )
-    return error.message
-  return 'Couldn’t save. Try again.'
-}
-
 export function reportSaveError(error: unknown) {
-  publishSaveError(saveErrorText(error))
+  publishSaveError(clientMessage(error, 'Couldn’t save. Try again.'))
 }
 
 export function clearSaveError() {

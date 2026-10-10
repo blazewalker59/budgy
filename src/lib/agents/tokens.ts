@@ -9,6 +9,7 @@ import { and, eq, isNull } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import { apiTokens, householdMembers } from '@/lib/db/schema'
+import { authorizationBearer, digestHex, prefixedToken } from '@/lib/secret'
 
 /** Marks a Budgy token, so a leaked one is easy to spot and scan for. */
 const TOKEN_PREFIX = 'bg_'
@@ -22,29 +23,16 @@ export type TokenScope = 'read' | 'write'
 
 /** A new random token: "bg_" and 32 random bytes, base64url. */
 export function newToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  const base64 = btoa(String.fromCharCode(...bytes))
-  return (
-    TOKEN_PREFIX +
-    base64.replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-  )
+  return prefixedToken(TOKEN_PREFIX)
 }
 
-export async function hashToken(token: string): Promise<string> {
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(token),
-  )
-  return [...new Uint8Array(digest)]
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
+export function hashToken(token: string): Promise<string> {
+  return digestHex('SHA-256', token)
 }
 
 /** The token from an `Authorization: Bearer …` header, if it's one of ours. */
 export function bearerToken(header: string | null): string | null {
-  const match = /^Bearer\s+(\S+)$/i.exec(header ?? '')
-  const token = match?.[1] ?? null
-  return token?.startsWith(TOKEN_PREFIX) ? token : null
+  return authorizationBearer(header, TOKEN_PREFIX)
 }
 
 /** Store a new token for a Member; returns it, the only time it's seen. */

@@ -20,7 +20,7 @@ export interface HistoryRow {
   amount: number
 }
 
-export interface BalanceHistory {
+interface BalanceHistory {
   kind: 'balances'
   rows: Array<HistoryRow>
   /** Lines with no readable date and balance (headers aside). */
@@ -32,7 +32,7 @@ export interface BalanceHistory {
 }
 
 /** One row of a transactions export. */
-export interface Change extends HistoryRow {
+interface Change extends HistoryRow {
   description?: string
   /** The institution's category ("Restaurants"), when it gives one. */
   category?: string

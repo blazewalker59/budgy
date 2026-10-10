@@ -5,9 +5,8 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { getImportRules, setImportRules } from '@/lib/ledger/server'
+import { RULES_KEY } from '@/lib/ledger/useImportRules'
 import { useSession } from '@/lib/ledger/useLedger'
-
-const RULES_KEY = ['import-rules'] as const
 
 /**
  * The Household's Import Rules as JSON: store aliases, local upkeep

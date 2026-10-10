@@ -56,7 +56,7 @@ export interface MonthView {
   elapsed: number
 }
 
-export function monthTxns(
+function monthTxns(
   ix: LedgerIndex,
   month: string,
   owner: Owner | null,

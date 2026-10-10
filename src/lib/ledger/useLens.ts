@@ -7,12 +7,13 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router'
 import { useCallback, useMemo } from 'react'
 import type { Lens, LensFilter } from '@/lib/model/lens'
-import { NO_LENS, isEmpty, readLens, withFilter } from '@/lib/model/lens'
+import { isEmpty, readLens, withFilter } from '@/lib/model/lens'
+import { withLensSearch } from '@/lib/ledger/search'
 
 export type LensPage = '/' | '/spending' | '/plan' | '/accounts'
 
 /** What each screen honors of the Lens (Overview: all but the dates). */
-export const HONORS: Record<LensPage, Array<keyof Lens> | 'all'> = {
+const HONORS: Record<LensPage, Array<keyof Lens> | 'all'> = {
   '/': 'all',
   '/spending': 'all',
   '/plan': ['people'],
@@ -54,14 +55,13 @@ export function useLens() {
   const search = location.search as Record<string, unknown>
   const lens = useMemo(() => readLens(search), [search])
 
-  /** Show `next`: here, or on `to` (keeping only the Lens). */
+  /** Show `next`: here, or on `to` (keeping only the Lens). `patch` sets a tab. */
   const show = useCallback(
-    (next: Lens, to?: LensPage) => {
+    (next: Lens, to?: LensPage, patch?: Record<string, unknown>) => {
       const target = to ?? page ?? '/spending'
-      const keep = target === page ? search : {}
       void navigate({
         to: target,
-        search: { ...keep, ...NO_LENS, ...next } as never,
+        search: withLensSearch(page, search, next, target, patch) as never,
       })
     },
     [navigate, page, search],

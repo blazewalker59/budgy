@@ -7,6 +7,7 @@ import { inHousehold } from './scope'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from './scope'
 import { hashToken } from '@/lib/agents/tokens'
+import { randomToken } from '@/lib/secret'
 import {
   apiTokens,
   categories,
@@ -172,11 +173,7 @@ export async function createInvite(
     .get()
   if (existing || email === normalizeEmail(actor.email))
     throw new Error('This person is already in a Household')
-  const bytes = crypto.getRandomValues(new Uint8Array(32))
-  const token = btoa(String.fromCharCode(...bytes))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replaceAll('=', '')
+  const token = randomToken()
   const tokenHash = await hashToken(token)
   const id = crypto.randomUUID()
   const expiresAt = new Date(now.getTime() + INVITE_LIFETIME_MS)

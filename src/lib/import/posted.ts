@@ -53,7 +53,7 @@ export const postedRowInput = z.object({
   sourceId: z.string().min(1).max(200).optional(),
 })
 
-export interface Filed {
+interface Filed {
   description: string
   store: string
   category: string

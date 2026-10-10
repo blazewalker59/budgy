@@ -8,6 +8,7 @@ import { INSTRUCTIONS, WRITE_INSTRUCTIONS, budgyTools } from './tools'
 import { handleMcp, parseError } from './mcp'
 import { bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
+import { BodyTooLarge, readLimited } from '@/lib/updates/http'
 import { dbFromD1 } from '@/lib/db'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { today } from '@/lib/model/dates'
@@ -56,9 +57,13 @@ export async function serveMcp(
     })
   }
 
-  const text = await request.text()
-  if (text.length > MAX_BODY_BYTES) {
-    return new Response('Request too large', { status: 413 })
+  let text: string
+  try {
+    text = await readLimited(request.body, MAX_BODY_BYTES)
+  } catch (error) {
+    return error instanceof BodyTooLarge
+      ? new Response('Request too large', { status: 413 })
+      : Response.json(parseError, { status: 400 })
   }
   let message: unknown
   try {

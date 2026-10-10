@@ -12,7 +12,7 @@ import type { LedgerIndex } from './ledger'
 import type { Txn } from './types'
 
 /** How far apart the two dates can be (the sync's own matching window). */
-export const DUPLICATE_DAYS = 3
+const DUPLICATE_DAYS = 3
 
 export interface DuplicatePair {
   /** The one a merge removes. */

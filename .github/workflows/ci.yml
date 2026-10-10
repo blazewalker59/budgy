@@ -23,16 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.5
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-      - run: bun install --frozen-lockfile
+      - uses: ./.github/actions/setup
       - name: Lint
         run: bun run check
       - name: Type check
@@ -54,19 +45,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup
         with:
           node-version: 24
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.5
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
-      - run: bun install --frozen-lockfile
       - run: bun run test:run
 
   deploy:
@@ -76,25 +57,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.3.5
-      - uses: actions/cache@v6
-        with:
-          path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            bun-${{ runner.os }}-
+      - uses: ./.github/actions/setup
       # Installed for wrangler alone, pinned by bun.lock (same binary as
       # `bun run ship` locally).
-      - run: bun install --frozen-lockfile
       - name: Download build artifact
         uses: actions/download-artifact@v8
         with:
           name: dist
           path: dist/
       # Worker secrets (BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID,
-      # GOOGLE_CLIENT_SECRET, ALLOWED_EMAILS) are set out-of-band with `wrangler secret put`.
+      # GOOGLE_CLIENT_SECRET, ALLOWED_EMAILS, BANK_CONNECTION_KEY) are set
+      # out-of-band with `wrangler secret put`.
       # Migrations go first, so new code never queries columns that don't
       # exist yet; a failure here stops the deploy.
       - name: Apply D1 migrations

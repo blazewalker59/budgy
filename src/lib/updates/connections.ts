@@ -20,7 +20,7 @@ import { householdTimeZone } from '@/lib/households/locale'
 import { today } from '@/lib/model/dates'
 
 /** Bridge asks clients to stay under 24 requests a day per connection. */
-export const DAILY_REQUESTS = 20
+const DAILY_REQUESTS = 20
 const NOT_CONFIGURED =
   'Bank connections aren’t set up on this Budgy server yet (BANK_CONNECTION_KEY).'
 

@@ -19,6 +19,7 @@ import {
   postTransactions,
   recordBalances,
 } from '@/lib/ledger/accounts'
+import { clientMessage } from '@/lib/errors'
 import { householdTimeZone } from '@/lib/households/locale'
 import { addDays, dateOn, today } from '@/lib/model/dates'
 import { isDebt } from '@/lib/model/accounts'
@@ -39,7 +40,7 @@ export interface SyncedAccount {
 }
 
 /** A posted SimpleFIN transaction as a purchase row, or null if it isn't one. */
-export function purchaseRow(
+function purchaseRow(
   t: SimplefinTransaction,
   debt: boolean,
   timeZone: string,
@@ -169,10 +170,10 @@ export async function syncConnection(
     } catch (error) {
       results.push({
         account: accountName,
-        error:
-          error instanceof Error && !error.message.startsWith('Failed query')
-            ? error.message
-            : 'This sync didn’t finish. Budgy will try again.',
+        error: clientMessage(
+          error,
+          'This sync didn’t finish. Budgy will try again.',
+        ),
       })
     }
   }

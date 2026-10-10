@@ -105,6 +105,33 @@ describe('handleMcp', () => {
     })
   })
 
+  it('hides database failures that would echo the query', async () => {
+    const leaky = tool({
+      name: 'leaky',
+      title: 'Leaky',
+      description: 'Fails like the database',
+      input: z.object({}),
+      call: () =>
+        Promise.reject(
+          new Error(
+            'Failed query: select "secret-value" from transactions where id = ?',
+          ),
+        ),
+    })
+    const failed = await handleMcp(req('tools/call', { name: 'leaky' }), [
+      leaky,
+    ])
+    const text = JSON.stringify(failed)
+    expect(text).not.toContain('secret-value')
+    expect(text).not.toContain('select')
+    expect(failed).toMatchObject({
+      result: {
+        isError: true,
+        content: [{ text: 'That didn’t work. Try again.' }],
+      },
+    })
+  })
+
   it('reports protocol errors as JSON-RPC errors', async () => {
     expect(
       await handleMcp(req('tools/call', { name: 'nope' }), tools),

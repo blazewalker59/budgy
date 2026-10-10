@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from 'react'
 import { CheckIcon, ChevronDownIcon } from 'lucide-react'
+import { Sheet } from './Sheet'
 import {
   Select,
   SelectContent,
@@ -10,7 +11,6 @@ import {
   SelectValue,
   triggerClass,
 } from '@/components/ui/select'
-import { Sheet } from '@/components/shared/Sheet'
 import { cn } from '@/lib/utils'
 
 export interface Option<T extends string> {

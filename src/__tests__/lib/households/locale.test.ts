@@ -12,7 +12,7 @@ import { EMPTY_RULES } from '@/lib/import/rules'
 import { bucketCategory } from '@/lib/import/stores'
 import { dateOn } from '@/lib/model/dates'
 import { connectSimplefin, mapBankAccount } from '@/lib/updates/connections'
-import { purchaseRow, syncConnection } from '@/lib/updates/sync'
+import { syncConnection } from '@/lib/updates/sync'
 
 const open: Array<DatabaseSync> = []
 afterEach(() => {
@@ -138,20 +138,6 @@ describe('household time zone and owners', () => {
     expect(
       dateOn(at, await householdTimeZone(householdDatabase(db, 'hh_initial'))),
     ).toBe('2026-10-09')
-    expect(
-      purchaseRow(
-        {
-          id: 't',
-          posted: Math.floor(at.getTime() / 1000),
-          transactedAt: null,
-          amount: '-4.00',
-          description: 'Cafe',
-          pending: false,
-        },
-        true,
-        await householdTimeZone(scope),
-      ),
-    ).toMatchObject({ date: '2026-10-10' })
 
     await db
       .update(households)

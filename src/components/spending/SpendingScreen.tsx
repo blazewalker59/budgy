@@ -49,10 +49,38 @@ export function SpendingScreen({ search }: { search: SpendingSearch }) {
   const set = (patch: Partial<SpendingSearch>) =>
     void navigate({ search: (s) => ({ ...s, ...patch }), replace: true })
 
-  const { period: periodParam, month: monthParam, ...rest } = search
-  const lensKey = JSON.stringify(rest)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const lens: Lens = useMemo(() => rest, [lensKey])
+  const periodParam = search.period
+  const monthParam = search.month
+  // Lens fields only, so a period or month change keeps this reference.
+  const lens = useMemo((): Lens => {
+    const next: Lens = {}
+    if (search.people?.length) next.people = search.people
+    if (search.accounts?.length) next.accounts = search.accounts
+    if (search.kinds?.length) next.kinds = search.kinds
+    if (search.stores?.length) next.stores = search.stores
+    if (search.categories?.length) next.categories = search.categories
+    if (search.tags?.length) next.tags = search.tags
+    if (search.flags?.length) next.flags = search.flags
+    if (search.min !== undefined) next.min = search.min
+    if (search.max !== undefined) next.max = search.max
+    if (search.from) next.from = search.from
+    if (search.to) next.to = search.to
+    if (search.q) next.q = search.q
+    return next
+  }, [
+    search.people,
+    search.accounts,
+    search.kinds,
+    search.stores,
+    search.categories,
+    search.tags,
+    search.flags,
+    search.min,
+    search.max,
+    search.from,
+    search.to,
+    search.q,
+  ])
   const thisMonth = book.today.slice(0, 7)
   const period: Period = periodParam ?? '3'
   const month = monthParam ?? thisMonth

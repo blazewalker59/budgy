@@ -48,6 +48,7 @@ vi.mock('@/lib/ledger/book', () => ({
         accounts: [
           { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
         ],
+        balances: [],
       },
     },
   }),
@@ -107,7 +108,7 @@ describe('Unified Account Updates UI', () => {
     mount()
     expect(await screen.findByText('Card')).toBeTruthy()
     expect(screen.getByText(/No update receipt yet/)).toBeTruthy()
-    expect(screen.getByText(/Export-based purchases/)).toBeTruthy()
+    expect(screen.getByText(/Export or Shortcut/)).toBeTruthy()
     await waitFor(() => expect(mocks.connections).toHaveBeenCalled())
     expect(screen.queryByText(/Connected by/)).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
@@ -238,15 +239,15 @@ describe('Unified Account Updates UI', () => {
     expect(screen.queryByText('Bearer bu_secret')).toBeNull()
   })
 
-  it('links a discovered bank account only when a Member chooses one', async () => {
+  it('links a bank account from its Budgy Account, with connections collapsed', async () => {
     mocks.get.mockResolvedValue([empty])
     mocks.connections.mockResolvedValue([
       {
         id: 'c1',
         name: 'SimpleFIN',
         createdBy: 'me@example.com',
-        status: 'ready',
-        lastError: null,
+        status: 'attention',
+        lastError: 'SimpleFIN says: Vanguard needs attention.',
         lastFetchedAt: null,
         createdAt: new Date('2026-10-01'),
         accounts: [
@@ -258,20 +259,35 @@ describe('Unified Account Updates UI', () => {
             currency: 'USD',
             account: null,
             present: true,
+            syncedThrough: null,
           },
         ],
       },
     ])
     mocks.link.mockResolvedValue(undefined)
     mount()
-    const select = await screen.findByLabelText('Budgy Account for Sapphire')
+    expect(
+      await screen.findByText(/SimpleFIN · 0 of 1 accounts linked/),
+    ).toBeTruthy()
+    expect(screen.getByText(/needs attention/)).toBeTruthy()
+    // Collapsed: the connection's details aren't shown until opened.
+    expect(screen.queryByText(/Vanguard needs attention/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Link bank' }))
+    const select = screen.getByLabelText('SimpleFIN account for Card')
     expect(select).toHaveProperty('value', '')
     expect(mocks.link).not.toHaveBeenCalled()
-    fireEvent.change(select, { target: { value: 'Card' } })
+    fireEvent.change(select, {
+      target: { value: JSON.stringify(['c1', 'p1']) },
+    })
     await waitFor(() =>
       expect(mocks.link).toHaveBeenCalledWith({
         data: { connectionId: 'c1', providerId: 'p1', account: 'Card' },
       }),
     )
+
+    fireEvent.click(screen.getByRole('button', { name: /Bank connections/ }))
+    expect(screen.getByText(/Vanguard needs attention/)).toBeTruthy()
+    expect(screen.getByText(/Not linked yet: Sapphire \(Chase\)/)).toBeTruthy()
   })
 })

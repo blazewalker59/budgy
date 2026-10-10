@@ -1,7 +1,7 @@
 /** One update surface, independent of where an Account's data comes from. */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Check, FileUp, Share } from 'lucide-react'
+import { Check, FileUp, Landmark, Share } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { Account } from '@/lib/model/types'
 import type { ExportFormat } from '@/lib/updates/exports'
@@ -12,17 +12,26 @@ import {
   detectExport,
 } from '@/lib/updates/exports'
 import { updateAccountExport } from '@/lib/updates/server'
-import { UPDATES_KEY, useAccountUpdates } from '@/lib/updates/useUpdates'
+import {
+  UPDATES_KEY,
+  useAccountUpdates,
+  useBankConnections,
+} from '@/lib/updates/useUpdates'
 import { useBook } from '@/lib/ledger/book'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 import { dollars } from '@/lib/model/money'
-import { BankConnections } from '@/components/accounts/BankConnections'
+import {
+  BankConnections,
+  BankLink,
+  useBankLink,
+} from '@/components/accounts/BankConnections'
 import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
 
 type UpdateState = NonNullable<
   ReturnType<typeof useAccountUpdates>['data']
 >[number]
 type Preview = Awaited<ReturnType<typeof updateAccountExport>>
+type Panel = 'link' | 'upload' | 'shortcut'
 const SOURCE_LABELS = {
   uploaded: 'Export upload',
   posted: 'Agent',
@@ -35,7 +44,7 @@ export function AccountUpdates() {
   const updates = useAccountUpdates()
   const [selected, setSelected] = useState<{
     account: string
-    panel: 'upload' | 'shortcut'
+    panel: Panel
   } | null>(null)
   const accounts = ix.ledger.accounts.filter((a) => !a.closed)
   if (updates.isPending)
@@ -53,116 +62,126 @@ export function AccountUpdates() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        Update card and bank purchases from exports (here, or from your iPhone’s
-        share sheet with a Shortcut), or open a balance-based Account to record
-        its value. Every input shares filing rules and update receipts.
+        How each Account stays current: a linked bank syncs on its own; cards
+        without one take an export, here or from your iPhone’s share sheet.
+        “Last updated” is a successful check, even with nothing new; it isn’t a
+        guarantee the source has every transaction through today.
       </p>
-      <BankConnections accounts={ix.ledger.accounts} />
-      <p className="text-xs text-muted">
-        “Last updated” is a successful check, even when there were no new
-        purchases. It is not a guarantee that the source includes every
-        transaction through today.
-      </p>
+      <BankConnections />
       {!accounts.length && (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
-          Add an Account on the Accounts tab first, then bring in its export
+          Add an Account on the Accounts tab first, then choose how it updates
           here.
         </p>
       )}
-      {accounts.map((account) => {
-        const state = updates.data.find((u) => u.account === account.name)
-        const spending = ['credit', 'checking', 'savings'].includes(
-          account.kind,
-        )
-        const lastBalance = !spending
-          ? ix.ledger.balances.filter((b) => b.account === account.name).at(-1)
-          : null
-        return (
-          <section
-            key={account.name}
-            className="space-y-3 rounded-xl border border-border bg-surface p-3"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold">{account.name}</h2>
-                <p className="text-xs text-muted">
-                  {account.owner} ·{' '}
-                  {spending ? 'Export-based purchases' : 'Recorded balances'}
-                </p>
-              </div>
-              {spending ? (
-                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                  <PanelButton
-                    open={
-                      selected?.account === account.name &&
-                      selected.panel === 'shortcut'
-                    }
-                    onClick={(open) =>
-                      setSelected(
-                        open
-                          ? null
-                          : { account: account.name, panel: 'shortcut' },
-                      )
-                    }
-                    icon={<Share size={14} aria-hidden />}
-                    label="Shortcut"
-                  />
-                  <PanelButton
-                    open={
-                      selected?.account === account.name &&
-                      selected.panel === 'upload'
-                    }
-                    onClick={(open) =>
-                      setSelected(
-                        open
-                          ? null
-                          : { account: account.name, panel: 'upload' },
-                      )
-                    }
-                    icon={<FileUp size={14} aria-hidden />}
-                    label="Upload CSV"
-                  />
-                </div>
-              ) : (
-                <Link
-                  to="/accounts"
-                  search={{ kinds: [account.kind], people: [account.owner] }}
-                  className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-semibold"
-                >
-                  Record balance
-                </Link>
-              )}
-            </div>
-            {spending ? (
-              <UpdateStatus state={state} />
-            ) : (
-              <p className="text-xs text-muted">
-                {lastBalance
-                  ? `Latest balance: ${dollars(lastBalance.amount)} on ${lastBalance.date}.`
-                  : 'No balance recorded yet.'}{' '}
-                Open this Account on the Accounts tab to record a balance or
-                import its history. Balance connections aren’t available yet.
-              </p>
-            )}
-            {spending &&
-              selected?.account === account.name &&
-              (selected.panel === 'upload' ? (
-                <ExportUpdate
-                  key={account.name}
-                  account={account}
-                  savedFormat={state?.format ?? null}
-                />
-              ) : (
-                <ShortcutUpload
-                  key={account.name}
-                  account={account}
-                  savedFormat={state?.format ?? null}
-                />
-              ))}
-          </section>
-        )
-      })}
+      {accounts.map((account) => (
+        <AccountCard
+          key={account.name}
+          account={account}
+          state={updates.data.find((u) => u.account === account.name)}
+          panel={selected?.account === account.name ? selected.panel : null}
+          onPanel={(panel) =>
+            setSelected(panel ? { account: account.name, panel } : null)
+          }
+        />
+      ))}
     </div>
+  )
+}
+
+function AccountCard({
+  account,
+  state,
+  panel,
+  onPanel,
+}: {
+  account: Account
+  state?: UpdateState
+  panel: Panel | null
+  onPanel: (panel: Panel | null) => void
+}) {
+  const { ix } = useBook()
+  const connections = useBankConnections()
+  const bank = useBankLink(account.name)
+  const spending = ['credit', 'checking', 'savings'].includes(account.kind)
+  const lastBalance = ix.ledger.balances
+    .filter((b) => b.account === account.name)
+    .at(-1)
+  const toggle = (which: Panel) => (open: boolean) =>
+    onPanel(open ? null : which)
+  const method = bank
+    ? `SimpleFIN · ${bank.institution}`
+    : spending
+      ? 'Export or Shortcut'
+      : 'Recorded balances'
+
+  return (
+    <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold">{account.name}</h2>
+          <p className="text-xs text-muted">
+            {account.owner} · {method}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-1.5">
+          {!!connections.data?.length && (
+            <PanelButton
+              open={panel === 'link'}
+              onClick={toggle('link')}
+              icon={<Landmark size={14} aria-hidden />}
+              label={bank ? 'SimpleFIN' : 'Link bank'}
+            />
+          )}
+          {spending && !bank && (
+            <PanelButton
+              open={panel === 'shortcut'}
+              onClick={toggle('shortcut')}
+              icon={<Share size={14} aria-hidden />}
+              label="Shortcut"
+            />
+          )}
+          {spending ? (
+            <PanelButton
+              open={panel === 'upload'}
+              onClick={toggle('upload')}
+              icon={<FileUp size={14} aria-hidden />}
+              label="Upload CSV"
+            />
+          ) : (
+            !bank && (
+              <Link
+                to="/accounts"
+                search={{ kinds: [account.kind], people: [account.owner] }}
+                className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-semibold"
+              >
+                Record balance
+              </Link>
+            )
+          )}
+        </div>
+      </div>
+      {spending && <UpdateStatus state={state} />}
+      {(!spending || bank) && (
+        <p className="text-xs text-muted">
+          {lastBalance
+            ? `Balance ${dollars(lastBalance.amount)} on ${lastBalance.date}`
+            : 'No balance recorded yet'}
+          {bank
+            ? bank.syncedThrough
+              ? ` · from ${bank.name}, synced through ${bank.syncedThrough}.`
+              : ` · from ${bank.name}; not synced yet.`
+            : '. Record a balance or import its history on the Accounts tab.'}
+        </p>
+      )}
+      {panel === 'link' && <BankLink account={account} />}
+      {panel === 'upload' && (
+        <ExportUpdate account={account} savedFormat={state?.format ?? null} />
+      )}
+      {panel === 'shortcut' && (
+        <ShortcutUpload account={account} savedFormat={state?.format ?? null} />
+      )}
+    </section>
   )
 }
 

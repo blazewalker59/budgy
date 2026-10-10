@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { lockScroll } from '@/lib/scrollLock'
 
 /** Drag further than this (px), or flick faster than FLICK, to dismiss. */
 const DISMISS_PX = 110
@@ -53,12 +54,11 @@ export function Sheet({
     const onKey = (e: KeyboardEvent) =>
       e.key === 'Escape' && open.at(-1) === me && dismiss()
     window.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     return () => {
       open.splice(open.indexOf(me), 1)
       window.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
+      unlock()
     }
   }, [dismiss])
 
@@ -113,7 +113,7 @@ export function Sheet({
         type="button"
         aria-label={`Close ${title.toLowerCase()}`}
         onClick={dismiss}
-        className="animate-in fade-in absolute inset-0 bg-black/40 transition-opacity duration-200"
+        className="animate-in fade-in absolute inset-0 touch-none bg-black/40 transition-opacity duration-200"
         style={{ opacity: leaving ? 0 : Math.max(0.2, 1 - drag / 400) }}
       />
       <div

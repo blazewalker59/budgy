@@ -60,6 +60,7 @@ import {
 import { dayLabel } from '@/lib/model/dates'
 import { money } from '@/lib/model/money'
 import { currentTheme, setTheme } from '@/lib/theme'
+import { lockScroll } from '@/lib/scrollLock'
 import { cn } from '@/lib/utils'
 
 const I = 16
@@ -445,10 +446,9 @@ function Palette({
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     inputRef.current?.focus()
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
+    const unlock = lockScroll()
     return () => {
-      document.body.style.overflow = overflow
+      unlock()
       previous?.focus()
     }
   }, [])

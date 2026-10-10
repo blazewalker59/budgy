@@ -160,10 +160,10 @@ export function budgetAlerts(
       severity: 'medium',
       title:
         duplicates === 1
-          ? 'A synced purchase may be a duplicate'
-          : `${duplicates} synced purchases may be duplicates`,
+          ? 'A purchase may be here twice'
+          : `${duplicates} purchases may be here twice`,
       detail:
-        'A bank sync added purchases that look like ones already here under another name, so spending may be counted twice. Merge or keep them on Accounts → Updates.',
+        'Some purchases look to be here twice, often under two names, so spending may be counted twice. Merge or keep them on Accounts → Updates.',
     })
 
   return out.sort(

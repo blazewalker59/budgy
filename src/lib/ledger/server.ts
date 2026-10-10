@@ -418,18 +418,18 @@ export const removeStartingPurchases = createServerFn({ method: 'POST' })
   )
 
 const pairInput = z.object({
-  synced: z.string().min(1).max(16),
-  other: z.string().min(1).max(16),
+  goes: z.string().min(1).max(16),
+  stays: z.string().min(1).max(16),
 })
 
-/** A possible duplicate: the synced one merges into the one already here. */
+/** A possible duplicate: the two become one. */
 export const mergeDuplicatePair = createServerFn({ method: 'POST' })
-  .validator((data: { synced: string; other: string }) => pairInput.parse(data))
+  .validator((data: { goes: string; stays: string }) => pairInput.parse(data))
   .handler(({ data }) => withMember(({ db }) => mergeDuplicate(db, data)))
 
 /** A possible duplicate that isn't one: keep both, and stop asking. */
 export const keepDuplicatePair = createServerFn({ method: 'POST' })
-  .validator((data: { synced: string; other: string }) => pairInput.parse(data))
+  .validator((data: { goes: string; stays: string }) => pairInput.parse(data))
   .handler(({ data }) => withMember(({ db }) => keepBoth(db, data)))
 
 export const getImportRules = createServerFn({ method: 'GET' }).handler(() =>

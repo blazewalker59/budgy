@@ -24,7 +24,7 @@ describe('possible duplicates', () => {
       indexLedger(ledger({ txns: [uploaded, synced] })),
     )
     expect(pairs).toEqual([
-      { synced, other: uploaded, key: pairKey(synced.id, uploaded.id) },
+      { goes: synced, stays: uploaded, key: pairKey(synced.id, uploaded.id) },
     ])
   })
 
@@ -35,9 +35,9 @@ describe('possible duplicates', () => {
     const pairs = possibleDuplicates(
       indexLedger(ledger({ txns: [far, near, synced, again] })),
     )
-    expect(pairs.map((p) => [p.synced.id, p.other.id])).toEqual([
-      ['again', 'far'],
-      [synced.id, 'near'],
+    expect(pairs.map((p) => [p.goes.id, p.stays.id])).toEqual([
+      ['again', 'near'],
+      [synced.id, 'far'],
     ])
   })
 
@@ -68,6 +68,58 @@ describe('possible duplicates', () => {
       possibleDuplicates(
         indexLedger(ledger({ txns: [{ ...uploaded, synced: true }, synced] })),
       ),
+    ).toEqual([])
+  })
+
+  it('pairs a starting purchase with an upload under another name; the upload stays', () => {
+    const seeded = txn({
+      date: '2026-09-30',
+      account: 'Blaze Apple Card',
+      store: 'ChatGPT',
+      amount: 2000,
+      starting: true,
+    })
+    const posted = {
+      ...seeded,
+      id: 'posted',
+      store: 'Openai *chatgpt Subscr',
+      description: 'Openai *chatgpt Subscr',
+      starting: undefined,
+    }
+    const coffee = {
+      ...seeded,
+      id: 'coffee',
+      date: '2026-10-02',
+      store: 'Starbucks',
+      description: 'Starbucks',
+    }
+    const pairs = possibleDuplicates(
+      indexLedger(ledger({ txns: [seeded, coffee, posted] })),
+    )
+    expect(pairs.map((p) => [p.goes.id, p.stays.id])).toEqual([
+      [seeded.id, 'posted'],
+    ])
+  })
+
+  it('pairs the very same row twice, but not two purchases from one source', () => {
+    const clean = txn({
+      date: '2026-10-01',
+      account: 'Alex Apple Card',
+      store: 'In *clean And Kind Com',
+      amount: 28_000,
+    })
+    const again = { ...clean, id: 'again' }
+    const other = {
+      ...clean,
+      id: 'other',
+      store: 'T3 Chat',
+      description: 'T3 Chat',
+    }
+    expect(
+      possibleDuplicates(indexLedger(ledger({ txns: [clean, again] }))),
+    ).toHaveLength(1)
+    expect(
+      possibleDuplicates(indexLedger(ledger({ txns: [clean, other] }))),
     ).toEqual([])
   })
 })

@@ -2,11 +2,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { testDatabase } from '../../helpers/d1'
 import type { DatabaseSync } from 'node:sqlite'
-import { householdDatabase } from '@/lib/households/scope'
+import { householdDatabase, householdRow } from '@/lib/households/scope'
 import {
   accountUpdateLocks,
   accountUpdates,
   households,
+  imports,
   transactions,
 } from '@/lib/db/schema'
 import {
@@ -409,8 +410,8 @@ describe('Possible duplicates from a bank sync', () => {
     ).toMatchObject({ added: 1, linked: 0 })
     const pairs = possibleDuplicates(indexLedger(await loadLedger(a)))
     expect(pairs).toHaveLength(1)
-    expect(pairs[0].other.store).toBe('Shellpoint')
-    expect(pairs[0].synced.synced).toBe(true)
+    expect(pairs[0].stays.store).toBe('Shellpoint')
+    expect(pairs[0].goes.synced).toBe(true)
   })
 
   it('merges into the one already here, keeping its Store and filing, and never re-adds it', async () => {
@@ -422,7 +423,7 @@ describe('Possible duplicates from a bank sync', () => {
     const synced = (await loadLedger(a)).txns.find((t) => t.id !== id)!
     await noteTransaction(a, synced.id, 'October')
 
-    await mergeDuplicate(a, { synced: synced.id, other: id })
+    await mergeDuplicate(a, { goes: synced.id, stays: id })
     const after = await loadLedger(a)
     expect(after.txns).toEqual([
       expect.objectContaining({
@@ -451,7 +452,7 @@ describe('Possible duplicates from a bank sync', () => {
     await postTransactions(a, { ...post(), rows: [uploaded] })
     await postTransactions(a, { ...sync, rows: [fromBank] })
     const [pair] = possibleDuplicates(indexLedger(await loadLedger(a)))
-    const ids = { synced: pair.synced.id, other: pair.other.id }
+    const ids = { goes: pair.goes.id, stays: pair.stays.id }
     await keepBoth(a, ids)
     await keepBoth(a, ids)
     const after = await loadLedger(a)
@@ -461,16 +462,95 @@ describe('Possible duplicates from a bank sync', () => {
     expect((await loadLedger(b)).kept).toEqual([])
   })
 
-  it('refuses to merge two purchases that aren’t a synced one and another', async () => {
+  it('refuses to merge two purchases the bank knows apart', async () => {
     const { a } = await fixture()
     await postTransactions(a, {
-      ...post(),
-      rows: [uploaded, { ...uploaded, description: 'Other' }],
+      ...sync,
+      rows: [fromBank, { ...fromBank, sourceId: 'bank-2' }],
     })
     const [x, y] = (await loadLedger(a)).txns
     await expect(
-      mergeDuplicate(a, { synced: x.id, other: y.id }),
+      mergeDuplicate(a, { goes: x.id, stays: y.id }),
     ).rejects.toThrow('can’t be merged')
     expect((await loadLedger(a)).txns).toHaveLength(2)
+  })
+})
+
+describe('Possible duplicates of a starting purchase', () => {
+  /** A purchase from the whole-household export Budgy started from. */
+  async function starting(db: Awaited<ReturnType<typeof fixture>>['a']) {
+    await db.insert(imports).values(
+      householdRow(db, {
+        id: 'seed',
+        fileName: 'this_year_transactions.csv',
+        account: null,
+        importedBy: 'Member',
+        added: 1,
+        skipped: 0,
+      }),
+    )
+    await db.insert(transactions).values(
+      householdRow(db, {
+        id: 'seeded',
+        date: '2026-09-30',
+        month: '2026-09',
+        account: 'Card',
+        description: 'ChatGPT',
+        store: 'ChatGPT',
+        sourceCategory: 'Software',
+        amount: 2000,
+        importId: 'seed',
+      }),
+    )
+  }
+  const posted = {
+    date: '2026-09-30',
+    description: 'Openai *chatgpt Subscr',
+    amount: 20,
+  }
+
+  it('offers an Agent’s post the bank names differently', async () => {
+    const { a } = await fixture()
+    await starting(a)
+    await postTransactions(a, { ...post(), rows: [posted] })
+    const pairs = possibleDuplicates(indexLedger(await loadLedger(a)))
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].goes.id).toBe('seeded')
+    expect(pairs[0].stays.description).toBe('Openai *chatgpt Subscr')
+  })
+
+  it('keeps the posted one with the starting one’s Store and filing, and never re-adds it', async () => {
+    const { a } = await fixture()
+    await starting(a)
+    await moveTransaction(a, 'seeded', 'Subscriptions')
+    await postTransactions(a, { ...post(), rows: [posted] })
+    const [pair] = possibleDuplicates(indexLedger(await loadLedger(a)))
+    await mergeDuplicate(a, { goes: pair.goes.id, stays: pair.stays.id })
+    const after = await loadLedger(a)
+    expect(after.txns).toEqual([
+      expect.objectContaining({
+        id: pair.stays.id,
+        store: 'ChatGPT',
+        sourceCategory: 'Software',
+        category: 'Subscriptions',
+      }),
+    ])
+    expect(after.txns[0].starting).toBeUndefined()
+    expect(
+      await postTransactions(a, { ...post(), rows: [posted] }),
+    ).toMatchObject({ added: 0, alreadyHad: 1 })
+  })
+
+  it('offers the very same row twice', async () => {
+    const { a } = await fixture()
+    const clean = {
+      date: '2026-10-01',
+      description: 'In *clean And Kind Com',
+      amount: 280,
+    }
+    await postTransactions(a, { ...post(), rows: [clean, clean] })
+    const [pair] = possibleDuplicates(indexLedger(await loadLedger(a)))
+    await mergeDuplicate(a, { goes: pair.goes.id, stays: pair.stays.id })
+    expect((await loadLedger(a)).txns).toHaveLength(1)
   })
 })

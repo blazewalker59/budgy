@@ -41,7 +41,7 @@ import type {
 } from '@/lib/model/types'
 import { newCategory } from '@/lib/model/defaults'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
-import { pairKey } from '@/lib/model/duplicates'
+import { filedFirst, pairKey } from '@/lib/model/duplicates'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -277,26 +277,29 @@ export function useRemoveStarting() {
   )
 }
 
-/** The synced one goes; the one already here keeps its filing. */
+/** The two become one (src/lib/ledger/duplicates.ts, `mergeDuplicate`). */
 export function useMergeDuplicate() {
   return useEdit(
-    (v: { synced: string; other: string }) => mergeDuplicatePair({ data: v }),
+    (v: { goes: string; stays: string }) => mergeDuplicatePair({ data: v }),
     (l, v) => {
-      const synced = l.txns.find((t) => t.id === v.synced)
+      const goes = l.txns.find((t) => t.id === v.goes)
+      if (!goes) return l
       return {
         ...l,
         txns: l.txns
-          .filter((t) => t.id !== v.synced)
-          .map((t) =>
-            t.id === v.other
-              ? {
-                  ...t,
-                  synced: true,
-                  category: t.category ?? synced?.category ?? null,
-                  note: t.note ?? synced?.note ?? null,
-                }
-              : t,
-          ),
+          .filter((t) => t.id !== v.goes)
+          .map((t) => {
+            if (t.id !== v.stays) return t
+            const [filed, other] = filedFirst(t, goes) ? [t, goes] : [goes, t]
+            return {
+              ...t,
+              store: filed.store,
+              sourceCategory: filed.sourceCategory,
+              category: filed.category ?? other.category ?? null,
+              note: filed.note ?? other.note ?? null,
+              ...(t.synced || goes.synced ? { synced: true } : {}),
+            }
+          }),
       }
     },
   )
@@ -304,8 +307,8 @@ export function useMergeDuplicate() {
 
 export function useKeepDuplicate() {
   return useEdit(
-    (v: { synced: string; other: string }) => keepDuplicatePair({ data: v }),
-    (l, v) => ({ ...l, kept: [...l.kept, pairKey(v.synced, v.other)] }),
+    (v: { goes: string; stays: string }) => keepDuplicatePair({ data: v }),
+    (l, v) => ({ ...l, kept: [...l.kept, pairKey(v.goes, v.stays)] }),
   )
 }
 

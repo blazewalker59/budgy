@@ -1,7 +1,7 @@
 /**
- * Possible duplicates, on Accounts → Updates: a bank sync added a purchase
- * that looks like one already here under another name. Merge keeps the one
- * already here (and its filing); Keep both stops asking.
+ * Possible duplicates, on Accounts → Updates: one purchase that looks to be
+ * here twice, often under two names. Merge keeps one (and its filing);
+ * Keep both stops asking.
  */
 
 import { useMemo } from 'react'
@@ -23,7 +23,7 @@ export function Duplicates() {
       <h2 className="border-b border-border px-3 py-1.5 text-[11px] font-semibold tracking-wide text-muted uppercase">
         Possible duplicates · {pairs.length}
         <span className="ml-1.5 font-normal tracking-normal normal-case">
-          a bank sync added these beside purchases already here
+          the same purchase may be counted twice
         </span>
       </h2>
       <ul className="divide-y divide-border">
@@ -38,19 +38,19 @@ export function Duplicates() {
 function Pair({ pair }: { pair: DuplicatePair }) {
   const merge = useMergeDuplicate()
   const keep = useKeepDuplicate()
-  const ids = { synced: pair.synced.id, other: pair.other.id }
+  const ids = { goes: pair.goes.id, stays: pair.stays.id }
   const busy = merge.isPending || keep.isPending
   return (
     <li className="flex flex-col gap-2 px-3 py-2.5 text-[13px] sm:flex-row sm:items-center sm:gap-4">
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="text-xs text-muted">
           <span className="font-semibold text-foreground tabular-nums">
-            {money(pair.synced.amount)}
+            {money(pair.stays.amount)}
           </span>{' '}
-          on {pair.synced.account}
+          on {pair.stays.account}
         </p>
-        <Side label="Already here" txn={pair.other} />
-        <Side label="From the bank" txn={pair.synced} />
+        <Side txn={pair.stays} />
+        <Side txn={pair.goes} />
         {(merge.error || keep.error) && (
           <p className="text-xs text-over">
             {(merge.error ?? keep.error)?.message ?? 'That didn’t save.'}
@@ -79,8 +79,12 @@ function Pair({ pair }: { pair: DuplicatePair }) {
   )
 }
 
-function Side({ label, txn }: { label: string; txn: Txn }) {
+const sourceOf = (t: Txn) =>
+  t.starting ? 'Starting' : t.synced ? 'Bank sync' : 'Upload'
+
+function Side({ txn }: { txn: Txn }) {
   const { ix } = useBook()
+  const label = sourceOf(txn)
   return (
     <p className="flex min-w-0 items-baseline gap-2">
       <span className="w-24 shrink-0 text-[11px] font-semibold tracking-wide text-muted uppercase">

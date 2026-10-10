@@ -257,9 +257,10 @@ function Palette({
     const go = (
       id: string,
       label: string,
-      to: string,
+      to: LensPage | '/agents',
       icon: ReactNode,
       keywords: string,
+      patch?: Record<string, unknown>,
     ): Cmd => ({
       id: `go:${id}`,
       group: 'Go to',
@@ -267,14 +268,8 @@ function Palette({
       keywords,
       icon,
       run: () => {
-        if (
-          to === '/' ||
-          to === '/spending' ||
-          to === '/plan' ||
-          to === '/accounts'
-        )
-          show(lens, to)
-        else void navigate({ to })
+        if (to === '/agents') void navigate({ to })
+        else show(lens, to, patch)
       },
     })
     const out: Array<Cmd> = [
@@ -302,9 +297,10 @@ function Palette({
       go(
         'bills',
         'Planned bills',
-        '/upcoming',
+        '/plan',
         <CalendarClock size={I} />,
         'plan bills upcoming forecast subscriptions due',
+        { tab: 'bills' },
       ),
       go(
         'accounts',
@@ -316,9 +312,10 @@ function Palette({
       go(
         'rules',
         'Store Rules',
-        '/rules',
+        '/accounts',
         <ListChecks size={I} />,
         'filing rules categorize recategorize always file move categories',
+        { tab: 'rules' },
       ),
       go('agents', 'Agents', '/agents', <Bot size={I} />, 'mcp api token'),
       {

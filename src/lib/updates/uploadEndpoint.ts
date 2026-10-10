@@ -8,8 +8,10 @@ import { eq } from 'drizzle-orm'
 import { UPLOAD_TOKEN_PATTERN, verifyUploadToken } from './uploads'
 import { ingestAccountExport } from './ingest'
 import { BodyTooLarge, readLimited } from './http'
-import { MAX_EXPORT_BYTES } from './exports'
+import { EXPORT_TOO_LARGE, MAX_EXPORT_BYTES } from './exports'
 import type { CloudflareEnv } from '@/lib/db'
+import { clientMessage } from '@/lib/errors'
+import { authorizationBearer } from '@/lib/secret'
 import { dbFromD1 } from '@/lib/db'
 import { uploadTokens } from '@/lib/db/schema'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
@@ -47,9 +49,7 @@ export async function serveUpload(
   if (origin && origin !== new URL(request.url).origin)
     return reply('Forbidden', 403)
 
-  const token = /^Bearer\s+(\S+)$/i.exec(
-    request.headers.get('authorization') ?? '',
-  )?.[1]
+  const token = authorizationBearer(request.headers.get('authorization'))
   const db = dbFromD1(env.DB)
   const uploader =
     token && UPLOAD_TOKEN_PATTERN.test(token)
@@ -82,7 +82,7 @@ export async function serveUpload(
     text = await readLimited(request.body, MAX_EXPORT_BYTES)
   } catch (error) {
     return error instanceof BodyTooLarge
-      ? reply('That file is over 2 MB. Choose a smaller CSV export.', 413)
+      ? reply(EXPORT_TOO_LARGE, 413)
       : reply('That file isn’t a readable CSV export.', 400)
   }
 
@@ -113,10 +113,7 @@ export async function serveUpload(
   } catch (error) {
     // Ingestion messages are written for Members (bad rows, busy Account);
     // a database failure's message would echo SQL and values, so it doesn't.
-    const message =
-      error instanceof Error && !error.message.startsWith('Failed query')
-        ? error.message
-        : 'The update didn’t finish. Try again.'
+    const message = clientMessage(error, 'The update didn’t finish. Try again.')
     return reply(`${uploader.account} wasn’t updated. ${message}`, 422)
   }
 }

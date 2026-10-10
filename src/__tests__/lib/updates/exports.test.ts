@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { detectExport, normalizeExport } from '@/lib/updates/exports'
+import {
+  EXPORT_TOO_LARGE,
+  MAX_EXPORT_BYTES,
+  detectExport,
+  normalizeExport,
+  withinExportLimit,
+} from '@/lib/updates/exports'
 
 const header =
   'Transaction Date,Clearing Date,Description,Merchant,Category,Type,Amount (USD)'
@@ -114,5 +120,24 @@ describe('Account export conventions', () => {
         false,
       ),
     ).toThrow('credit card account')
+  })
+
+  it('measures the size cap in bytes and says so from one message', () => {
+    expect(EXPORT_TOO_LARGE).toBe(
+      'That file is over 2 MB. Choose a smaller CSV export.',
+    )
+    expect(withinExportLimit('x'.repeat(MAX_EXPORT_BYTES))).toBe(true)
+    expect(withinExportLimit('x'.repeat(MAX_EXPORT_BYTES + 1))).toBe(false)
+    // Under the old character cap, over the byte cap: é is two UTF-8 bytes.
+    const wide = 'é'.repeat(MAX_EXPORT_BYTES / 2 + 1)
+    expect(wide.length).toBeLessThanOrEqual(MAX_EXPORT_BYTES)
+    expect(withinExportLimit(wide)).toBe(false)
+    expect(() =>
+      normalizeExport(
+        'x'.repeat(MAX_EXPORT_BYTES + 1),
+        'spending-positive',
+        true,
+      ),
+    ).toThrow(EXPORT_TOO_LARGE)
   })
 })

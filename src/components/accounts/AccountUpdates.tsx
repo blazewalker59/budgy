@@ -9,6 +9,7 @@ import type { BankAccount } from '@/components/accounts/BankConnections'
 import {
   EXPORT_FORMATS,
   EXPORT_LABELS,
+  EXPORT_TOO_LARGE,
   MAX_EXPORT_BYTES,
   detectExport,
 } from '@/lib/updates/exports'
@@ -33,6 +34,11 @@ type UpdateState = NonNullable<
   ReturnType<typeof useAccountUpdates>['data']
 >[number]
 type Preview = Awaited<ReturnType<typeof updateAccountExport>>
+type ExportAttempt = {
+  commit: boolean
+  text: string
+  format: ExportFormat
+}
 type Panel = 'choose' | 'link' | 'upload' | 'shortcut'
 const SOURCE_LABELS = {
   uploaded: 'Export upload',
@@ -524,13 +530,16 @@ function ExportUpdate({
   const [problem, setProblem] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
   const update = useMutation({
-    mutationFn: (commit: boolean) => {
-      if (!format) throw new Error('Choose an export format.')
+    // The file and format travel with the call. Query installs a new
+    // mutation function in an effect, so a click in that gap would otherwise
+    // review with the previous render's empty format.
+    mutationFn: ({ commit, text: csv, format: chosen }: ExportAttempt) => {
+      if (!chosen) throw new Error('Choose an export format.')
       return updateAccountExport({
-        data: { account: account.name, text, format, commit },
+        data: { account: account.name, text: csv, format: chosen, commit },
       })
     },
-    onSuccess: async (result, commit) => {
+    onSuccess: async (result, { commit }) => {
       if (!commit) {
         setPreview(result)
         return
@@ -575,7 +584,7 @@ function ExportUpdate({
             setText('')
             setFileName('')
             if (file.size > MAX_EXPORT_BYTES) {
-              setProblem('That file is over 2 MB. Choose a smaller CSV export.')
+              setProblem(EXPORT_TOO_LARGE)
               return
             }
             setReading(true)
@@ -629,7 +638,9 @@ function ExportUpdate({
           type="button"
           disabled={!format || update.isPending}
           className="min-h-11 rounded-full bg-foreground px-4 text-xs font-semibold text-background disabled:opacity-50"
-          onClick={() => update.mutate(false)}
+          onClick={() => {
+            if (format) update.mutate({ commit: false, text, format })
+          }}
         >
           {update.isPending ? 'Reading…' : 'Review export'}
         </button>
@@ -664,7 +675,9 @@ function ExportUpdate({
           <button
             type="button"
             disabled={update.isPending}
-            onClick={() => update.mutate(true)}
+            onClick={() => {
+              if (format) update.mutate({ commit: true, text, format })
+            }}
             className="min-h-11 rounded-full bg-foreground px-4 text-xs font-semibold text-background disabled:opacity-50"
           >
             {update.isPending ? 'Updating…' : 'Confirm update'}

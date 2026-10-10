@@ -7,7 +7,8 @@ import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { ExportFormat } from './exports'
-import { hashToken, newToken } from '@/lib/agents/tokens'
+import { hashToken } from '@/lib/agents/tokens'
+import { prefixedToken } from '@/lib/secret'
 import { accounts, householdMembers, uploadTokens } from '@/lib/db/schema'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
@@ -48,7 +49,7 @@ export async function createUploadToken(
     throw new Error(
       `${account.name} already has ${MAX_ACTIVE_PER_ACCOUNT} Shortcut tokens. Revoke one you no longer use.`,
     )
-  const token = UPLOAD_PREFIX + newToken().slice(3)
+  const token = prefixedToken(UPLOAD_PREFIX)
   const id = crypto.randomUUID()
   await db.insert(uploadTokens).values(
     householdRow(db, {

@@ -27,6 +27,8 @@ export interface CloudflareEnv {
   CANONICAL_HOST?: string
   /** Local development only: act as this Member without Google sign-in. */
   DEV_MEMBER_EMAIL?: string
+  /** 32 random bytes, base64-encoded. Never reuse the authentication secret. */
+  BANK_CONNECTION_KEY?: string
 }
 
 export type Database = DrizzleD1Database<typeof schema>

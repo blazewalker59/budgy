@@ -59,13 +59,18 @@ The routine update flow is **Accounts → Updates**: choose an
 export, review its purchases, and confirm. This needs no known balance and keeps
 an update receipt even if nothing new was added. See
 [ADR 0009](docs/adr/0009-unified-account-updates.md). The Account sheet still
-supports manual balances and historical backfills. SimpleFIN connections and
-the share-sheet Shortcut are not connected yet.
+supports manual balances and historical backfills. Each card or bank Account
+can also get an iPhone share-sheet Shortcut that sends its export straight to
+`/api/updates/upload`, and SimpleFIN Bridge accounts can be connected and linked
+to Budgy Accounts (syncing their purchases comes next). See
+[ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md).
 
 Worker secrets (`wrangler secret put <NAME> --env production`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` (comma-separated; a secret so the
-Household's addresses stay out of the repository).
+Household's addresses stay out of the repository), and `BANK_CONNECTION_KEY`
+(32 random bytes, base64: `openssl rand -base64 32`; encrypts SimpleFIN access.
+Losing or changing it means reconnecting every bank connection).
 
 The Google OAuth client needs `<origin>/api/auth/callback/google` as an
 authorized redirect URI, for production and for `http://localhost:3000`.

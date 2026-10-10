@@ -17,6 +17,8 @@ export const EXPORT_LABELS: Record<ExportFormat, string> = {
   'debit-credit': 'Bank CSV — separate Debit and Credit columns',
 }
 export const MAX_EXPORT_BYTES = 2 * 1024 * 1024
+/** Where the share-sheet Shortcut sends an export (uploadEndpoint.ts). */
+export const UPLOAD_PATH = '/api/updates/upload'
 const MOVING =
   /\b(payment|autopay|transfer|xfer|deposit|payroll|direct dep|installment|interest earned|daily cash|cashback)\b/i
 const REFUND = /\b(refund|return|reversal)\b/i

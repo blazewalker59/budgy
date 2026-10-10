@@ -17,6 +17,8 @@ import { getAuth } from '@/lib/auth/server'
 import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
+import { serveUpload } from '@/lib/updates/uploadEndpoint'
+import { UPLOAD_PATH } from '@/lib/updates/exports'
 
 const startFetch = createStartHandler(defaultStreamHandler) as (
   request: Request,
@@ -51,6 +53,7 @@ export default {
 
     // Agents sign in with an API token, not a session (docs/adr/0004).
     if (url.pathname === MCP_PATH) return serveMcp(request, env)
+    if (url.pathname === UPLOAD_PATH) return serveUpload(request, env)
 
     if (url.pathname.startsWith('/api/auth')) {
       return getAuth(env, url.origin).handler(request)

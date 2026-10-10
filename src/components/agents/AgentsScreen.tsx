@@ -6,45 +6,17 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Copy } from 'lucide-react'
 import {
   createApiToken,
   getApiTokens,
   revokeApiToken,
 } from '@/lib/agents/server'
 import { useSession } from '@/lib/ledger/useLedger'
+import { CopyLine } from '@/components/shared/CopyLine'
 
 const TOKENS_KEY = ['api-tokens']
 
 const DAILY_PROMPT = `Every morning: if you have an account’s new posted purchases, add them to Budgy with add_transactions (commit true), leaving out payments and transfers. Then call get_daily_digest for yesterday and send me a short summary: what we spent by person and account, anything unusual, and every Budget Alert, most urgent first. Do not invent or assume bank access; mention any account whose source data looks out of date.`
-
-function CopyLine({ text, label }: { text: string; label: string }) {
-  const [copied, setCopied] = useState(false)
-  return (
-    <div className="flex items-start gap-1.5">
-      <code className="min-w-0 flex-1 rounded-lg bg-background px-2 py-1.5 font-mono text-[11px] break-all whitespace-pre-wrap">
-        {text}
-      </code>
-      <button
-        type="button"
-        aria-label={`Copy ${label}`}
-        onClick={() =>
-          void navigator.clipboard.writeText(text).then(() => {
-            setCopied(true)
-            setTimeout(() => setCopied(false), 1500)
-          })
-        }
-        className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground"
-      >
-        {copied ? (
-          <span className="text-[10px] font-bold">✓</span>
-        ) : (
-          <Copy size={13} />
-        )}
-      </button>
-    </div>
-  )
-}
 
 export function AgentsScreen() {
   const queryClient = useQueryClient()

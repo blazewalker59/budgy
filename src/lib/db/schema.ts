@@ -489,3 +489,79 @@ export const apiTokens = sqliteTable(
   },
   (t) => [index('api_tokens_member_idx').on(t.memberId)],
 )
+
+/**
+ * A Shortcut's write-only CSV capability: one Household, one Account, one
+ * export format. Like API tokens, only the SHA-256 hash is kept.
+ */
+export const uploadTokens = sqliteTable(
+  'upload_tokens',
+  {
+    householdId: householdId(),
+    id: text('id').primaryKey(),
+    account: text('account').notNull(),
+    format: text('format').$type<ExportFormat>().notNull(),
+    /** The Member who made it; the token works only while they're allowed. */
+    memberId: text('member_id').notNull(),
+    memberEmail: text('member_email').notNull(),
+    tokenHash: text('token_hash').notNull().unique(),
+    prefix: text('prefix').notNull(),
+    createdAt: createdAt(),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
+    revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
+  },
+  (t) => [index('upload_tokens_account_idx').on(t.householdId, t.account)],
+)
+
+// ─── Bank connections (docs/adr/0010) ───────────────────────────────────────
+
+/**
+ * A SimpleFIN Bridge connection. Its access URL is a credential: stored only
+ * encrypted with BANK_CONNECTION_KEY, bound to its Household and id.
+ */
+export const bankConnections = sqliteTable(
+  'bank_connections',
+  {
+    householdId: householdId(),
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    createdBy: text('created_by').notNull(),
+    encryptedAccess: text('encrypted_access').notNull(),
+    /** The same Bridge access can't be connected twice, anywhere. */
+    accessHash: text('access_hash').notNull().unique(),
+    status: text('status').$type<'ready' | 'attention'>().notNull(),
+    /** Safe operational message only; never a raw Bridge response. */
+    lastError: text('last_error'),
+    createdAt: createdAt(),
+    lastFetchedAt: integer('last_fetched_at', { mode: 'timestamp_ms' }),
+    /** Bridge asks for at most 24 requests a day per connection. */
+    requestDay: text('request_day'),
+    requestCount: integer('request_count').notNull().default(0),
+  },
+  (t) => [index('bank_connections_household_idx').on(t.householdId)],
+)
+
+/**
+ * An account SimpleFIN discovered. Discovery is metadata only; mapping it to
+ * a Budgy Account is an explicit Member choice and imports nothing itself.
+ */
+export const bankAccounts = sqliteTable(
+  'bank_accounts',
+  {
+    householdId: householdId(),
+    connectionId: text('connection_id').notNull(),
+    /** SimpleFIN's account id, stable within its connection. */
+    providerId: text('provider_id').notNull(),
+    name: text('name').notNull(),
+    institution: text('institution').notNull(),
+    currency: text('currency').notNull(),
+    /** The Budgy Account it feeds, or null while unmapped. */
+    account: text('account'),
+    /** False once Bridge stops listing it; its mapping is kept. */
+    present: integer('present', { mode: 'boolean' }).notNull().default(true),
+  },
+  (t) => [
+    primaryKey({ columns: [t.householdId, t.connectionId, t.providerId] }),
+    uniqueIndex('bank_accounts_account_unique').on(t.householdId, t.account),
+  ],
+)

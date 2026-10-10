@@ -1,7 +1,7 @@
 /** One update surface, independent of where an Account's data comes from. */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Check, FileUp } from 'lucide-react'
+import { Check, FileUp, Share } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { Account } from '@/lib/model/types'
 import type { ExportFormat } from '@/lib/updates/exports'
@@ -16,6 +16,8 @@ import { UPDATES_KEY, useAccountUpdates } from '@/lib/updates/useUpdates'
 import { useBook } from '@/lib/ledger/book'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 import { dollars } from '@/lib/model/money'
+import { BankConnections } from '@/components/accounts/BankConnections'
+import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
 
 type UpdateState = NonNullable<
   ReturnType<typeof useAccountUpdates>['data']
@@ -31,7 +33,10 @@ const SOURCE_LABELS = {
 export function AccountUpdates() {
   const { ix } = useBook()
   const updates = useAccountUpdates()
-  const [selected, setSelected] = useState<string | null>(null)
+  const [selected, setSelected] = useState<{
+    account: string
+    panel: 'upload' | 'shortcut'
+  } | null>(null)
   const accounts = ix.ledger.accounts.filter((a) => !a.closed)
   if (updates.isPending)
     return (
@@ -48,11 +53,11 @@ export function AccountUpdates() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted">
-        Update card and bank purchases from exports, or open a balance-based
-        Account to record its value. Purchase inputs share filing rules and
-        update receipts. Bank connections and share-sheet uploads will plug into
-        this flow next; they aren’t connected yet.
+        Update card and bank purchases from exports (here, or from your iPhone’s
+        share sheet with a Shortcut), or open a balance-based Account to record
+        its value. Every input shares filing rules and update receipts.
       </p>
+      <BankConnections accounts={ix.ledger.accounts} />
       <p className="text-xs text-muted">
         “Last updated” is a successful check, even when there were no new
         purchases. It is not a guarantee that the source includes every
@@ -86,18 +91,38 @@ export function AccountUpdates() {
                 </p>
               </div>
               {spending ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelected(selected === account.name ? null : account.name)
-                  }
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-semibold"
-                >
-                  <FileUp size={14} aria-hidden />
-                  {selected === account.name
-                    ? 'Close upload'
-                    : 'Update Account'}
-                </button>
+                <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
+                  <PanelButton
+                    open={
+                      selected?.account === account.name &&
+                      selected.panel === 'shortcut'
+                    }
+                    onClick={(open) =>
+                      setSelected(
+                        open
+                          ? null
+                          : { account: account.name, panel: 'shortcut' },
+                      )
+                    }
+                    icon={<Share size={14} aria-hidden />}
+                    label="Shortcut"
+                  />
+                  <PanelButton
+                    open={
+                      selected?.account === account.name &&
+                      selected.panel === 'upload'
+                    }
+                    onClick={(open) =>
+                      setSelected(
+                        open
+                          ? null
+                          : { account: account.name, panel: 'upload' },
+                      )
+                    }
+                    icon={<FileUp size={14} aria-hidden />}
+                    label="Upload CSV"
+                  />
+                </div>
               ) : (
                 <Link
                   to="/accounts"
@@ -119,17 +144,49 @@ export function AccountUpdates() {
                 import its history. Balance connections aren’t available yet.
               </p>
             )}
-            {spending && selected === account.name && (
-              <ExportUpdate
-                key={account.name}
-                account={account}
-                savedFormat={state?.format ?? null}
-              />
-            )}
+            {spending &&
+              selected?.account === account.name &&
+              (selected.panel === 'upload' ? (
+                <ExportUpdate
+                  key={account.name}
+                  account={account}
+                  savedFormat={state?.format ?? null}
+                />
+              ) : (
+                <ShortcutUpload
+                  key={account.name}
+                  account={account}
+                  savedFormat={state?.format ?? null}
+                />
+              ))}
           </section>
         )
       })}
     </div>
+  )
+}
+
+function PanelButton({
+  open,
+  onClick,
+  icon,
+  label,
+}: {
+  open: boolean
+  onClick: (open: boolean) => void
+  icon: React.ReactNode
+  label: string
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      onClick={() => onClick(open)}
+      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold ${open ? 'border-foreground' : 'border-border'}`}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
 

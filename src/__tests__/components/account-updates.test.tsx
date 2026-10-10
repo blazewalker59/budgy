@@ -10,10 +10,25 @@ import {
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AccountUpdates } from '@/components/accounts/AccountUpdates'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), update: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  get: vi.fn(),
+  update: vi.fn(),
+  tokens: vi.fn(),
+  createToken: vi.fn(),
+  connections: vi.fn(),
+  link: vi.fn(),
+}))
 vi.mock('@/lib/updates/server', () => ({
   getAccountUpdates: mocks.get,
   updateAccountExport: mocks.update,
+  getUploadTokens: mocks.tokens,
+  createAccountUploadToken: mocks.createToken,
+  revokeAccountUploadToken: vi.fn(),
+  getBankConnections: mocks.connections,
+  connectBank: vi.fn(),
+  refreshBankAccounts: vi.fn(),
+  linkBankAccount: mocks.link,
+  disconnectBank: vi.fn(),
 }))
 vi.mock('@/lib/ledger/useLedger', () => ({
   LEDGER_KEY: ['ledger'],
@@ -44,6 +59,9 @@ vi.mock('@tanstack/react-router', () => ({
 
 const clients: Array<QueryClient> = []
 function mount() {
+  if (!mocks.tokens.getMockImplementation()) mocks.tokens.mockResolvedValue([])
+  if (!mocks.connections.getMockImplementation())
+    mocks.connections.mockResolvedValue([])
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -88,7 +106,9 @@ describe('Unified Account Updates UI', () => {
     mount()
     expect(await screen.findByText('Card')).toBeTruthy()
     expect(screen.getByText(/No update receipt yet/)).toBeTruthy()
-    expect(screen.getByText(/aren’t connected yet/)).toBeTruthy()
+    expect(screen.getByText(/Export-based purchases/)).toBeTruthy()
+    await waitFor(() => expect(mocks.connections).toHaveBeenCalled())
+    expect(screen.queryByText(/Connected by/)).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
   })
 
@@ -102,9 +122,7 @@ describe('Unified Account Updates UI', () => {
       total: 1,
     })
     mount()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Update Account' }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload CSV' }))
     const file = new File([csv], 'apple.csv', { type: 'text/csv' })
     Object.defineProperty(file, 'text', { value: () => Promise.resolve(csv) })
     fireEvent.change(screen.getByLabelText('Choose transactions CSV'), {
@@ -138,9 +156,7 @@ describe('Unified Account Updates UI', () => {
   it('does not silently choose an amount sign for a generic bank export', async () => {
     mocks.get.mockResolvedValue([empty])
     mount()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Update Account' }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload CSV' }))
     const generic = 'Date,Description,Amount\n2026-10-01,Shop,-5'
     const file = new File([generic], 'bank.csv')
     Object.defineProperty(file, 'text', {
@@ -190,6 +206,66 @@ describe('Unified Account Updates UI', () => {
     expect(await screen.findByText(/^Last updated /)).toBeTruthy()
     expect(screen.getByRole('alert').textContent).toContain(
       'last successful update is shown above',
+    )
+  })
+  it('shows a new Shortcut token once, bound to its Account and format', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.createToken.mockResolvedValue({
+      id: 't1',
+      token: 'bu_secret',
+      account: 'Card',
+    })
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Shortcut' }))
+    expect(screen.getByLabelText('The export it will send')).toHaveProperty(
+      'value',
+      'apple-card',
+    )
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create Shortcut token' }),
+    )
+    expect(await screen.findByText('Bearer bu_secret')).toBeTruthy()
+    expect(mocks.createToken).toHaveBeenCalledWith({
+      data: { account: 'Card', format: 'apple-card' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByText('Bearer bu_secret')).toBeNull()
+  })
+
+  it('links a discovered bank account only when a Member chooses one', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.connections.mockResolvedValue([
+      {
+        id: 'c1',
+        name: 'SimpleFIN',
+        createdBy: 'me@example.com',
+        status: 'ready',
+        lastError: null,
+        lastFetchedAt: null,
+        createdAt: new Date('2026-10-01'),
+        accounts: [
+          {
+            connectionId: 'c1',
+            providerId: 'p1',
+            name: 'Sapphire',
+            institution: 'Chase',
+            currency: 'USD',
+            account: null,
+            present: true,
+          },
+        ],
+      },
+    ])
+    mocks.link.mockResolvedValue(undefined)
+    mount()
+    const select = await screen.findByLabelText('Budgy Account for Sapphire')
+    expect(select).toHaveProperty('value', '')
+    expect(mocks.link).not.toHaveBeenCalled()
+    fireEvent.change(select, { target: { value: 'Card' } })
+    await waitFor(() =>
+      expect(mocks.link).toHaveBeenCalledWith({
+        data: { connectionId: 'c1', providerId: 'p1', account: 'Card' },
+      }),
     )
   })
 })

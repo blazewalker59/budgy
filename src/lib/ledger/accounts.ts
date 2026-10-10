@@ -21,9 +21,11 @@ import {
   accountUpdates,
   accounts,
   balances,
+  bankAccounts,
   categories,
   imports,
   transactions,
+  uploadTokens,
 } from '@/lib/db/schema'
 import { newCategory } from '@/lib/model/defaults'
 import { addDays } from '@/lib/model/dates'
@@ -127,6 +129,13 @@ export async function deleteAccount(db: Database, name: string): Promise<void> {
       db
         .delete(accountInputs)
         .where(inHousehold(db, accountInputs, eq(accountInputs.account, name))),
+      db
+        .delete(uploadTokens)
+        .where(inHousehold(db, uploadTokens, eq(uploadTokens.account, name))),
+      db
+        .update(bankAccounts)
+        .set({ account: null })
+        .where(inHousehold(db, bankAccounts, eq(bankAccounts.account, name))),
     ])
   } finally {
     await releaseUpdate(db, name, lease)

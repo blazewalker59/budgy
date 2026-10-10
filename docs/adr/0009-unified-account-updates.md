@@ -2,9 +2,8 @@
 
 ## Status
 
-Implemented foundation. Live adapters remain separate slices.
-Live SimpleFIN connections and share-sheet uploads are subsequent adapters,
-not implemented bank access in this slice.
+Implemented foundation. The share-sheet Shortcut and SimpleFIN connection
+setup followed in [ADR 0010](0010-shortcut-uploads-and-simplefin-connections.md).
 
 ## Context
 

@@ -95,81 +95,86 @@ export function MonthScreen({
   )
 
   return (
-    <div className="space-y-3">
-      {/* Relative: the GapChip's list opens across this row, not off screen. */}
-      <div className="relative flex flex-wrap items-center justify-between gap-2">
-        <MonthPicker
-          month={month}
-          months={months}
-          onChange={(m) =>
-            void navigate({
-              search: (s: OverviewSearch) => ({
-                ...s,
-                month: m === thisMonth ? undefined : m,
-              }),
-            })
+    <div className="space-y-5">
+      {/* The month and the filter bar are one header, like Plan's title row. */}
+      <div className="space-y-2">
+        {/* Relative: the GapChip's list opens across this row, not off screen. */}
+        <div className="relative flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          <MonthPicker
+            month={month}
+            months={months}
+            onChange={(m) =>
+              void navigate({
+                search: (s: OverviewSearch) => ({
+                  ...s,
+                  month: m === thisMonth ? undefined : m,
+                }),
+              })
+            }
+          />
+          <GapChip gaps={gaps} month={month} />
+        </div>
+        <LensBar
+          page="/"
+          note={
+            lens.from
+              ? 'Overview shows one month. Dates apply on Spending.'
+              : undefined
           }
         />
-        <GapChip gaps={gaps} month={month} />
       </div>
-      <LensBar
-        page="/"
-        note={
-          lens.from
-            ? 'Overview shows one month. Dates apply on Spending.'
-            : undefined
-        }
-      />
 
-      <Headline
-        view={view}
-        isCurrent={isCurrent}
-        bills={bills}
-        pay={pay}
-        label={
-          person
-            ? `${person}’s everyday`
-            : filtered
-              ? 'Everyday, in the lens'
-              : 'Everyday'
-        }
-      />
+      <div className="space-y-3">
+        <Headline
+          view={view}
+          isCurrent={isCurrent}
+          bills={bills}
+          pay={pay}
+          label={
+            person
+              ? `${person}’s everyday`
+              : filtered
+                ? 'Everyday, in the lens'
+                : 'Everyday'
+          }
+        />
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
-        <div className="space-y-3">
-          <Section title="Everyday" hint="planned bills counted separately">
-            <CategoryRows
-              rows={filtered ? spentIn(view.everyday) : view.everyday}
-              lens={lens}
-              month={month}
-              onPick={add}
-            />
-          </Section>
-          {(filtered ? spentIn(view.housing) : view.housing).length > 0 && (
-            <Section title="Housing">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] lg:items-start">
+          <div className="space-y-3">
+            <Section title="Everyday" hint="planned bills counted separately">
               <CategoryRows
-                rows={filtered ? spentIn(view.housing) : view.housing}
+                rows={filtered ? spentIn(view.everyday) : view.everyday}
                 lens={lens}
                 month={month}
                 onPick={add}
               />
             </Section>
-          )}
-        </div>
-        <div className="space-y-3">
-          {isCurrent && !filtered && soon.length > 0 && (
-            <ComingUp items={soon} today={book.today} />
-          )}
-          <Stores
-            stores={view.stores}
-            total={view.totals.spent}
-            month={month}
-            onPick={add}
-          />
-          <CopySummary
-            view={view}
-            owner={filtered ? describe(lens) : undefined}
-          />
+            {(filtered ? spentIn(view.housing) : view.housing).length > 0 && (
+              <Section title="Housing">
+                <CategoryRows
+                  rows={filtered ? spentIn(view.housing) : view.housing}
+                  lens={lens}
+                  month={month}
+                  onPick={add}
+                />
+              </Section>
+            )}
+          </div>
+          <div className="space-y-3">
+            {isCurrent && !filtered && soon.length > 0 && (
+              <ComingUp items={soon} today={book.today} />
+            )}
+            <Stores
+              stores={view.stores}
+              total={view.totals.spent}
+              month={month}
+              onPick={add}
+            />
+            <CopySummary
+              view={view}
+              owner={filtered ? describe(lens) : undefined}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -381,7 +386,7 @@ function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
   if (!gaps.length || dismissed) return null
   return (
     <div>
-      <span className="inline-flex items-center rounded-full border border-nice/40 bg-surface text-xs font-semibold text-nice">
+      <span className="inline-flex items-center rounded-full border border-border bg-sunken text-xs font-semibold text-nice">
         <button
           type="button"
           onClick={() => setOpen(!open)}

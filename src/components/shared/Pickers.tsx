@@ -15,13 +15,13 @@ export function MonthPicker({
   const first = months[0] ?? month
   const last = months[months.length - 1] ?? month
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center">
       <button
         type="button"
         aria-label="Previous month"
         disabled={month <= first}
         onClick={() => onChange(shiftMonth(month, -1))}
-        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground disabled:opacity-30"
       >
         <ChevronLeft size={18} aria-hidden />
       </button>
@@ -29,7 +29,7 @@ export function MonthPicker({
         value={month}
         onChange={onChange}
         label="Month"
-        className="min-w-36 font-semibold"
+        className="h-8 min-h-0 w-auto rounded-lg border-0 bg-transparent px-1 text-lg font-extrabold tracking-tight shadow-none hover:bg-sunken pointer-coarse:min-h-8 pointer-coarse:text-lg"
         options={[...months]
           .reverse()
           .map((m) => ({ value: m, label: monthLabel(m, true) }))}
@@ -39,7 +39,7 @@ export function MonthPicker({
         aria-label="Next month"
         disabled={month >= last}
         onClick={() => onChange(shiftMonth(month, 1))}
-        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-surface disabled:opacity-30"
+        className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-sunken hover:text-foreground disabled:opacity-30"
       >
         <ChevronRight size={18} aria-hidden />
       </button>

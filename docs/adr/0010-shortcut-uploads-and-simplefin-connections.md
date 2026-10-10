@@ -40,10 +40,14 @@ separate update experience.
   moved between them. Its SHA-256 prevents connecting the same access twice.
   It is never returned to the browser or written to errors.
 - The client calls only Bridge hosts over HTTPS, without redirects, with a
-  timeout and response size limit, and validates responses before use.
-  Bridge's own error strings are not stored; connections show a safe message
-  and an `attention` status. Requests are capped at 20 per connection per day
-  (Bridge asks for under 24).
+  timeout and response size limit, and validates responses before use. It
+  reads protocol 1 and 2 responses (institutions on each account, or in a
+  `connections` list); null optional fields are absent, and a blank currency
+  is USD. A mismatch logs field paths only, never values. Bridge's problem
+  messages are meant for the user, so they are shown with an `attention`
+  status, stripped of markup and control characters and shortened; raw
+  responses and transport errors never are. Requests are capped at 20 per
+  connection per day (Bridge asks for under 24).
 - **Discovery** (balances-only) lists accounts and stores only names,
   institution and currency. **Mapping** to a Budgy Account is an explicit
   Member choice: any open Account, USD only, one bank account per Budgy

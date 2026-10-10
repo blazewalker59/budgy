@@ -175,9 +175,9 @@ export async function readBridge(
     db
       .update(bankConnections)
       .set({
-        status: found.attention ? 'attention' : 'ready',
-        lastError: found.attention
-          ? 'SimpleFIN reported an institution that needs attention. Check your connections in Bridge.'
+        status: found.problems.length ? 'attention' : 'ready',
+        lastError: found.problems.length
+          ? `SimpleFIN says: ${found.problems.join(' ')} Check your connections in Bridge.`
           : null,
         lastFetchedAt: new Date(),
       })

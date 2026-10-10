@@ -301,11 +301,13 @@ describe('SimpleFIN connections', () => {
       account: 'Card',
     })
     accounts = []
-    errors = ['Connection to Chase may need attention: <raw detail>']
+    errors = ['Connection to Vanguard may need attention.\n<b>Log in</b>']
     await discoverAccounts(a, id, KEY, transport)
     const [connection] = await listConnections(a)
     expect(connection.status).toBe('attention')
-    expect(connection.lastError).not.toContain('raw detail')
+    expect(connection.lastError).toBe(
+      'SimpleFIN says: Connection to Vanguard may need attention. b Log in /b Check your connections in Bridge.',
+    )
     expect(connection.accounts[0]).toMatchObject({
       account: 'Card',
       present: false,
@@ -429,8 +431,8 @@ describe('SimpleFIN client', () => {
           ],
         }),
       )) as typeof fetch
-    const { accounts, attention } = await fetchSimplefin(ACCESS, {}, transport)
-    expect(attention).toBe(false)
+    const { accounts, problems } = await fetchSimplefin(ACCESS, {}, transport)
+    expect(problems).toEqual([])
     const blank = (() =>
       Promise.resolve(
         Response.json({ accounts: [{ ...sapphire, currency: '' }] }),

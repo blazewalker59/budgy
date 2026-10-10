@@ -200,14 +200,15 @@ function normalize(set: z.infer<typeof accountSet>): Array<SimplefinAccount> {
 }
 
 /**
- * Bridge's accounts. `attention` means it also reported a problem (often an
- * institution needing a new login): what it returned is real but partial.
+ * Bridge's accounts, and any problems it reported (often an institution
+ * needing a new login): what it returned is real but partial. The protocol
+ * means these messages for the user, so they're kept, cleaned and short.
  */
 export async function fetchSimplefin(
   access: string,
   options: { balancesOnly?: boolean; start?: number; end?: number },
   transport: typeof fetch = fetch,
-): Promise<{ accounts: Array<SimplefinAccount>; attention: boolean }> {
+): Promise<{ accounts: Array<SimplefinAccount>; problems: Array<string> }> {
   const url = trustedUrl(access, false)
   let credentials: string
   try {
@@ -261,8 +262,31 @@ export async function fetchSimplefin(
   }
   return {
     accounts: normalize(parsed.data),
-    attention:
-      (parsed.data.errors?.length ?? 0) + (parsed.data.errlist?.length ?? 0) >
-      0,
+    problems: problems([
+      ...(parsed.data.errors ?? []),
+      ...(parsed.data.errlist ?? []),
+    ]),
   }
+}
+
+/** Bridge's messages as plain, short, distinct text (v1 strings, v2 `msg`). */
+function problems(reported: Array<unknown>): Array<string> {
+  const messages = reported.map((entry) => {
+    const text =
+      typeof entry === 'string'
+        ? entry
+        : typeof entry === 'object' &&
+            entry !== null &&
+            'msg' in entry &&
+            typeof entry.msg === 'string'
+          ? entry.msg
+          : 'An institution needs attention.'
+    const clean = text
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f<>]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return clean.length > 200 ? `${clean.slice(0, 199)}…` : clean
+  })
+  return [...new Set(messages.filter(Boolean))].slice(0, 5)
 }

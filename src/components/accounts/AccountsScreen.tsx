@@ -274,7 +274,6 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
           setConfirm(false)
         }}
         onBlur={() => setConfirm(false)}
-        data-haptic={confirm ? 'warning' : undefined}
         className={cn(
           'rounded-full px-2 py-0.5 font-semibold',
           confirm ? 'bg-over text-background' : 'text-over',

@@ -13,7 +13,6 @@ import { BookProvider } from '@/lib/ledger/book'
 import { AppShell } from '@/components/layout/AppShell'
 import { NotAllowed, SignIn } from '@/components/layout/SignIn'
 import { useServiceWorker } from '@/lib/pwa'
-import { useHaptics } from '@/lib/haptics'
 import { Onboarding } from '@/components/households/Onboarding'
 
 interface MyRouterContext {
@@ -62,7 +61,6 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
  */
 function Gate() {
   useServiceWorker()
-  useHaptics()
   const session = useSession()
   const state = session.data
   const pathname = useRouterState({ select: (s) => s.location.pathname })

@@ -42,7 +42,6 @@ import type {
 import { newCategory } from '@/lib/model/defaults'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
-import { haptic } from '@/lib/haptics'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -102,7 +101,6 @@ function useEdit<TVars>(
       return { previous, queryKey }
     },
     onError: (_error, _vars, context) => {
-      haptic('error')
       if (context?.previous)
         queryClient.setQueryData(context.queryKey, context.previous)
     },

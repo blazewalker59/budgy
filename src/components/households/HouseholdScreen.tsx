@@ -148,9 +148,6 @@ export function HouseholdScreen() {
                 type="button"
                 disabled={busy}
                 className="min-h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50"
-                data-haptic={
-                  confirmation.action === 'remove' ? 'warning' : undefined
-                }
                 onClick={() => manage.mutate(confirmation)}
               >
                 {manage.isPending ? 'Saving…' : 'Confirm'}

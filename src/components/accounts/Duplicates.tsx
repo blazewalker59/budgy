@@ -62,7 +62,6 @@ function Pair({ pair }: { pair: DuplicatePair }) {
           type="button"
           disabled={busy}
           onClick={() => merge.mutate(ids)}
-          data-haptic="success"
           className="min-h-9 flex-1 rounded-full bg-accent px-4 text-[13px] font-semibold text-surface disabled:opacity-50 sm:flex-none"
         >
           Merge

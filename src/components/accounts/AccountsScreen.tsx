@@ -8,7 +8,7 @@
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, Receipt } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import { AccountUpdates } from './AccountUpdates'
 import { RemoveStarting } from './RemoveStarting'
@@ -312,6 +312,16 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
   )
 }
 
+/** How long ago, briefly: "today", "3d", "2w", "4mo", "1y". */
+function age(date: string, today: string): string {
+  const days = daysBetween(date, today)
+  if (days < 1) return 'today'
+  if (days < 14) return `${days}d`
+  if (days < 60) return `${Math.floor(days / 7)}w`
+  if (days < 365) return `${Math.floor(days / 30)}mo`
+  return `${Math.floor(days / 365)}y`
+}
+
 function AccountRow({
   account: a,
   balance,
@@ -346,17 +356,28 @@ function AccountRow({
         <span className="text-right font-semibold tabular-nums">
           {balance ? dollars(balance.amount) : ''}
         </span>
-        <span className="truncate text-[11px] text-muted">
-          {[
-            e && e.loans.length
-              ? `owe ${dollars(e.owed)} · equity ${dollars(e.equity)}`
-              : a.owner,
-            a.institution,
-            a.securedBy && `against ${a.securedBy}`,
-            lastPurchase && `last purchase ${dayLabel(lastPurchase)}`,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
+        <span className="flex min-w-0 items-center gap-2 text-[11px] text-muted">
+          <span className="truncate">
+            {[
+              e && e.loans.length
+                ? `owe ${dollars(e.owed)} · equity ${dollars(e.equity)}`
+                : a.owner,
+              a.institution,
+              a.securedBy && `against ${a.securedBy}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </span>
+          {lastPurchase && (
+            <span
+              className="flex shrink-0 items-center gap-0.5"
+              title={`Last purchase ${dayLabel(lastPurchase)}`}
+            >
+              <Receipt size={11} aria-hidden />
+              <span className="sr-only">Last purchase </span>
+              {age(lastPurchase, today)}
+            </span>
+          )}
         </span>
         <span
           className={cn(

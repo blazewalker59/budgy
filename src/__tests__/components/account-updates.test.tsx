@@ -225,6 +225,11 @@ describe('Unified Account Updates UI', () => {
       screen.getByRole('button', { name: 'Create Shortcut token' }),
     )
     expect(await screen.findByText('Bearer bu_secret')).toBeTruthy()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.assign(navigator, { clipboard: { writeText } })
+    fireEvent.click(screen.getByRole('button', { name: 'Copy header value' }))
+    expect(writeText).toHaveBeenCalledWith('Bearer bu_secret')
+    expect(await screen.findByText('Copied')).toBeTruthy()
     expect(mocks.createToken).toHaveBeenCalledWith({
       data: { account: 'Card', format: 'apple-card' },
     })

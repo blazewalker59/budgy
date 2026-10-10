@@ -376,6 +376,27 @@ describe('SimpleFIN client', () => {
     ).rejects.toThrow(SimplefinError)
   })
 
+  it('uses only fetch options Cloudflare Workers accept, and refuses redirects', async () => {
+    // workerd throws on redirect: 'error' before sending anything.
+    const workers = ((_url: string, init?: RequestInit) =>
+      init?.redirect === 'manual'
+        ? Promise.resolve(new Response(ACCESS))
+        : Promise.reject(
+            new TypeError('Invalid redirect value'),
+          )) as typeof fetch
+    expect(await claimSimplefin(SETUP, workers)).toBe(ACCESS)
+    const redirecting = (() =>
+      Promise.resolve(
+        new Response(null, {
+          status: 302,
+          headers: { location: 'https://evil.test' },
+        }),
+      )) as typeof fetch
+    await expect(fetchSimplefin(ACCESS, {}, redirecting)).rejects.toThrow(
+      /couldn’t safely read/,
+    )
+  })
+
   it('rejects an access URL from a claim that points elsewhere', async () => {
     const transport = (() =>
       Promise.resolve(

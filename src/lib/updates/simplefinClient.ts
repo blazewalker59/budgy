@@ -53,15 +53,20 @@ function trustedUrl(value: string, claim: boolean): URL {
 }
 
 async function call(url: URL, init: RequestInit, transport: typeof fetch) {
+  let response: Response
   try {
-    return await transport(url.toString(), {
+    // Workers don't support redirect: 'error'; a redirect is refused here.
+    response = await transport(url.toString(), {
       ...init,
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(20_000),
     })
   } catch {
     throw new SimplefinError('network')
   }
+  if (response.status >= 300 && response.status < 400)
+    throw new SimplefinError('invalid')
+  return response
 }
 
 /** Trade a one-time setup token for the access URL (the credential). */

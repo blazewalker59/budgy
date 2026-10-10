@@ -26,7 +26,7 @@ export interface SpendingSearch extends Lens {
 const MONTH = /^\d{4}-\d{2}$/
 
 /** The Lens, from this URL or an older one (`owner`, comma-joined `acct`). */
-export function validateLensSearch(s: Record<string, unknown>): Lens {
+function validateLensSearch(s: Record<string, unknown>): Lens {
   const raw = { ...s }
   if (typeof raw.owner === 'string' && raw.people === undefined)
     raw.people = [raw.owner]

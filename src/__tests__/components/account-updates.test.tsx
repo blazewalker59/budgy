@@ -108,7 +108,7 @@ describe('Unified Account Updates UI', () => {
     mount()
     expect(await screen.findByText('Card')).toBeTruthy()
     expect(screen.getByText(/No update receipt yet/)).toBeTruthy()
-    expect(screen.getByText(/Export or Shortcut/)).toBeTruthy()
+    expect(screen.getByText(/Not set up yet/)).toBeTruthy()
     await waitFor(() => expect(mocks.connections).toHaveBeenCalled())
     expect(screen.queryByText(/Connected by/)).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
@@ -124,7 +124,10 @@ describe('Unified Account Updates UI', () => {
       total: 1,
     })
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Upload CSV' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Set up updates' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Upload a file now/ }))
     const file = new File([csv], 'apple.csv', { type: 'text/csv' })
     Object.defineProperty(file, 'text', { value: () => Promise.resolve(csv) })
     fireEvent.change(screen.getByLabelText('Choose transactions CSV'), {
@@ -158,7 +161,10 @@ describe('Unified Account Updates UI', () => {
   it('does not silently choose an amount sign for a generic bank export', async () => {
     mocks.get.mockResolvedValue([empty])
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Upload CSV' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Set up updates' }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Upload a file now/ }))
     const generic = 'Date,Description,Amount\n2026-10-01,Shop,-5'
     const file = new File([generic], 'bank.csv')
     Object.defineProperty(file, 'text', {
@@ -218,7 +224,15 @@ describe('Unified Account Updates UI', () => {
       account: 'Card',
     })
     mount()
-    fireEvent.click(await screen.findByRole('button', { name: 'Shortcut' }))
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Set up updates' }),
+    )
+    // No bank to link: for a card, the share sheet is the recommended way.
+    const shortcut = screen.getByRole('button', {
+      name: /From your iPhone’s share sheet/,
+    })
+    expect(shortcut.textContent).toContain('Recommended')
+    fireEvent.click(shortcut)
     expect(screen.getByLabelText('The export it will send')).toHaveProperty(
       'value',
       'apple-card',
@@ -273,7 +287,12 @@ describe('Unified Account Updates UI', () => {
     // Collapsed: the connection's details aren't shown until opened.
     expect(screen.queryByText(/Vanguard needs attention/)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Link bank' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Set up updates' }))
+    const fromBank = screen.getByRole('button', {
+      name: /Automatically from your bank/,
+    })
+    expect(fromBank.textContent).toContain('Recommended')
+    fireEvent.click(fromBank)
     const select = screen.getByLabelText('SimpleFIN account for Card')
     expect(select).toHaveProperty('value', '')
     expect(mocks.link).not.toHaveBeenCalled()

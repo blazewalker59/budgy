@@ -38,10 +38,15 @@ export function useBankLink(account: string): BankAccount | null {
   )
 }
 
-export function BankConnections() {
+export function BankConnections({
+  open,
+  onOpenChange,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
   const queryClient = useQueryClient()
   const connections = useBankConnections()
-  const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: BANK_CONNECTIONS_KEY })
@@ -71,7 +76,7 @@ export function BankConnections() {
         <button
           type="button"
           aria-expanded={open}
-          onClick={() => setOpen(!open)}
+          onClick={() => onOpenChange(!open)}
           className="flex min-h-11 min-w-0 flex-1 items-center gap-2 text-left"
         >
           <Landmark size={14} aria-hidden className="shrink-0" />

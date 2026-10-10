@@ -16,6 +16,7 @@ import {
   UPDATES_KEY,
   useAccountUpdates,
   useBankConnections,
+  useUploadTokens,
 } from '@/lib/updates/useUpdates'
 import { useBook } from '@/lib/ledger/book'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
@@ -31,7 +32,7 @@ type UpdateState = NonNullable<
   ReturnType<typeof useAccountUpdates>['data']
 >[number]
 type Preview = Awaited<ReturnType<typeof updateAccountExport>>
-type Panel = 'link' | 'upload' | 'shortcut'
+type Panel = 'choose' | 'link' | 'upload' | 'shortcut'
 const SOURCE_LABELS = {
   uploaded: 'Export upload',
   posted: 'Agent',
@@ -46,6 +47,7 @@ export function AccountUpdates() {
     account: string
     panel: Panel
   } | null>(null)
+  const [banksOpen, setBanksOpen] = useState(false)
   const accounts = ix.ledger.accounts.filter((a) => !a.closed)
   if (updates.isPending)
     return (
@@ -67,7 +69,7 @@ export function AccountUpdates() {
         “Last updated” is a successful check, even with nothing new; it isn’t a
         guarantee the source has every transaction through today.
       </p>
-      <BankConnections />
+      <BankConnections open={banksOpen} onOpenChange={setBanksOpen} />
       {!accounts.length && (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
           Add an Account on the Accounts tab first, then choose how it updates
@@ -83,10 +85,22 @@ export function AccountUpdates() {
           onPanel={(panel) =>
             setSelected(panel ? { account: account.name, panel } : null)
           }
+          onConnectBank={() => {
+            setBanksOpen(true)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }}
         />
       ))}
     </div>
   )
+}
+
+type Method = 'bank' | 'shortcut' | 'manual'
+
+/** Which way of updating suits an Account best, given what's set up. */
+function recommend(account: Account, bankAvailable: boolean): Panel {
+  if (bankAvailable) return 'link'
+  return account.kind === 'credit' ? 'shortcut' : 'upload'
 }
 
 function AccountCard({
@@ -94,118 +108,268 @@ function AccountCard({
   state,
   panel,
   onPanel,
+  onConnectBank,
 }: {
   account: Account
   state?: UpdateState
   panel: Panel | null
   onPanel: (panel: Panel | null) => void
+  onConnectBank: () => void
 }) {
   const { ix } = useBook()
   const connections = useBankConnections()
+  const tokens = useUploadTokens()
   const bank = useBankLink(account.name)
   const spending = ['credit', 'checking', 'savings'].includes(account.kind)
   const lastBalance = ix.ledger.balances
     .filter((b) => b.account === account.name)
     .at(-1)
-  const toggle = (which: Panel) => (open: boolean) =>
-    onPanel(open ? null : which)
-  const method = bank
-    ? `SimpleFIN · ${bank.institution}`
-    : spending
-      ? 'Export or Shortcut'
-      : 'Recorded balances'
+  const unlinkedBanks =
+    connections.data
+      ?.flatMap((c) => c.accounts)
+      .filter(
+        (b) => !b.account && b.present && b.currency.toUpperCase() === 'USD',
+      ) ?? []
+  const method: Method = bank
+    ? 'bank'
+    : tokens.data?.some((t) => t.account === account.name)
+      ? 'shortcut'
+      : 'manual'
+  const best = recommend(account, unlinkedBanks.length > 0)
+
+  // What the card says, and the one thing it asks for (if anything).
+  let summary: string
+  let primary: { label: string; panel?: Panel; record?: boolean } | null = null
+  if (bank) {
+    summary = `Updates automatically from ${bank.name} (${bank.institution}).`
+  } else if (method === 'shortcut') {
+    summary =
+      'Updates when you share an export to its iPhone Shortcut: export from Wallet or your bank, then Share → your Shortcut.'
+  } else if (spending) {
+    summary = state?.success
+      ? 'Updated by uploading exports. Set up an easier way so it stays current.'
+      : 'Not set up yet. Choose how its purchases come into Budgy.'
+    primary = { label: 'Set up updates', panel: 'choose' }
+  } else if (unlinkedBanks.length) {
+    summary =
+      'Its balance is entered by hand. Link its bank to keep it current.'
+    primary = { label: 'Link bank', panel: 'link' }
+  } else {
+    summary = 'Its balance is entered by hand.'
+    primary = { label: 'Record balance', record: true }
+  }
 
   return (
-    <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
+    <section className="space-y-2.5 rounded-xl border border-border bg-surface p-3 text-xs">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold">{account.name}</h2>
-          <p className="text-xs text-muted">
-            {account.owner} · {method}
+          <p className="text-muted">
+            {account.owner} ·{' '}
+            {bank
+              ? 'Bank sync'
+              : method === 'shortcut'
+                ? 'iPhone Shortcut'
+                : spending
+                  ? 'Manual'
+                  : 'Recorded balances'}
           </p>
         </div>
-        <div className="flex flex-wrap justify-end gap-1.5">
-          {!!connections.data?.length && (
-            <PanelButton
-              open={panel === 'link'}
-              onClick={toggle('link')}
-              icon={<Landmark size={14} aria-hidden />}
-              label={bank ? 'SimpleFIN' : 'Link bank'}
-            />
-          )}
-          {spending && !bank && (
-            <PanelButton
-              open={panel === 'shortcut'}
-              onClick={toggle('shortcut')}
-              icon={<Share size={14} aria-hidden />}
-              label="Shortcut"
-            />
-          )}
-          {spending ? (
-            <PanelButton
-              open={panel === 'upload'}
-              onClick={toggle('upload')}
-              icon={<FileUp size={14} aria-hidden />}
-              label="Upload CSV"
-            />
+        {primary &&
+          (primary.record ? (
+            <Link
+              to="/accounts"
+              search={{ kinds: [account.kind], people: [account.owner] }}
+              className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 font-semibold text-background"
+            >
+              {primary.label}
+            </Link>
           ) : (
-            !bank && (
-              <Link
-                to="/accounts"
-                search={{ kinds: [account.kind], people: [account.owner] }}
-                className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-semibold"
+            panel !== primary.panel && (
+              <button
+                type="button"
+                onClick={() => onPanel(primary.panel!)}
+                className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background"
               >
-                Record balance
-              </Link>
+                {primary.label}
+              </button>
             )
-          )}
-        </div>
+          ))}
       </div>
+      <p className="text-muted">{summary}</p>
       {spending && <UpdateStatus state={state} />}
       {(!spending || bank) && (
-        <p className="text-xs text-muted">
+        <p className="text-muted">
           {lastBalance
             ? `Balance ${dollars(lastBalance.amount)} on ${lastBalance.date}`
             : 'No balance recorded yet'}
           {bank
             ? bank.syncedThrough
-              ? ` · from ${bank.name}, synced through ${bank.syncedThrough}.`
-              : ` · from ${bank.name}; not synced yet.`
-            : '. Record a balance or import its history on the Accounts tab.'}
+              ? `; synced through ${bank.syncedThrough}.`
+              : '; waiting for the first sync.'
+            : '.'}
         </p>
       )}
-      {panel === 'link' && <BankLink account={account} />}
-      {panel === 'upload' && (
-        <ExportUpdate account={account} savedFormat={state?.format ?? null} />
+
+      {panel === 'choose' && (
+        <UpdateOptions
+          account={account}
+          spending={spending}
+          method={method}
+          best={best}
+          hasConnection={!!connections.data?.length}
+          onPick={onPanel}
+          onConnectBank={onConnectBank}
+        />
       )}
-      {panel === 'shortcut' && (
-        <ShortcutUpload account={account} savedFormat={state?.format ?? null} />
+      {panel && panel !== 'choose' && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <button
+            type="button"
+            onClick={() => onPanel('choose')}
+            className="min-h-11 font-semibold text-accent"
+          >
+            ‹ All ways to update
+          </button>
+          {panel === 'link' && <BankLink account={account} />}
+          {panel === 'upload' && (
+            <ExportUpdate
+              account={account}
+              savedFormat={state?.format ?? null}
+            />
+          )}
+          {panel === 'shortcut' && (
+            <ShortcutUpload
+              account={account}
+              savedFormat={state?.format ?? null}
+            />
+          )}
+        </div>
       )}
+      <button
+        type="button"
+        onClick={() => onPanel(panel ? null : 'choose')}
+        className="min-h-11 font-semibold text-muted hover:text-foreground"
+      >
+        {panel
+          ? 'Close'
+          : method === 'manual' && spending
+            ? 'What are my options?'
+            : 'Other ways to update'}
+      </button>
     </section>
   )
 }
 
-function PanelButton({
-  open,
-  onClick,
-  icon,
-  label,
+/** Every way an Account can update, explained, with the best one first. */
+function UpdateOptions({
+  account,
+  spending,
+  method,
+  best,
+  hasConnection,
+  onPick,
+  onConnectBank,
 }: {
-  open: boolean
-  onClick: (open: boolean) => void
-  icon: React.ReactNode
-  label: string
+  account: Account
+  spending: boolean
+  method: Method
+  best: Panel
+  hasConnection: boolean
+  onPick: (panel: Panel) => void
+  onConnectBank: () => void
 }) {
+  const options: Array<{
+    panel: Panel
+    icon: React.ReactNode
+    title: string
+    body: string
+    current: boolean
+  }> = [
+    {
+      panel: 'link',
+      icon: <Landmark size={16} aria-hidden />,
+      title: 'Automatically from your bank',
+      body: spending
+        ? 'Best when your bank is in SimpleFIN Bridge: purchases and the balance arrive on their own, several times a day.'
+        : 'Best when it’s in SimpleFIN Bridge: the balance stays current on its own.',
+      current: method === 'bank',
+    },
+  ]
+  if (spending)
+    options.push(
+      {
+        panel: 'shortcut',
+        icon: <Share size={16} aria-hidden />,
+        title: 'From your iPhone’s share sheet',
+        body: 'For cards SimpleFIN can’t reach, like Apple Card. Set up a Shortcut once; then export from Wallet or your bank and share it to Budgy in a couple of taps.',
+        current: method === 'shortcut',
+      },
+      {
+        panel: 'upload',
+        icon: <FileUp size={16} aria-hidden />,
+        title: 'Upload a file now',
+        body: 'A one-off: choose a CSV export, review what’s new, and confirm. Good for catching up.',
+        current: false,
+      },
+    )
+  options.sort((a, b) => Number(b.panel === best) - Number(a.panel === best))
   return (
-    <button
-      type="button"
-      aria-expanded={open}
-      onClick={() => onClick(open)}
-      className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-xs font-semibold ${open ? 'border-foreground' : 'border-border'}`}
-    >
-      {icon}
-      {label}
-    </button>
+    <div className="space-y-2 border-t border-border pt-3">
+      <p className="font-semibold">How should {account.name} update?</p>
+      <ul className="space-y-2">
+        {options.map((o) => (
+          <li key={o.panel}>
+            <button
+              type="button"
+              onClick={() =>
+                o.panel === 'link' && !hasConnection
+                  ? onConnectBank()
+                  : onPick(o.panel)
+              }
+              className="flex w-full items-start gap-2.5 rounded-lg border border-border bg-background p-2.5 text-left hover:border-foreground"
+            >
+              <span className="mt-0.5 shrink-0">{o.icon}</span>
+              <span className="min-w-0">
+                <span className="flex flex-wrap items-center gap-1.5 font-semibold">
+                  {o.title}
+                  {o.current ? (
+                    <span className="rounded-full bg-sunken px-1.5 py-0.5 text-[10px] text-muted">
+                      Current
+                    </span>
+                  ) : (
+                    o.panel === best && (
+                      <span className="rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] text-accent">
+                        Recommended
+                      </span>
+                    )
+                  )}
+                </span>
+                <span className="block text-muted">
+                  {o.body}
+                  {o.panel === 'link' && !hasConnection
+                    ? ' Connect SimpleFIN first, in Bank connections above.'
+                    : ''}
+                </span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {!spending && (
+        <p className="text-muted">
+          Or{' '}
+          <Link
+            to="/accounts"
+            search={{ kinds: [account.kind], people: [account.owner] }}
+            className="font-semibold text-accent"
+          >
+            record a balance by hand
+          </Link>{' '}
+          on the Accounts tab.
+        </p>
+      )}
+    </div>
   )
 }
 

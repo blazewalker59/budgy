@@ -24,6 +24,7 @@ import { dollars, parseDollars, signedDollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'
 import { Sheet } from '@/components/shared/Sheet'
 import { IncomeMonths } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 const MAX_MONTHS = 24
 
@@ -202,20 +203,15 @@ function PayForm({
         )}
       </div>
       <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <select
+        <Dropdown<PayCadence>
           value={draft.cadence}
-          onChange={(e) =>
-            save(update({ cadence: e.target.value as PayCadence }))
-          }
-          aria-label="How often"
-          className="field"
-        >
-          {PAY_CADENCES.map((c) => (
-            <option key={c} value={c}>
-              {PAY_CADENCE_LABELS[c]}
-            </option>
-          ))}
-        </select>
+          onChange={(cadence) => save(update({ cadence }))}
+          label="How often"
+          options={PAY_CADENCES.map((c) => ({
+            value: c,
+            label: PAY_CADENCE_LABELS[c],
+          }))}
+        />
         <label className="flex items-center gap-1 text-muted">
           {draft.cadence === 'semimonthly' ? 'on' : 'a payday'}
           <input
@@ -231,20 +227,15 @@ function PayForm({
         {draft.cadence === 'semimonthly' && (
           <label className="flex items-center gap-1 text-muted">
             and the
-            <select
-              value={draft.secondDay ?? 31}
-              onChange={(e) =>
-                save(update({ secondDay: Number(e.target.value) }))
-              }
-              aria-label="Other payday of the month"
-              className="field text-foreground"
-            >
-              {DAYS.map((d) => (
-                <option key={d} value={d}>
-                  {d === 31 ? 'last day' : ordinal(d)}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              value={String(draft.secondDay ?? 31)}
+              onChange={(d) => save(update({ secondDay: Number(d) }))}
+              label="Other payday of the month"
+              options={DAYS.map((d) => ({
+                value: String(d),
+                label: d === 31 ? 'last day' : ordinal(d),
+              }))}
+            />
           </label>
         )}
         {isNew ? (

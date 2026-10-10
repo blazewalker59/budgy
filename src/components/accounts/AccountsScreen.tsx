@@ -37,6 +37,7 @@ import { ownerColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Segmented, Stat } from '@/components/shared/Layout'
 import { WorthChart } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 const GROUPS: Array<{ title: string; kinds: Array<AccountKind> }> = [
   { title: 'Cash', kinds: ['checking', 'savings'] },
@@ -385,18 +386,15 @@ function AddAccount({ onAdded }: { onAdded: (name: string) => void }) {
           aria-label="New account name"
           className="field min-w-40 flex-1"
         />
-        <select
+        <Dropdown<AccountKind>
           value={kind}
-          onChange={(e) => setKind(e.target.value as AccountKind)}
-          aria-label="Kind"
-          className="field"
-        >
-          {ACCOUNT_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {ACCOUNT_KIND_LABELS[k]}
-            </option>
-          ))}
-        </select>
+          onChange={setKind}
+          label="Kind"
+          options={ACCOUNT_KINDS.map((k) => ({
+            value: k,
+            label: ACCOUNT_KIND_LABELS[k],
+          }))}
+        />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
         <OwnerInput value={owner} onChange={setOwner} className="w-28" />

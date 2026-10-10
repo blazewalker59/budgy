@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { monthLabel, shiftMonth } from '@/lib/model/dates'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 export function MonthPicker({
   month,
@@ -24,18 +25,15 @@ export function MonthPicker({
       >
         <ChevronLeft size={18} aria-hidden />
       </button>
-      <select
+      <Dropdown
         value={month}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Month"
-        className="field min-w-36 font-semibold"
-      >
-        {[...months].reverse().map((m) => (
-          <option key={m} value={m}>
-            {monthLabel(m, true)}
-          </option>
-        ))}
-      </select>
+        onChange={onChange}
+        label="Month"
+        className="min-w-36 font-semibold"
+        options={[...months]
+          .reverse()
+          .map((m) => ({ value: m, label: monthLabel(m, true) }))}
+      />
       <button
         type="button"
         aria-label="Next month"

@@ -27,6 +27,7 @@ import {
   BankLink,
 } from '@/components/accounts/BankConnections'
 import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 type UpdateState = NonNullable<
   ReturnType<typeof useAccountUpdates>['data']
@@ -599,24 +600,23 @@ function ExportUpdate({
       {fileName && <p className="text-xs text-muted">{fileName}</p>}
       <label className="block space-y-1 text-xs font-semibold">
         Export format
-        <select
+        <Dropdown<ExportFormat>
           value={format}
           disabled={update.isPending || reading}
-          className="field min-h-11 w-full"
-          onChange={(event) => {
-            setFormat(event.target.value as ExportFormat)
+          label="Export format"
+          placeholder="Choose the amount convention…"
+          className="min-h-11 w-full"
+          onChange={(value) => {
+            setFormat(value)
             setPreview(null)
             setDone(null)
             update.reset()
           }}
-        >
-          <option value="">Choose the amount convention…</option>
-          {EXPORT_FORMATS.map((value) => (
-            <option key={value} value={value}>
-              {EXPORT_LABELS[value]}
-            </option>
-          ))}
-        </select>
+          options={EXPORT_FORMATS.map((value) => ({
+            value,
+            label: EXPORT_LABELS[value],
+          }))}
+        />
       </label>
       {format === 'apple-card' && (
         <p className="text-xs text-muted">

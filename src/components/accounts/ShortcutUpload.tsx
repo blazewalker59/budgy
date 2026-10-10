@@ -17,6 +17,7 @@ import {
 } from '@/lib/updates/server'
 import { UPLOAD_TOKENS_KEY, useUploadTokens } from '@/lib/updates/useUpdates'
 import { CopyLine } from '@/components/shared/CopyLine'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 export function ShortcutUpload({
   account,
@@ -112,23 +113,17 @@ export function ShortcutUpload({
         <div className="flex flex-wrap items-end gap-2">
           <label className="block min-w-0 flex-1 space-y-1 font-semibold">
             The export it will send
-            <select
+            <Dropdown<ExportFormat>
               value={format}
               disabled={create.isPending}
-              className="field min-h-11 w-full"
-              onChange={(event) =>
-                setFormat(event.target.value as ExportFormat)
-              }
-            >
-              <option value="">Choose the amount convention…</option>
-              {EXPORT_FORMATS.filter(
+              label="The export it will send"
+              placeholder="Choose the amount convention…"
+              className="min-h-11 w-full"
+              onChange={setFormat}
+              options={EXPORT_FORMATS.filter(
                 (value) => value !== 'apple-card' || account.kind === 'credit',
-              ).map((value) => (
-                <option key={value} value={value}>
-                  {EXPORT_LABELS[value]}
-                </option>
-              ))}
-            </select>
+              ).map((value) => ({ value, label: EXPORT_LABELS[value] }))}
+            />
           </label>
           <button
             type="button"

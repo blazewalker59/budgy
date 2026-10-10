@@ -1,7 +1,7 @@
 import type { Tag } from '@/lib/model/types'
 import { TAGS } from '@/lib/model/types'
 import { TAG_SHORT } from '@/lib/format'
-import { cn } from '@/lib/utils'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 export function TagSelect({
   value,
@@ -17,18 +17,15 @@ export function TagSelect({
   className?: string
 }) {
   return (
-    <select
+    <Dropdown
       value={value}
-      aria-label={label}
-      className={cn('field', className)}
-      onChange={(e) => onChange((e.target.value || null) as Tag | null)}
-    >
-      {allowInherit && <option value="">As category</option>}
-      {TAGS.map((t) => (
-        <option key={t} value={t}>
-          {TAG_SHORT[t]}
-        </option>
-      ))}
-    </select>
+      label={label}
+      className={className}
+      onChange={(t) => onChange(t || null)}
+      options={[
+        ...(allowInherit ? [{ value: '' as const, label: 'As category' }] : []),
+        ...TAGS.map((t) => ({ value: t, label: TAG_SHORT[t] })),
+      ]}
+    />
   )
 }

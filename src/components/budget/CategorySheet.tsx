@@ -25,6 +25,7 @@ import { dollars, signedDollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'
 import { Sheet } from '@/components/shared/Sheet'
 import { CategoryTrend } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 /** At most this many months back, so the bars stay readable on a phone. */
 const MAX_MONTHS = 24
@@ -123,20 +124,15 @@ function Settings({ name }: { name: string }) {
         </label>
         <label className="flex items-center gap-1.5 text-xs text-muted">
           Group
-          <select
+          <Dropdown<Group>
             value={category.group}
-            aria-label={`Group for ${name}`}
-            className="field"
-            onChange={(e) =>
-              saveCategory.mutate({
-                ...category,
-                group: e.target.value as Group,
-              })
-            }
-          >
-            <option value="everyday">Everyday</option>
-            <option value="housing">Housing</option>
-          </select>
+            label={`Group for ${name}`}
+            onChange={(group) => saveCategory.mutate({ ...category, group })}
+            options={[
+              { value: 'everyday', label: 'Everyday' },
+              { value: 'housing', label: 'Housing' },
+            ]}
+          />
         </label>
       </div>
       <p className="text-xs text-muted">

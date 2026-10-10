@@ -32,6 +32,7 @@ import {
   SelectionMonths,
   SourceChart,
 } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 const PERIODS: ReadonlyArray<{ value: Period; label: string }> = [
   { value: 'month', label: 'Month' },
@@ -169,26 +170,18 @@ export function SpendingScreen({ search }: { search: SpendingSearch }) {
               onChange={(p) => set({ period: p === '3' ? undefined : p })}
             />
             {period === 'month' && (
-              <select
+              <Dropdown
                 value={month}
-                onChange={(e) =>
-                  set({
-                    month:
-                      e.target.value === thisMonth ? undefined : e.target.value,
-                  })
+                onChange={(m) =>
+                  set({ month: m === thisMonth ? undefined : m })
                 }
-                aria-label="Month"
-                className="field font-semibold"
-              >
-                {[...new Set([...book.months, thisMonth])]
+                label="Month"
+                className="font-semibold"
+                options={[...new Set([...book.months, thisMonth])]
                   .sort()
                   .reverse()
-                  .map((m) => (
-                    <option key={m} value={m}>
-                      {monthLabel(m)}
-                    </option>
-                  ))}
-              </select>
+                  .map((m) => ({ value: m, label: monthLabel(m) }))}
+              />
             )}
           </div>
         )}

@@ -20,6 +20,7 @@ import { CADENCES, CADENCE_LABELS } from '@/lib/model/types'
 import { cn } from '@/lib/utils'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { ForecastChart } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 export function UpcomingScreen() {
   const book = useBook()
@@ -381,19 +382,16 @@ function PlanForm({ plan, onDone }: { plan: Plan; onDone: () => void }) {
         />
       </Field>
       <Field label="How often">
-        <select
+        <Dropdown<Plan['cadence']>
           value={draft.cadence}
-          onChange={(e) =>
-            setDraft({ ...draft, cadence: e.target.value as Plan['cadence'] })
-          }
-          className="field w-full"
-        >
-          {CADENCES.map((c) => (
-            <option key={c} value={c}>
-              {CADENCE_LABELS[c]}
-            </option>
-          ))}
-        </select>
+          onChange={(cadence) => setDraft({ ...draft, cadence })}
+          label="How often"
+          className="w-full"
+          options={CADENCES.map((c) => ({
+            value: c,
+            label: CADENCE_LABELS[c],
+          }))}
+        />
       </Field>
       <Field label="Next due">
         <input

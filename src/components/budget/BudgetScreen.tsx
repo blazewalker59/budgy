@@ -29,6 +29,7 @@ import { TAG_BG } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Segmented, Stat } from '@/components/shared/Layout'
 import { TrendSpark } from '@/components/charts/lazy'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 type Span = '3' | '6' | '12'
 const SPANS = [
@@ -150,20 +151,15 @@ export function BudgetScreen({ owner }: { owner?: string }) {
         <h2 className="text-base font-extrabold tracking-tight">
           {owner ? `Budget, ${owner}’s spending` : 'Budget'}
         </h2>
-        <select
+        <Dropdown
           value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          aria-label="Targets apply from"
-          className="field text-xs font-semibold"
-        >
-          {Array.from({ length: 13 }, (_, i) =>
+          onChange={setFrom}
+          label="Targets apply from"
+          className="text-xs font-semibold"
+          options={Array.from({ length: 13 }, (_, i) =>
             shiftMonth(thisMonth, i - 1),
-          ).map((m) => (
-            <option key={m} value={m}>
-              Targets from {monthLabel(m)}
-            </option>
-          ))}
-        </select>
+          ).map((m) => ({ value: m, label: `Targets from ${monthLabel(m)}` }))}
+        />
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -464,15 +460,15 @@ function AddCategory() {
         className="field min-w-32 flex-1"
       />
       <TagSelect value={tag} label="Tag" onChange={(t) => t && setTag(t)} />
-      <select
+      <Dropdown<Group>
         value={group}
-        onChange={(e) => setGroup(e.target.value as Group)}
-        aria-label="Group"
-        className="field"
-      >
-        <option value="everyday">Everyday</option>
-        <option value="housing">Housing</option>
-      </select>
+        onChange={setGroup}
+        label="Group"
+        options={[
+          { value: 'everyday', label: 'Everyday' },
+          { value: 'housing', label: 'Housing' },
+        ]}
+      />
       <button
         type="submit"
         className="inline-flex items-center gap-1 rounded-full bg-foreground px-3 py-1 text-xs font-semibold text-background"

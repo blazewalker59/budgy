@@ -9,6 +9,20 @@ import {
 } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AccountUpdates } from '@/components/accounts/AccountUpdates'
+import { EXPORT_LABELS } from '@/lib/updates/exports'
+
+// A touch screen: each Dropdown opens a sheet of plain option buttons.
+window.matchMedia = ((query: string) => ({
+  matches: query === '(pointer: coarse)',
+  addEventListener: () => {},
+  removeEventListener: () => {},
+})) as unknown as typeof window.matchMedia
+
+/** Choose an option from a Dropdown, as a person would. */
+function pick(label: string, option: string | RegExp) {
+  fireEvent.click(screen.getByRole('button', { name: label }))
+  fireEvent.click(screen.getByRole('option', { name: option }))
+}
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -135,9 +149,8 @@ describe('Unified Account Updates UI', () => {
       target: { files: [file] },
     })
     await waitFor(() =>
-      expect(screen.getByLabelText('Export format')).toHaveProperty(
-        'value',
-        'apple-card',
+      expect(screen.getByLabelText('Export format').textContent).toBe(
+        EXPORT_LABELS['apple-card'],
       ),
     )
     expect(screen.queryByLabelText('A balance you know')).toBeNull()
@@ -176,9 +189,7 @@ describe('Unified Account Updates UI', () => {
     })
     const review = await screen.findByRole('button', { name: 'Review export' })
     expect((review as HTMLButtonElement).disabled).toBe(true)
-    fireEvent.change(screen.getByLabelText('Export format'), {
-      target: { value: 'money-out-negative' },
-    })
+    pick('Export format', EXPORT_LABELS['money-out-negative'])
     expect((review as HTMLButtonElement).disabled).toBe(false)
   })
 
@@ -234,9 +245,8 @@ describe('Unified Account Updates UI', () => {
     })
     expect(shortcut.textContent).toContain('Recommended')
     fireEvent.click(shortcut)
-    expect(screen.getByLabelText('The export it will send')).toHaveProperty(
-      'value',
-      'apple-card',
+    expect(screen.getByLabelText('The export it will send').textContent).toBe(
+      EXPORT_LABELS['apple-card'],
     )
     fireEvent.click(
       screen.getByRole('button', { name: 'Create Shortcut token' }),
@@ -294,12 +304,11 @@ describe('Unified Account Updates UI', () => {
     })
     expect(fromBank.textContent).toContain('Recommended')
     fireEvent.click(fromBank)
-    const select = screen.getByLabelText('SimpleFIN account for Card')
-    expect(select).toHaveProperty('value', '')
+    expect(
+      screen.getByLabelText('SimpleFIN account for Card').textContent,
+    ).toBe('Not linked')
     expect(mocks.link).not.toHaveBeenCalled()
-    fireEvent.change(select, {
-      target: { value: JSON.stringify(['c1', 'p1']) },
-    })
+    pick('SimpleFIN account for Card', 'Sapphire · Chase')
     await waitFor(() =>
       expect(mocks.link).toHaveBeenCalledWith({
         data: { connectionId: 'c1', providerId: 'p1', account: 'Card' },

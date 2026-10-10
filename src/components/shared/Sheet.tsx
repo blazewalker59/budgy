@@ -28,7 +28,8 @@ export function Sheet({
 }: {
   title: string
   onClose: () => void
-  children: React.ReactNode
+  /** Or, to close it the way Done does: a function given that close. */
+  children: React.ReactNode | ((dismiss: () => void) => React.ReactNode)
 }) {
   const close = useRef<HTMLButtonElement>(null)
   const body = useRef<HTMLDivElement>(null)
@@ -154,7 +155,7 @@ export function Sheet({
           onTouchEnd={onTouchEnd}
           onTouchCancel={onTouchEnd}
         >
-          {children}
+          {typeof children === 'function' ? children(dismiss) : children}
         </div>
       </div>
     </div>

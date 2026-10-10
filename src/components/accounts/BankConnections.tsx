@@ -22,6 +22,7 @@ import {
   useBankConnections,
 } from '@/lib/updates/useUpdates'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 type Connection = NonNullable<
   ReturnType<typeof useBankConnections>['data']
@@ -375,34 +376,33 @@ export function BankLink({ account }: { account: Account }) {
     <div className="space-y-1.5 border-t border-border pt-3 text-xs">
       <label className="block space-y-1 font-semibold">
         SimpleFIN account
-        <select
-          aria-label={`SimpleFIN account for ${account.name}`}
+        <Dropdown
+          label={`SimpleFIN account for ${account.name}`}
           value={current ? key(current) : ''}
           disabled={link.isPending}
-          onChange={(event) => link.mutate(event.target.value)}
-          className="field min-h-11 w-full"
-        >
-          <option value="">Not linked</option>
-          {all.map((c) => (
-            <optgroup key={c.id} label={c.name}>
-              {c.accounts.map((b) => {
+          onChange={(value) => link.mutate(value)}
+          className="min-h-11 w-full"
+          options={[
+            { value: '', label: 'Not linked' },
+            ...all.map((c) => ({
+              group: c.name,
+              options: c.accounts.map((b) => {
                 const elsewhere = b.account && b.account !== account.name
                 const usable = b.currency.toUpperCase() === 'USD' && b.present
-                return (
-                  <option
-                    key={key(b)}
-                    value={key(b)}
-                    disabled={!!elsewhere || !usable}
-                  >
-                    {b.name} · {b.institution}
-                    {elsewhere ? ` (feeds ${b.account})` : ''}
-                    {!usable ? ' (unavailable)' : ''}
-                  </option>
-                )
-              })}
-            </optgroup>
-          ))}
-        </select>
+                return {
+                  value: key(b),
+                  label: `${b.name} · ${b.institution}`,
+                  hint: elsewhere
+                    ? `feeds ${b.account}`
+                    : !usable
+                      ? 'unavailable'
+                      : undefined,
+                  disabled: !!elsewhere || !usable,
+                }
+              }),
+            })),
+          ]}
+        />
       </label>
       <p className="text-muted">
         {['credit', 'checking', 'savings'].includes(account.kind)

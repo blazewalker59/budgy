@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useBook } from '@/lib/ledger/book'
 import { TRANSFER, allCategoryNames } from '@/lib/model/ledger'
 import { cn } from '@/lib/utils'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 const NEW = '__new'
 
@@ -41,36 +42,34 @@ export function CategorySelect({
         }}
       />
     )
-  const names = allCategoryNames(ix)
+  // Its usual Category, even when nothing else is filed there.
+  const names = new Set(allCategoryNames(ix))
+  if (defaultValue && defaultValue !== TRANSFER) names.add(defaultValue)
+  const usual = (n: string) =>
+    n === defaultValue && value !== defaultValue ? 'usual' : undefined
   return (
-    <select
+    <Dropdown
       value={value}
-      aria-label={label}
-      className={cn(
-        'field',
-        value !== defaultValue && defaultValue && 'has-value',
-        className,
-      )}
-      onChange={(e) =>
-        e.target.value === NEW ? setAdding(true) : onChange(e.target.value)
-      }
-    >
-      {!value && (
-        <option value="" disabled>
-          Choose a category
-        </option>
-      )}
-      {names.map((n) => (
-        <option key={n} value={n}>
-          {n}
-          {n === defaultValue && value !== defaultValue ? ' (usual)' : ''}
-        </option>
-      ))}
-      <option value={TRANSFER}>
-        Transfer, not spending
-        {TRANSFER === defaultValue && value !== defaultValue ? ' (usual)' : ''}
-      </option>
-      <option value={NEW}>New category…</option>
-    </select>
+      label={label}
+      placeholder="Choose a category"
+      edited={!!defaultValue && value !== defaultValue}
+      className={className}
+      onChange={(c) => (c === NEW ? setAdding(true) : onChange(c))}
+      options={[
+        ...[...names]
+          .sort((a, b) => a.localeCompare(b))
+          .map((n) => ({
+            value: n,
+            label: n,
+            hint: usual(n),
+          })),
+        {
+          value: TRANSFER,
+          label: 'Transfer, not spending',
+          hint: usual(TRANSFER),
+        },
+        { value: NEW, label: 'New category…' },
+      ]}
+    />
   )
 }

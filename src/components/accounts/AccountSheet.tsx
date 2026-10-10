@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils'
 import { Sheet } from '@/components/shared/Sheet'
 import { WorthChart } from '@/components/charts/lazy'
 import { UPDATES_KEY } from '@/lib/updates/useUpdates'
+import { Dropdown } from '@/components/shared/Dropdown'
 
 export function AccountSheet({
   name,
@@ -151,18 +152,15 @@ function Details({
   }
   return (
     <section className="flex flex-wrap items-center gap-1.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
-      <select
+      <Dropdown<AccountKind>
         value={account.kind}
-        onChange={(e) => save({ kind: e.target.value as AccountKind })}
-        aria-label="Kind"
-        className="field"
-      >
-        {ACCOUNT_KINDS.map((k) => (
-          <option key={k} value={k}>
-            {ACCOUNT_KIND_LABELS[k]}
-          </option>
-        ))}
-      </select>
+        onChange={(kind) => save({ kind })}
+        label="Kind"
+        options={ACCOUNT_KINDS.map((k) => ({
+          value: k,
+          label: ACCOUNT_KIND_LABELS[k],
+        }))}
+      />
       <OwnerInput
         value={owner}
         onChange={setOwner}
@@ -188,19 +186,15 @@ function Details({
       {account.kind === 'loan' && properties.length > 0 && (
         <label className="flex items-center gap-1 text-muted">
           Against
-          <select
+          <Dropdown
             value={account.securedBy ?? ''}
-            onChange={(e) => save({ securedBy: e.target.value || null })}
-            aria-label="The property this loan is against"
-            className="field text-foreground"
-          >
-            <option value="">Nothing</option>
-            {properties.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+            onChange={(p) => save({ securedBy: p || null })}
+            label="The property this loan is against"
+            options={[
+              { value: '', label: 'Nothing' },
+              ...properties.map((p) => ({ value: p.name, label: p.name })),
+            ]}
+          />
         </label>
       )}
       <label className="flex items-center gap-1 text-muted">

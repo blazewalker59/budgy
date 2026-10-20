@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ledger, txn } from '@test/factories'
 import { ANY_SOURCE, categoryOf, indexLedger } from '@/lib/model/ledger'
-import { ruleUses, suggestRules } from '@/lib/model/rules'
+import { ruleUses, suggestRules, suggestionKey } from '@/lib/model/rules'
 
 describe('a store-wide rule', () => {
   const ix = indexLedger(
@@ -115,5 +115,25 @@ describe('suggestRules', () => {
       }),
     )
     expect(suggestRules(ruled)).toEqual([])
+  })
+
+  it('stays quiet about a suggestion a Member dismissed, until the Moves point elsewhere', () => {
+    const moved = [store('a', 'Groceries'), store('b', 'Groceries')]
+    const dismissed = [suggestionKey('CORNER SHOP', 'Groceries')]
+    expect(
+      suggestRules(indexLedger(ledger({ txns: moved, dismissed }))),
+    ).toEqual([])
+    const elsewhere = indexLedger(
+      ledger({
+        txns: [
+          ...moved,
+          store('c', 'Gifts'),
+          store('d', 'Gifts'),
+          store('e', 'Gifts'),
+        ],
+        dismissed,
+      }),
+    )
+    expect(suggestRules(elsewhere).map((s) => s.category)).toEqual(['Gifts'])
   })
 })

@@ -4,10 +4,10 @@
  */
 
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import { KEPT_KEY, loadKept } from './queries'
+import { KEPT_KEY, addKey } from './queries'
 import type { HouseholdDatabase as Database } from '@/lib/households/scope'
-import { householdRow, inHousehold } from '@/lib/households/scope'
-import { imports, settings, transactions } from '@/lib/db/schema'
+import { inHousehold } from '@/lib/households/scope'
+import { imports, transactions } from '@/lib/db/schema'
 import { filedFirst, pairKey, staysFirst } from '@/lib/model/duplicates'
 
 /**
@@ -93,15 +93,5 @@ export async function keepBoth(
   db: Database,
   pair: { goes: string; stays: string },
 ): Promise<void> {
-  const key = pairKey(pair.goes, pair.stays)
-  const kept = await loadKept(db)
-  if (kept.includes(key)) return
-  const value = JSON.stringify([...kept, key])
-  await db
-    .insert(settings)
-    .values(householdRow(db, { key: KEPT_KEY, value }))
-    .onConflictDoUpdate({
-      target: [settings.householdId, settings.key],
-      set: { value },
-    })
+  await addKey(db, KEPT_KEY, pairKey(pair.goes, pair.stays))
 }

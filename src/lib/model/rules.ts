@@ -47,13 +47,19 @@ export interface RuleSuggestion {
   changes: number
 }
 
+/** One Store and Category suggested together, as a dismissal remembers it. */
+export function suggestionKey(store: string, category: string): string {
+  return `${store.toLowerCase()}|${category}`
+}
+
 /** A Store needs at least this many Moves to one Category to suggest a rule. */
 const MIN_MOVES = 2
 
 /**
  * Rules the Moves suggest: each Store whose purchases were Moved to one
  * Category at least twice, more than to any other, and that no store-wide
- * rule already files there. Most Moves first.
+ * rule already files there, unless a Member dismissed that suggestion. Most
+ * Moves first.
  */
 export function suggestRules(ix: LedgerIndex): Array<RuleSuggestion> {
   const byStore = new Map<
@@ -71,13 +77,15 @@ export function suggestRules(ix: LedgerIndex): Array<RuleSuggestion> {
     if (t.category) s.moves.set(t.category, (s.moves.get(t.category) ?? 0) + 1)
     byStore.set(key, s)
   }
+  const dismissed = new Set(ix.ledger.dismissed)
   const out: Array<RuleSuggestion> = []
   for (const s of byStore.values()) {
     const [first, second] = [...s.moves].sort((a, b) => b[1] - a[1])
     if (!first || first[1] < MIN_MOVES || first[1] === second?.[1]) continue
     const [category, moved] = first
     const has = ix.rules.get(ruleKey(ANY_SOURCE, s.store))?.category
-    if (has === category) continue
+    if (has === category || dismissed.has(suggestionKey(s.store, category)))
+      continue
     const changes = everyTxn(ix).filter(
       (t) =>
         t.store.toLowerCase() === s.store.toLowerCase() &&

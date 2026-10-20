@@ -65,6 +65,7 @@ function ledger(category: string | null): Ledger {
     targets: [],
     plans: [],
     kept: [],
+    dismissed: [],
     baseline: null,
   }
 }

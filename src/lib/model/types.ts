@@ -205,6 +205,8 @@ export interface Ledger {
   plans: Array<Plan>
   /** Possible duplicates a Member kept both of (`pairKey`s). */
   kept: Array<string>
+  /** Rule suggestions a Member dismissed (`suggestionKey`s). */
+  dismissed: Array<string>
   /** The day net worth history counts from; null for `autoBaseline`. */
   baseline: string | null
 }

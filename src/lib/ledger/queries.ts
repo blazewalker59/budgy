@@ -37,6 +37,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
     held,
     lenses,
     kept,
+    dismissed,
     baseline,
   ] = await Promise.all([
     db.select().from(categories).where(inHousehold(db, categories)),
@@ -97,6 +98,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       .where(inHousehold(db, savedLenses))
       .orderBy(savedLenses.name),
     loadKept(db),
+    loadDismissed(db),
     loadBaseline(db),
   ])
   return {
@@ -145,6 +147,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       }),
     ),
     kept,
+    dismissed,
     baseline,
   }
 }
@@ -184,14 +187,51 @@ export async function saveBaseline(
 /** Where the possible duplicates a Member kept both of are remembered. */
 export const KEPT_KEY = 'kept-duplicates'
 
-export async function loadKept(db: Database): Promise<Array<string>> {
+export function loadKept(db: Database): Promise<Array<string>> {
+  return loadKeys(db, KEPT_KEY)
+}
+
+/** Where the rule suggestions a Member dismissed are remembered. */
+const DISMISSED_KEY = 'dismissed-rule-suggestions'
+
+function loadDismissed(db: Database): Promise<Array<string>> {
+  return loadKeys(db, DISMISSED_KEY)
+}
+
+/** A rule suggestion not wanted: never suggest it again. */
+export async function dismissSuggestion(
+  db: Database,
+  key: string,
+): Promise<void> {
+  await addKey(db, DISMISSED_KEY, key)
+}
+
+async function loadKeys(db: Database, name: string): Promise<Array<string>> {
   const row = await db
     .select({ value: settings.value })
     .from(settings)
-    .where(inHousehold(db, settings, eq(settings.key, KEPT_KEY)))
+    .where(inHousehold(db, settings, eq(settings.key, name)))
     .get()
-  const kept: unknown = row ? JSON.parse(row.value) : []
-  return Array.isArray(kept) ? kept.filter((k) => typeof k === 'string') : []
+  const keys: unknown = row ? JSON.parse(row.value) : []
+  return Array.isArray(keys) ? keys.filter((k) => typeof k === 'string') : []
+}
+
+/** Remember one more key in a setting's list (once). */
+export async function addKey(
+  db: Database,
+  name: string,
+  key: string,
+): Promise<void> {
+  const keys = await loadKeys(db, name)
+  if (keys.includes(key)) return
+  const value = JSON.stringify([...keys, key])
+  await db
+    .insert(settings)
+    .values(householdRow(db, { key: name, value }))
+    .onConflictDoUpdate({
+      target: [settings.householdId, settings.key],
+      set: { value },
+    })
 }
 
 /** A Category named in an edit exists from then on. */

@@ -101,7 +101,8 @@ Filing every Transaction from a Store somewhere else, past and future
 the Store whatever Category its purchases came in with, and is what Moving a
 purchase and choosing "Always" makes; a rule for one import Category wins
 over it. Store names match in any case. Members manage them on Filing rules,
-where Stores Moved to one Category again and again are suggested as rules.
+where Stores Moved to one Category again and again are suggested as rules;
+a dismissed suggestion stays away for the whole Household.
 
 **Note**:
 A Member's few words on a Transaction, usually why it was Moved.

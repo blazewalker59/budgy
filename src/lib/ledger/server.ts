@@ -8,6 +8,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import {
+  dismissSuggestion,
   ensureCategory,
   loadLedger,
   moveTransaction,
@@ -37,6 +38,7 @@ import type { SessionState } from '@/lib/auth/session'
 import type { ImportRules } from '@/lib/import/rules'
 import { savedLensInput } from '@/lib/model/lens'
 import { ANY_SOURCE } from '@/lib/model/ledger'
+import { suggestionKey } from '@/lib/model/rules'
 import { accountInput, balanceInput } from '@/lib/model/accounts'
 import { sessionState, withMember } from '@/lib/auth/session'
 import {
@@ -432,6 +434,17 @@ export const mergeDuplicatePair = createServerFn({ method: 'POST' })
 export const keepDuplicatePair = createServerFn({ method: 'POST' })
   .validator((data: { goes: string; stays: string }) => pairInput.parse(data))
   .handler(({ data }) => withMember(({ db }) => keepBoth(db, data)))
+
+/** A suggested Store Rule not wanted: stop suggesting it. */
+export const dismissRuleSuggestion = createServerFn({ method: 'POST' })
+  .validator((data: { store: string; category: string }) =>
+    z.object({ store: z.string().min(1).max(80), category: NAME }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) =>
+      dismissSuggestion(db, suggestionKey(data.store, data.category)),
+    ),
+  )
 
 /** The day net worth history counts from; null for the automatic one. */
 export const setWorthBaseline = createServerFn({ method: 'POST' })

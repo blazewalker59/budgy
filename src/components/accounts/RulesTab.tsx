@@ -1,7 +1,7 @@
 /**
  * The Rules tab on Accounts: where each Store's purchases go, past and
  * future (every upload is filed by them). Rules the Moves suggest come
- * first, then every rule to change or remove, then a new one, then the
+ * first (each can be dismissed for good), then every rule to change or remove, then a new one, then the
  * Transfers they and the Moves left out of spending, then the Import Rules.
  * A Move on one purchase still wins over its Store's rule.
  */
@@ -11,7 +11,10 @@ import { X } from 'lucide-react'
 import { ImportRules } from './ImportRules'
 import type { StoreRule } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
-import { useSetStoreRule } from '@/lib/ledger/useLedger'
+import {
+  useDismissRuleSuggestion,
+  useSetStoreRule,
+} from '@/lib/ledger/useLedger'
 import { ANY_SOURCE, everyTxn } from '@/lib/model/ledger'
 import { ruleUses, suggestRules } from '@/lib/model/rules'
 import { dayLabel } from '@/lib/model/dates'
@@ -40,6 +43,7 @@ export function RulesTab() {
 
 function Suggestions({ list }: { list: ReturnType<typeof suggestRules> }) {
   const setRule = useSetStoreRule()
+  const dismiss = useDismissRuleSuggestion()
   const make = (s: { store: string; category: string }) =>
     setRule.mutate({
       sourceCategory: ANY_SOURCE,
@@ -80,13 +84,26 @@ function Suggestions({ list }: { list: ReturnType<typeof suggestRules> }) {
                 {s.changes > 0 && ` · ${s.changes} more would change`}
               </span>
             </span>
-            <button
-              type="button"
-              onClick={() => make(s)}
-              className="shrink-0 rounded-full bg-foreground px-2.5 py-0.5 text-xs font-semibold text-background"
-            >
-              Make rule
-            </button>
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={() => make(s)}
+                className="rounded-full bg-foreground px-2.5 py-0.5 text-xs font-semibold text-background"
+              >
+                Make rule
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  dismiss.mutate({ store: s.store, category: s.category })
+                }
+                aria-label={`Dismiss the suggestion for ${s.store}`}
+                title="Don’t suggest this again"
+                className="rounded-full p-1 text-muted hover:bg-sunken hover:text-foreground"
+              >
+                <X size={14} aria-hidden />
+              </button>
+            </span>
           </li>
         ))}
       </ul>

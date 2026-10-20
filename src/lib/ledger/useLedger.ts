@@ -12,6 +12,7 @@ import {
   deleteLens,
   deletePay,
   deletePlan,
+  dismissRuleSuggestion,
   getLedger,
   getSession,
   keepDuplicatePair,
@@ -44,6 +45,7 @@ import { newCategory } from '@/lib/model/defaults'
 import { clientMessage } from '@/lib/errors'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
+import { suggestionKey } from '@/lib/model/rules'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -349,6 +351,17 @@ export function useKeepDuplicate() {
   return useEdit(
     (v: { goes: string; stays: string }) => keepDuplicatePair({ data: v }),
     (l, v) => ({ ...l, kept: [...l.kept, pairKey(v.goes, v.stays)] }),
+  )
+}
+
+export function useDismissRuleSuggestion() {
+  return useEdit(
+    (v: { store: string; category: string }) =>
+      dismissRuleSuggestion({ data: v }),
+    (l, v) => ({
+      ...l,
+      dismissed: [...l.dismissed, suggestionKey(v.store, v.category)],
+    }),
   )
 }
 

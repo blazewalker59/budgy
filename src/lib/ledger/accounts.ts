@@ -36,6 +36,7 @@ import {
   storeHistory,
 } from '@/lib/import/posted'
 import { prepareIdentified } from '@/lib/updates/reconcile'
+import { deleteMoneyInFor } from '@/lib/moneyIn/service'
 import {
   acquireUpdate,
   finishReceipt,
@@ -133,6 +134,7 @@ export async function deleteAccount(db: Database, name: string): Promise<void> {
       db
         .delete(uploadTokens)
         .where(inHousehold(db, uploadTokens, eq(uploadTokens.account, name))),
+      deleteMoneyInFor(db, name),
       db
         .update(bankAccounts)
         .set({ account: null })

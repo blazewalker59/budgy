@@ -20,6 +20,7 @@ import {
 } from 'drizzle-orm/sqlite-core'
 import type { Lens } from '@/lib/model/lens'
 import type { ExportFormat } from '@/lib/updates/exports'
+import type { MoneyInUse } from '@/lib/model/moneyIn'
 import type {
   AccountKind,
   Cadence,
@@ -571,9 +572,58 @@ export const bankAccounts = sqliteTable(
     present: integer('present', { mode: 'boolean' }).notNull().default(true),
     /** The last day a sync covered; the next one overlaps it. */
     syncedThrough: text('synced_through'),
+    /**
+     * The first day Money in was read from (docs/adr/0011). Null until a
+     * sync has reached back the full window for it once.
+     */
+    moneyInSince: text('money_in_since'),
   },
   (t) => [
     primaryKey({ columns: [t.householdId, t.connectionId, t.providerId] }),
     uniqueIndex('bank_accounts_account_unique').on(t.householdId, t.account),
+  ],
+)
+
+/**
+ * Money in (docs/adr/0011): money that came into a checking or savings
+ * Account, kept apart from Transactions so it never moves spending until a
+ * Member files it as an offset. An offset is a refund Transaction this row
+ * points to; un-filing removes it.
+ */
+export const moneyIn = sqliteTable(
+  'money_in',
+  {
+    householdId: householdId(),
+    id: text('id').notNull(),
+    account: text('account').notNull(),
+    /** YYYY-MM-DD */
+    date: text('date').notNull(),
+    /** YYYY-MM, for month queries. */
+    month: text('month').notNull(),
+    description: text('description').notNull(),
+    /** Normalized Store name: who it came from. */
+    store: text('store').notNull(),
+    /** Cents, always positive. */
+    amount: integer('amount').notNull(),
+    use: text('use').$type<MoneyInUse>().notNull(),
+    /** For an offset: the Category it comes off. */
+    category: text('category'),
+    /** For an offset: cents taken off (at most `amount`). */
+    offset: integer('offset_amount'),
+    /** For an offset: the refund Transaction's id. */
+    txnId: text('txn_id'),
+    note: text('note'),
+    /** Connector identity, or a hash of the exported row; dedupes updates. */
+    sourceKey: text('source_key').notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.householdId, t.id] }),
+    index('money_in_month_idx').on(t.householdId, t.month),
+    uniqueIndex('money_in_source_unique').on(
+      t.householdId,
+      t.account,
+      t.sourceKey,
+    ),
   ],
 )

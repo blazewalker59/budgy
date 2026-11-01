@@ -69,6 +69,10 @@ describe('Account export conventions', () => {
     )
     expect(result.rows.map((r) => r.amount)).toEqual([5, -2])
     expect(result.excluded).toBe(2)
+    // The deposit is kept as Money in; the transfer out is not.
+    expect(result.incoming).toEqual([
+      { date: '2026-10-03', description: 'Payroll', amount: 10_000 },
+    ])
     expect(() =>
       normalizeExport(
         'Date,Description,Debit,Credit\n2026-10-01,Shop,5,2',
@@ -85,7 +89,7 @@ describe('Account export conventions', () => {
         'apple-card',
         true,
       ),
-    ).toMatchObject({ rows: [], excluded: 1, total: 1 })
+    ).toMatchObject({ rows: [], incoming: [], excluded: 1, total: 1 })
   })
 
   it('rejects malformed dates and rows rather than silently dropping data', () => {

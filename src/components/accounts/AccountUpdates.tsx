@@ -22,6 +22,7 @@ import {
 } from '@/lib/updates/useUpdates'
 import { useBook } from '@/lib/ledger/book'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
+import { MONEY_IN_KEY } from '@/lib/moneyIn/useMoneyIn'
 import { dollars } from '@/lib/model/money'
 import {
   BankConnections,
@@ -545,7 +546,7 @@ function ExportUpdate({
         return
       }
       setDone(
-        `Updated ${account.name}: ${result.summary.added} added, ${result.summary.alreadyHad + result.summary.duplicates.length} already present, ${result.summary.notSpending} excluded.`,
+        `Updated ${account.name}: ${result.summary.added} added, ${result.summary.alreadyHad + result.summary.duplicates.length} already present, ${result.summary.notSpending} excluded.${result.moneyInAdded ? ` ${result.moneyInAdded} new money in to see under Money in.` : ''}`,
       )
       setPreview(null)
       setText('')
@@ -553,6 +554,7 @@ function ExportUpdate({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
         queryClient.invalidateQueries({ queryKey: UPDATES_KEY }),
+        queryClient.invalidateQueries({ queryKey: MONEY_IN_KEY }),
       ])
     },
     onError: async () => {
@@ -654,7 +656,9 @@ function ExportUpdate({
           </p>
           <p className="text-muted">
             {preview.fromDate} through {preview.toDate}. Payments and transfers
-            are left out.
+            are left out of spending.
+            {preview.incoming > 0 &&
+              ` ${preview.incoming} incoming will be kept under Money in.`}
           </p>
           <ul className="space-y-1">
             {preview.summary.filed.slice(0, 5).map((row, index) => (

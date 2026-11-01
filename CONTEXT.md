@@ -27,7 +27,8 @@ Categories, Store Rules, Targets, Planned Expenses and Pay Schedules.
 **Transaction**:
 One purchase (or refund) on one Account, from that Account's uploaded export
 or posted by an Agent. Only spending is kept: card payments, transfers,
-deposits, escrow payouts and investment contributions are left out. Its id is
+deposits, escrow payouts and investment contributions are left out (a bank
+Account's deposits are kept apart, as Money in). Its id is
 a hash of the row for exports without source IDs, or a stable connector
 identity when available; overlapping updates add no duplicate source IDs.
 _Avoid_: expense, charge
@@ -48,7 +49,15 @@ the source supplied complete data through today (docs/adr/0009).
 **Pay Schedule**:
 A paycheck the Household counts on, entered by hand: whose, how much lands in
 the bank per paycheck, how often (every week, every 2 weeks, twice a month,
-every month) and one payday to count from. Imported deposits are never used.
+every month) and one payday to count from. Money in is never used for it.
+
+**Money in**:
+Money that came into a checking or savings Account, from its sync or
+uploaded export (docs/adr/0011). It is never spending by itself. Each one is
+To review, Income, a Transfer between the Household's accounts, or an
+Offset: some or all of it taken off one Category, as a refund Transaction
+it owns. Money from people (Venmo, Zelle) starts out To review.
+_Avoid_: deposit, income (for the whole list)
 
 **Take-home pay**:
 Every Pay Schedule together, per month: each paycheck times paychecks per

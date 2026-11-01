@@ -9,6 +9,7 @@ import { accountInputs } from '@/lib/db/schema'
 import { householdRow } from '@/lib/households/scope'
 import { findAccount, postTransactions } from '@/lib/ledger/accounts'
 import { isDebt } from '@/lib/model/accounts'
+import { recordMoneyIn } from '@/lib/moneyIn/service'
 
 export interface AccountExportInput {
   account: string
@@ -68,8 +69,15 @@ export async function ingestAccountExport(
         ? { from: normalized.fromDate, to: normalized.toDate }
         : undefined,
   })
+  // Only once the purchases are in; a retry adds none twice (docs/adr/0011).
+  const moneyInAdded = data.commit
+    ? await recordMoneyIn(db, account.name, normalized.incoming)
+    : 0
   return {
     summary,
+    /** Incoming rows in the export, kept as Money in. */
+    incoming: normalized.incoming.length,
+    moneyInAdded,
     excluded: normalized.excluded,
     fromDate: normalized.fromDate,
     toDate: normalized.toDate,

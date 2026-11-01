@@ -1,5 +1,6 @@
 /** Known CSV conventions, normalized to Budgy purchases. No sign guessing. */
 import type { PostedRow } from '@/lib/import/posted'
+import type { IncomingRow } from '@/lib/model/moneyIn'
 import { parseCsv } from '@/lib/import/csv'
 import { readDate, readMoney } from '@/lib/import/history'
 
@@ -122,6 +123,7 @@ export function normalizeExport(
       'An export can have at most 20,000 rows. Split it into smaller date ranges.',
     )
   const rows: Array<PostedRow> = []
+  const moneyIn: Array<IncomingRow> = []
   const invalid: Array<number> = []
   let excluded = 0
   const dates: Array<string> = []
@@ -165,6 +167,10 @@ export function normalizeExport(
     dates.push(day)
     if (!isSpending(cents, desc, kind, debt)) {
       excluded++
+      // A bank Account's incoming money is kept as Money in (docs/adr/0011);
+      // a card's is its payments, which stay out.
+      if (!debt && cents < 0)
+        moneyIn.push({ date: day, description: desc, amount: -cents })
       continue
     }
     if (format === 'apple-card') {
@@ -190,6 +196,7 @@ export function normalizeExport(
   dates.sort()
   return {
     rows,
+    incoming: moneyIn,
     excluded,
     fromDate: dates[0] ?? null,
     toDate: dates.at(-1) ?? null,

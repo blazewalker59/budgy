@@ -22,6 +22,7 @@ import {
   useBankConnections,
 } from '@/lib/updates/useUpdates'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
+import { MONEY_IN_KEY } from '@/lib/moneyIn/useMoneyIn'
 import { ConfirmPanel } from '@/components/shared/Confirm'
 import { Dropdown } from '@/components/shared/Dropdown'
 
@@ -58,9 +59,11 @@ export function BankConnections({
         refresh(),
         queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
         queryClient.invalidateQueries({ queryKey: UPDATES_KEY }),
+        queryClient.invalidateQueries({ queryKey: MONEY_IN_KEY }),
       ]),
   })
   const failed = sync.data?.filter((r) => r.error) ?? []
+  const moneyIn = sync.data?.reduce((n, r) => n + (r.moneyIn ?? 0), 0) ?? 0
 
   return (
     <section className="rounded-xl border border-border bg-surface text-xs">
@@ -114,6 +117,7 @@ export function BankConnections({
             <p className="text-accent">
               Synced {sync.data!.length - failed.length} of {sync.data!.length}{' '}
               linked accounts.
+              {moneyIn > 0 && ` ${moneyIn} new money in to see under Money in.`}
             </p>
           )}
           {failed.map((r) => (

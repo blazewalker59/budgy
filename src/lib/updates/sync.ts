@@ -11,6 +11,8 @@ import { isSpending } from './exports'
 import type { SimplefinTransaction } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { PostedRow } from '@/lib/import/posted'
+import type { IncomingRow } from '@/lib/model/moneyIn'
+import { recordMoneyIn } from '@/lib/moneyIn/service'
 import { dbFromD1 } from '@/lib/db'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
 import { householdDatabase, inHousehold } from '@/lib/households/scope'
@@ -35,6 +37,8 @@ const SPENDING_KINDS = ['credit', 'checking', 'savings']
 export interface SyncedAccount {
   account: string
   added?: number
+  /** New Money in, for a bank Account. */
+  moneyIn?: number
   balance?: boolean
   error?: string
 }
@@ -54,6 +58,23 @@ function purchaseRow(
     date: dateOn(new Date((t.transactedAt ?? t.posted) * 1000), timeZone),
     description,
     amount: cents / 100,
+    sourceId: t.id,
+  }
+}
+
+/** Posted money into a bank Account, as Money in (docs/adr/0011). */
+function incomingRow(
+  t: SimplefinTransaction,
+  debt: boolean,
+  timeZone: string,
+): IncomingRow | null {
+  if (debt || t.pending || !t.posted) return null
+  const cents = Math.round(Number(t.amount) * 100)
+  if (cents <= 0) return null
+  return {
+    date: dateOn(new Date((t.transactedAt ?? t.posted) * 1000), timeZone),
+    description: t.description.slice(0, 200) || 'Money in',
+    amount: cents,
     sourceId: t.id,
   }
 }
@@ -86,12 +107,17 @@ export async function syncConnection(
     )
     .reduce((a, b) => (a < b ? a : b))
   const start = [from, addDays(until, -MAX_DAYS)].sort().at(-1)!
+  // A day early, so no time zone drops the first day's purchases.
+  const purchasesFrom = Date.parse(`${addDays(start, -1)}T00:00:00Z`) / 1000
+  // An account not yet read for Money in reaches back the whole window once
+  // (docs/adr/0011); its purchases still keep to their own window.
+  const backfill = mapped.some((m) => !m.moneyInSince)
+  const fetchFrom = backfill ? addDays(until, -MAX_DAYS) : start
   const found = await readBridge(
     db,
     id,
     secret,
-    // A day early, so no time zone drops the first day's purchases.
-    { start: Date.parse(`${addDays(start, -1)}T00:00:00Z`) / 1000 },
+    { start: Date.parse(`${addDays(fetchFrom, -1)}T00:00:00Z`) / 1000 },
     transport,
   )
   const connection = await db
@@ -102,6 +128,23 @@ export async function syncConnection(
   const by = `SimpleFIN (${connection?.name ?? 'connection'})`
 
   const results: Array<SyncedAccount> = []
+  const covered = (
+    m: (typeof mapped)[number],
+    set: { syncedThrough?: string },
+  ) =>
+    db
+      .update(bankAccounts)
+      .set({ ...set, moneyInSince: m.moneyInSince ?? fetchFrom })
+      .where(
+        inHousehold(
+          db,
+          bankAccounts,
+          and(
+            eq(bankAccounts.connectionId, id),
+            eq(bankAccounts.providerId, m.providerId),
+          ),
+        ),
+      )
   for (const m of mapped) {
     const accountName = m.account!
     const source = found.find((a) => a.id === m.providerId)
@@ -114,16 +157,25 @@ export async function syncConnection(
     }
     try {
       const account = await findAccount(db, accountName)
-      if (account.closed) continue
+      if (account.closed) {
+        // Nothing to read, so no reason to reach back for it again.
+        if (!m.moneyInSince) await covered(m, {})
+        continue
+      }
       const debt = isDebt(account)
       const result: SyncedAccount = { account: account.name }
       if (SPENDING_KINDS.includes(account.kind)) {
         const rows: Array<PostedRow> = []
+        const incoming: Array<IncomingRow> = []
         let excluded = 0
         for (const t of source.transactions) {
           const row = purchaseRow(t, debt, timeZone)
-          if (row === 'excluded') excluded++
-          else if (row) rows.push(row)
+          const ours = !!t.posted && t.posted >= purchasesFrom
+          if (row === 'excluded') {
+            if (ours) excluded++
+            const money = incomingRow(t, debt, timeZone)
+            if (money) incoming.push(money)
+          } else if (row && ours) rows.push(row)
         }
         const summary = await postTransactions(db, {
           account: account.name,
@@ -136,6 +188,13 @@ export async function syncConnection(
           coverage: { from: start, to: until },
         })
         result.added = summary.added
+        if (!debt)
+          result.moneyIn = await recordMoneyIn(
+            db,
+            account.name,
+            incoming,
+            `simplefin:${m.providerId}`,
+          )
       }
       // SimpleFIN shows what's owed as negative; Budgy as positive.
       const cents = Math.round(Number(source.balance) * 100)
@@ -153,19 +212,7 @@ export async function syncConnection(
         by,
       )
       result.balance = true
-      await db
-        .update(bankAccounts)
-        .set({ syncedThrough: until })
-        .where(
-          inHousehold(
-            db,
-            bankAccounts,
-            and(
-              eq(bankAccounts.connectionId, id),
-              eq(bankAccounts.providerId, m.providerId),
-            ),
-          ),
-        )
+      await covered(m, { syncedThrough: until })
       results.push(result)
     } catch (error) {
       results.push({

@@ -14,6 +14,7 @@ import { AccountUpdates } from './AccountUpdates'
 import { RemoveStarting } from './RemoveStarting'
 import { Baseline, WorthSheet, dayWithYear } from './WorthSheet'
 import { RulesTab } from './RulesTab'
+import { MoneyInTab } from './MoneyInTab'
 import { Duplicates } from './Duplicates'
 import type { WorthView } from './WorthSheet'
 import type { Account, AccountKind } from '@/lib/model/types'
@@ -47,10 +48,11 @@ import { Dropdown } from '@/components/shared/Dropdown'
 /** A Balance older than this is worth updating. */
 const STALE_DAYS = 35
 
-type Tab = 'accounts' | 'rules' | 'updates'
+type Tab = 'accounts' | 'rules' | 'updates' | 'money-in'
 
 const TABS: ReadonlyArray<{ value: Tab; label: string }> = [
   { value: 'accounts', label: 'Accounts' },
+  { value: 'money-in', label: 'Money in' },
   { value: 'updates', label: 'Updates' },
   { value: 'rules', label: 'Rules' },
 ]
@@ -65,7 +67,9 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
             ? 'Store Rules'
             : tab === 'updates'
               ? 'Update Accounts'
-              : 'Accounts'}
+              : tab === 'money-in'
+                ? 'Money in'
+                : 'Accounts'}
         </h1>
         <Segmented
           label="Accounts section"
@@ -83,6 +87,8 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
       </div>
       {tab === 'rules' ? (
         <RulesTab />
+      ) : tab === 'money-in' ? (
+        <MoneyInTab />
       ) : tab === 'updates' ? (
         <>
           <Duplicates />

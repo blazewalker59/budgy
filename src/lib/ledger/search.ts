@@ -14,8 +14,8 @@ export interface OverviewSearch extends Lens {
 }
 
 export interface AccountsSearch extends Lens {
-  /** The Rules tab, instead of the Accounts. */
-  tab?: 'rules' | 'updates'
+  /** Another tab, instead of the Accounts. */
+  tab?: 'rules' | 'updates' | 'money-in'
 }
 
 export interface SpendingSearch extends Lens {
@@ -60,7 +60,8 @@ export function validateAccountsSearch(
   s: Record<string, unknown>,
 ): AccountsSearch {
   const out: AccountsSearch = validateLensSearch(s)
-  if (s.tab === 'rules' || s.tab === 'updates') out.tab = s.tab
+  if (s.tab === 'rules' || s.tab === 'updates' || s.tab === 'money-in')
+    out.tab = s.tab
   return out
 }
 

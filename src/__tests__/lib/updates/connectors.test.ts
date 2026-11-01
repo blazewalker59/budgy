@@ -5,8 +5,10 @@ import type { CloudflareEnv } from '@/lib/db'
 import { householdDatabase } from '@/lib/households/scope'
 import {
   balances,
+  bankAccounts,
   householdMembers,
   households,
+  moneyIn,
   transactions,
 } from '@/lib/db/schema'
 import {
@@ -580,7 +582,7 @@ describe('SimpleFIN sync', () => {
     expect((await listAccountUpdates(b))[0].latest).toBeNull()
   })
 
-  it('reads back to the last sync with an overlap, and 45 days the first time', async () => {
+  it('reads back to the last sync with an overlap, and 60 days the first time for Money in', async () => {
     const { a, id, transport, urls } = await linked([sapphire])
     const startDay = (url: string) =>
       new Date(Number(new URL(url).searchParams.get('start-date')) * 1000)
@@ -590,8 +592,8 @@ describe('SimpleFIN sync', () => {
     const today = new Date().toISOString().slice(0, 10)
     const days = (from: string) =>
       Math.round((Date.parse(today) - Date.parse(from)) / 86_400_000)
-    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(45)
-    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(47)
+    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(60)
+    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(62)
     await syncConnection(a, id, KEY, transport)
     expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(10)
     expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(12)
@@ -618,7 +620,7 @@ describe('SimpleFIN sync', () => {
     expect(await db.select().from(transactions)).toHaveLength(1)
   })
 
-  it('records only a balance for an investment Account, and leaves bank deposits out', async () => {
+  it('records only a balance for an investment Account, and keeps bank deposits as Money in', async () => {
     const f = await fixture()
     await saveAccount(
       f.a,
@@ -670,7 +672,7 @@ describe('SimpleFIN sync', () => {
     expect(results).toEqual(
       expect.arrayContaining([
         { account: 'Vanguard', balance: true },
-        { account: 'Checking', added: 1, balance: true },
+        { account: 'Checking', added: 1, moneyIn: 1, balance: true },
       ]),
     )
     const saved = await f.db.select().from(balances)
@@ -681,6 +683,65 @@ describe('SimpleFIN sync', () => {
     expect(
       (await f.db.select().from(transactions)).map((t) => t.description),
     ).toEqual(['Hardware Store'])
+    expect(await f.db.select().from(moneyIn)).toMatchObject([
+      {
+        account: 'Checking',
+        description: 'Payroll ACME',
+        amount: 200_000,
+        use: 'income',
+      },
+    ])
+    // The overlap next time adds nothing twice.
+    const again = await syncConnection(f.a, id, KEY, live.transport)
+    expect(again.find((r) => r.account === 'Checking')?.moneyIn).toBe(0)
+    expect(await f.db.select().from(moneyIn)).toHaveLength(1)
+  })
+
+  it('reaches back once for Money in without adding older purchases', async () => {
+    const f = await fixture()
+    await saveAccount(
+      f.a,
+      { name: 'Checking', ...card, kind: 'checking' },
+      true,
+    )
+    const checking = {
+      ...sapphire,
+      id: 'CHK',
+      name: 'Checking',
+      balance: '500.25',
+      transactions: [
+        txn('c1', '600', 'VENMO CASHOUT', { posted: daysAgo(55) }),
+        txn('c2', '-40', 'Old Hardware', { posted: daysAgo(55) }),
+        txn('c3', '-12', 'Coffee'),
+      ],
+    }
+    const live = liveBridge([checking])
+    const { id } = await connectSimplefin(
+      f.a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      live.transport,
+    )
+    await mapBankAccount(f.a, {
+      connectionId: id,
+      providerId: 'CHK',
+      account: 'Checking',
+    })
+    // As if the Account had synced before Money in existed.
+    await f.db.update(bankAccounts).set({
+      syncedThrough: new Date(daysAgo(3) * 1000).toISOString().slice(0, 10),
+    })
+    const [result] = await syncConnection(f.a, id, KEY, live.transport)
+    expect(result).toMatchObject({ added: 1, moneyIn: 1 })
+    expect(
+      (await f.db.select().from(transactions)).map((t) => t.description),
+    ).toEqual(['Coffee'])
+    expect(await f.db.select().from(moneyIn)).toMatchObject([
+      { description: 'VENMO CASHOUT', amount: 60_000, use: 'review' },
+    ])
+    const [link] = await f.db.select().from(bankAccounts)
+    expect(link.moneyInSince).not.toBeNull()
   })
 
   it('syncs every Household’s linked connections on schedule, each in its own scope', async () => {

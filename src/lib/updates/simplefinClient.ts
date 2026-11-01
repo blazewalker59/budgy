@@ -61,11 +61,18 @@ async function call(url: URL, init: RequestInit, transport: typeof fetch) {
       redirect: 'manual',
       signal: AbortSignal.timeout(20_000),
     })
-  } catch {
+  } catch (error) {
+    // The kind only (e.g. TimeoutError): never the URL, which may hold access.
+    console.error(
+      'SimpleFIN request failed:',
+      error instanceof Error ? error.name : 'unknown',
+    )
     throw new SimplefinError('network')
   }
-  if (response.status >= 300 && response.status < 400)
+  if (response.status >= 300 && response.status < 400) {
+    console.error(`SimpleFIN redirected (HTTP ${response.status})`)
     throw new SimplefinError('invalid')
+  }
   return response
 }
 
@@ -237,6 +244,8 @@ export async function fetchSimplefin(
     },
     transport,
   )
+  if (!response.ok)
+    console.error(`SimpleFIN accounts request returned HTTP ${response.status}`)
   if (response.status === 401 || response.status === 403)
     throw new SimplefinError('auth')
   if (response.status === 402) throw new SimplefinError('payment')

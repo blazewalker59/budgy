@@ -24,6 +24,9 @@ export interface CloudflareEnv {
    * rollout (docs/adr/0008). Partners are admitted by invitation. A secret so
    * personal addresses stay out of the repository. */
   ALLOWED_EMAILS?: string
+  /** Who may use the demo sandbox at /admin (docs/adr/0015), comma-separated
+   * like ALLOWED_EMAILS. Unset means no one. Admins must still be admitted. */
+  ADMIN_EMAILS?: string
   /** Production's one host; every other host redirects to it. Unset locally. */
   CANONICAL_HOST?: string
   /** Local development only: act as this Member without Google sign-in. */

@@ -145,6 +145,12 @@ export const households = sqliteTable('households', {
    * any of these except Joint into a "<name> personal" Category.
    */
   owners: text('owners').notNull().default('["Joint"]'),
+  /**
+   * A Demo Household: made by a Demo persona in an admin's sandbox
+   * (docs/adr/0015). Only demo personas are ever its Members, and only it
+   * can be reset. Set once at creation; a trigger keeps it from changing.
+   */
+  demo: integer('demo', { mode: 'boolean' }).notNull().default(false),
   createdAt: createdAt(),
 })
 
@@ -678,3 +684,51 @@ export const moneyIn = sqliteTable(
     ),
   ],
 )
+
+// ─── Demo sandbox (docs/adr/0015) ───────────────────────────────────────────
+
+/**
+ * A Demo persona: a synthetic user an admin made, at the reserved
+ * `demo.invalid` domain, with no `account` row, so no one can sign in as
+ * it. Triggers (0021) keep a real user from becoming one and a persona from
+ * ever getting a sign-in account.
+ */
+export const demoPersonas = sqliteTable('demo_personas', {
+  id: text('id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  /** What the admin called it, e.g. "Sam". */
+  label: text('label').notNull(),
+  createdBy: text('created_by').notNull(),
+  createdAt: createdAt(),
+})
+
+/**
+ * An admin acting as a Demo persona, bound to the admin's own Better Auth
+ * session: signing out (or the session expiring) ends it.
+ */
+export const demoSessions = sqliteTable(
+  'demo_sessions',
+  {
+    sessionId: text('session_id')
+      .primaryKey()
+      .references(() => session.id, { onDelete: 'cascade' }),
+    adminId: text('admin_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    personaId: text('persona_id')
+      .notNull()
+      .references(() => demoPersonas.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (t) => [index('demo_sessions_persona_idx').on(t.personaId)],
+)
+
+/** What an admin did in the sandbox, and when. */
+export const adminAudit = sqliteTable('admin_audit', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  adminId: text('admin_id').notNull(),
+  action: text('action').notNull(),
+  personaId: text('persona_id'),
+  createdAt: createdAt(),
+})

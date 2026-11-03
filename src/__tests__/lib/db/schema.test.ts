@@ -15,6 +15,12 @@ const NOT_HOUSEHOLD_DATA = new Set([
   'verification',
   'rate_limit',
   'households',
+  // The demo sandbox's own bookkeeping (docs/adr/0015): who is a Demo
+  // persona, which admin session acts as one, and what admins did. A
+  // persona's Household is an ordinary (demo-flagged) Household.
+  'demo_personas',
+  'demo_sessions',
+  'admin_audit',
 ])
 
 const tables = Object.values(schema)

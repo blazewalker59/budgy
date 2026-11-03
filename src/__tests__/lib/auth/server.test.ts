@@ -20,6 +20,30 @@ describe('getAuth', () => {
     expect(auth.options.account?.accountLinking).toEqual({ enabled: false })
   })
 
+  it('refuses Google sign-in for a demo.invalid email, even an allowlisted one', async () => {
+    const { d1, sqlite } = testDatabase()
+    open.push(sqlite)
+    const auth = getAuth({
+      DB: d1,
+      BETTER_AUTH_URL: 'http://localhost:3000',
+      BETTER_AUTH_SECRET: 'x'.repeat(32),
+      ALLOWED_EMAILS: 'sam-1@demo.invalid, sam@example.com',
+    })
+    const before = auth.options.databaseHooks?.user?.create?.before
+    const attempt = (email: string) =>
+      before!({
+        id: 'u',
+        email,
+        name: 'Sam',
+        emailVerified: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+    expect(await attempt('sam-1@demo.invalid')).toBe(false)
+    expect(await attempt('SAM-1@Demo.Invalid')).toBe(false)
+    expect(await attempt('sam@example.com')).toBe(true)
+  })
+
   it('uses secure cookies when Budgy is served over HTTPS', () => {
     const { d1, sqlite } = testDatabase()
     open.push(sqlite)

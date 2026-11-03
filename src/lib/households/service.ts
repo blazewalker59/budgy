@@ -22,12 +22,16 @@ import {
 import { DEFAULT_TIME_ZONE } from '@/lib/model/dates'
 import { DEFAULT_CATEGORIES } from '@/lib/model/defaults'
 import { rowsPerInsert } from '@/lib/ledger/importer'
+import { isDemoEmail } from '@/lib/demo/personas'
 import { UserError } from '@/lib/errors'
 
 export interface HouseholdActor {
   id: string
   email: string
   emailVerified: boolean
+  /** Acting as a Demo persona through an admin's demo session (0015). Set
+   * only by sessionState, never from the client. */
+  demo?: boolean
 }
 export type Household = {
   id: string
@@ -100,7 +104,13 @@ export async function createHousehold(
 ): Promise<Household> {
   verified(actor)
   // An invitation admits someone to join a Household, not to start one.
-  if (!(await canCreateHousehold(db, actor.email, allowedEmails)))
+  // A Demo persona's Household is a Demo Household (docs/adr/0015).
+  const demo = actor.demo === true && isDemoEmail(actor.email)
+  if (
+    !(await canCreateHousehold(db, actor.email, allowedEmails, {
+      demoSession: demo,
+    }))
+  )
     throw new UserError(
       'Budgy is invitation-only for now. Open the invitation link you were sent to join a Household.',
     )
@@ -128,6 +138,7 @@ export async function createHousehold(
       name,
       timeZone,
       owners: JSON.stringify(owners),
+      demo,
     }),
     db
       .insert(householdMembers)
@@ -234,6 +245,20 @@ export async function createInvite(
     .get()
   if (existing || email === normalizeEmail(actor.email))
     throw new UserError('This person is already in a Household')
+  // Demo Households invite only Demo personas, and real ones never do
+  // (docs/adr/0015); the insert below repeats this in its SQL.
+  const demo = isDemoEmail(email)
+  const household = await db
+    .select({ demo: households.demo })
+    .from(households)
+    .where(eq(households.id, db.householdId))
+    .get()
+  if (household && household.demo !== demo)
+    throw new UserError(
+      household.demo
+        ? 'A demo Household can only invite a demo persona'
+        : 'Enter a valid email address',
+    )
   const token = randomToken()
   const tokenHash = await hashToken(token)
   const id = crypto.randomUUID()
@@ -272,6 +297,7 @@ export async function createInvite(
           .where(
             and(
               eq(households.id, db.householdId),
+              eq(households.demo, demo),
               ownerGuard(db, actor.id),
               sql`(select count(*) from ${householdInvites} where ${householdInvites.householdId} = ${db.householdId} and ${householdInvites.revokedAt} is null and ${householdInvites.acceptedAt} is null and ${householdInvites.expiresAt} > ${now.getTime()}) < ${MAX_INVITES}`,
             ),
@@ -365,6 +391,8 @@ export async function acceptInvite(
               eq(householdInvites.id, invite.id),
               eq(householdInvites.email, normalizeEmail(actor.email)),
               activeInvite(now),
+              // A Demo persona joins only a Demo Household (docs/adr/0015).
+              sql`exists (select 1 from ${households} where ${households.id} = ${householdInvites.householdId} and ${households.demo} = ${isDemoEmail(actor.email) ? 1 : 0})`,
             ),
           ),
       )

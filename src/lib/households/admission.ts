@@ -6,6 +6,13 @@ import { LEGACY_HOUSEHOLD_ID } from './membership'
 import type { Database } from '@/lib/db'
 import { isAllowed } from '@/lib/auth/allowlist'
 import { householdInvites, householdMembers, user } from '@/lib/db/schema'
+import { isDemoEmail } from '@/lib/demo/personas'
+
+/** How a Member arrived: only an admin's demo session admits a Demo persona
+ * (docs/adr/0015). Google sign-in, Agent and Shortcut tokens never do. */
+export interface Arrival {
+  demoSession?: boolean
+}
 
 /** Additional rollout gate for already-verified membership in the initial
  * Household. A pending invitation elsewhere must never bypass this gate. */
@@ -36,7 +43,9 @@ export async function canSignIn(
   email: string,
   allowedEmails?: string,
   now = new Date(),
+  via: Arrival = {},
 ) {
+  if (isDemoEmail(email)) return via.demoSession === true
   if (isAllowed(email, allowedEmails)) return true
   const normalized = email.trim().toLowerCase()
   // Migration attaches pre-existing user rows. Do not restore access to an
@@ -78,6 +87,8 @@ export function canCreateHousehold(
   _db: Database,
   email: string,
   allowedEmails?: string,
+  via: Arrival = {},
 ): Promise<boolean> {
+  if (isDemoEmail(email)) return Promise.resolve(via.demoSession === true)
   return Promise.resolve(isAllowed(email, allowedEmails))
 }

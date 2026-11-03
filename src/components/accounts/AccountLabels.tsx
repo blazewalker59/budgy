@@ -130,18 +130,15 @@ function AlsoLabel({ offer, onDone }: { offer: Offer; onDone: () => void }) {
     <div
       role="group"
       aria-label="Label others too"
-      className="flex basis-full items-center gap-1.5 rounded-lg bg-sunken px-2 py-1"
+      className="flex basis-full flex-wrap items-center gap-x-1.5 rounded-lg bg-sunken px-2 py-1"
     >
-      <span className="min-w-0 flex-1 text-muted">
-        {offer.others.map((o) => o.name).join(', ')}
-      </span>
       <button
         type="button"
         onClick={() => {
           labelAccounts.mutate({ label: offer.label, accounts: offer.others })
           onDone()
         }}
-        className="min-h-9 shrink-0 rounded-full bg-foreground px-3 font-semibold text-background"
+        className="min-h-9 rounded-full bg-foreground px-3 font-semibold text-background"
       >
         Also label {n} other {n === 1 ? 'account' : 'accounts'} starting with{' '}
         {offer.label}
@@ -150,10 +147,13 @@ function AlsoLabel({ offer, onDone }: { offer: Offer; onDone: () => void }) {
         type="button"
         onClick={onDone}
         aria-label="No thanks"
-        className="grid size-9 shrink-0 place-items-center rounded-full text-muted"
+        className="ml-auto grid size-9 shrink-0 place-items-center rounded-full text-muted"
       >
         <X size={14} aria-hidden />
       </button>
+      <span className="basis-full truncate px-1 pb-0.5 text-[11px] text-muted">
+        {offer.others.map((o) => o.name).join(', ')}
+      </span>
     </div>
   )
 }
@@ -191,6 +191,18 @@ function LabelPicker({
         aria-label="Label"
         className="flex flex-wrap gap-1.5"
       >
+        <button
+          type="button"
+          role="radio"
+          aria-checked={current === null}
+          onClick={() => onChoose(null)}
+          className={cn(
+            'min-h-9 rounded-full border px-2.5 text-muted',
+            current === null ? 'border-foreground' : 'border-transparent',
+          )}
+        >
+          None
+        </button>
         {labels.map((l) => (
           <button
             key={l.name}
@@ -207,18 +219,6 @@ function LabelPicker({
             {current === l.name && <Check size={13} aria-hidden />}
           </button>
         ))}
-        <button
-          type="button"
-          role="radio"
-          aria-checked={current === null}
-          onClick={() => onChoose(null)}
-          className={cn(
-            'min-h-9 rounded-full border px-3 text-muted',
-            current === null ? 'border-foreground' : 'border-border',
-          )}
-        >
-          None
-        </button>
       </div>
       <form
         className="flex flex-wrap items-center gap-1.5"
@@ -277,7 +277,7 @@ function Swatches({
     <div
       role="radiogroup"
       aria-label={label}
-      className="flex basis-full flex-wrap"
+      className="grid basis-full grid-cols-10"
     >
       {LABEL_COLOR_KEYS.map((c) => (
         <button
@@ -287,13 +287,13 @@ function Swatches({
           aria-checked={value === c}
           aria-label={LABEL_COLORS[c].name}
           onClick={() => onChange(c)}
-          className="grid size-9 place-items-center rounded-full"
+          className="grid h-9 min-w-0 place-items-center rounded-full"
           style={labelStyle(c)}
         >
           <span
             className={cn(
               LABEL_SWATCH,
-              'size-5',
+              'size-6',
               value === c &&
                 'ring-2 ring-foreground ring-offset-2 ring-offset-surface',
             )}
@@ -364,7 +364,7 @@ function ManageRow({
           className="grid size-9 shrink-0 place-items-center rounded-full"
           style={labelStyle(label.color)}
         >
-          <span className={cn(LABEL_SWATCH, 'size-5')} />
+          <span className={cn(LABEL_SWATCH, 'size-6')} />
         </button>
         <input
           value={name}

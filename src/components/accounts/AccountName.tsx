@@ -26,9 +26,9 @@ export function labelStyle(color: AccountLabel['color']): CSSProperties {
 export const LABEL_CHIP =
   'inline-flex shrink-0 items-center rounded-md bg-[var(--label-bg)] px-1.5 font-bold leading-[1.15rem] text-[var(--label-fg)] dark:bg-[var(--label-bg-dark)] dark:text-[var(--label-fg-dark)]'
 
-/** A colour swatch: the chip's text colour, which reads on the surface. */
+/** A colour swatch: the chip's fill, ringed in its text colour. */
 export const LABEL_SWATCH =
-  'inline-block rounded-full bg-[var(--label-fg)] dark:bg-[var(--label-fg-dark)]'
+  'inline-block rounded-full border-[5px] border-[var(--label-fg)] bg-[var(--label-bg)] dark:border-[var(--label-fg-dark)] dark:bg-[var(--label-bg-dark)]'
 
 export function LabelChip({
   label,

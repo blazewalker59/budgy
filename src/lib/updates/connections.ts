@@ -3,7 +3,7 @@
  * a one-time setup token, discover its accounts, and map each one to a Budgy
  * Account. Discovery imports nothing; syncing mapped accounts is sync.ts.
  */
-import { and, eq, sql } from 'drizzle-orm'
+import { and, count, eq, sql } from 'drizzle-orm'
 import {
   connectionKeyReady,
   currentKey,
@@ -26,6 +26,8 @@ import { householdTimeZone } from '@/lib/households/locale'
 import { today } from '@/lib/model/dates'
 import { UserError } from '@/lib/errors'
 
+/** One Bridge connection covers many banks; a few is plenty. */
+export const MAX_CONNECTIONS = 5
 /** Bridge asks clients to stay under 24 requests a day per connection. */
 const DAILY_REQUESTS = 20
 const NOT_CONFIGURED =
@@ -45,6 +47,14 @@ export async function connectSimplefin(
   // A setup token works once: don't spend it unless it can be stored.
   if (!connectionKeyReady(currentKey(secret)))
     throw new UserError(NOT_CONFIGURED)
+  const [{ connected }] = await db
+    .select({ connected: count() })
+    .from(bankConnections)
+    .where(inHousehold(db, bankConnections))
+  if (connected >= MAX_CONNECTIONS)
+    throw new UserError(
+      `A Household can have ${MAX_CONNECTIONS} bank connections. Disconnect one you no longer use.`,
+    )
   const access = await claimSimplefin(input.setupToken, transport)
   const accessHash = await hashToken(access)
   const taken = await db

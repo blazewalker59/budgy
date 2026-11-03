@@ -34,7 +34,7 @@ separate update experience.
   per-Account secret. Apple's export remains a manual tap; Budgy does not
   scrape or automate Wallet.
 - **SimpleFIN connections** belong to a Household and record who connected
-  them. The one-time setup token is claimed server-side only after confirming
+  them, at most five per Household (checked before a setup token is spent). The one-time setup token is claimed server-side only after confirming
   `BANK_CONNECTION_KEY` is configured, so a token isn't spent and lost. The
   access URL is encrypted with AES-GCM under that Worker secret, with the
   Household and connection id as additional data, so ciphertext can't be

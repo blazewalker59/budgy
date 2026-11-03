@@ -32,6 +32,7 @@ import { serveUpload } from '@/lib/updates/uploadEndpoint'
 import { UPLOAD_PATH } from '@/lib/updates/exports'
 import { listAccountUpdates } from '@/lib/updates/queries'
 import {
+  MAX_CONNECTIONS,
   connectSimplefin,
   disconnectSimplefin,
   discoverAccounts,
@@ -274,6 +275,41 @@ describe('SimpleFIN connections', () => {
     await expect(
       connectSimplefin(b, me, { name: 'x', setupToken: SETUP }, KEY, transport),
     ).rejects.toThrow(/already connected/)
+  })
+
+  it('holds a Household to five connections, before spending a setup token', async () => {
+    const { a, b } = await fixture()
+    const claimed: Array<string> = []
+    const transport = ((url: string) => {
+      if (url.includes('/claim/')) {
+        const name = url.split('/').at(-1)!
+        claimed.push(name)
+        return Promise.resolve(
+          new Response(
+            `https://user:${name}@beta-bridge.simplefin.org/simplefin`,
+          ),
+        )
+      }
+      return Promise.resolve(Response.json({ accounts: [] }))
+    }) as typeof fetch
+    const connect = (scope: typeof a, name: string) =>
+      connectSimplefin(
+        scope,
+        me,
+        {
+          name,
+          setupToken: btoa(
+            `https://beta-bridge.simplefin.org/simplefin/claim/${name}`,
+          ),
+        },
+        KEY,
+        transport,
+      )
+    for (let i = 0; i < MAX_CONNECTIONS; i++) await connect(a, `a${i}`)
+    await expect(connect(a, 'extra')).rejects.toThrow(/5 bank connections/)
+    expect(claimed).not.toContain('extra')
+    await connect(b, 'b0')
+    expect(await listConnections(a)).toHaveLength(MAX_CONNECTIONS)
   })
 
   it('maps explicitly, one Budgy Account per bank account, within the Household', async () => {

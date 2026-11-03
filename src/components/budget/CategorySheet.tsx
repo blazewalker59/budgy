@@ -6,6 +6,7 @@
 
 import { useMemo, useState } from 'react'
 import { TagSelect } from './TagSelect'
+import { CategoryControls } from './CategoryControls'
 import type { Category, Group } from '@/lib/model/types'
 import type { TrendMonth } from '@/components/charts/CategoryTrend'
 import { useBook } from '@/lib/ledger/book'
@@ -36,6 +37,7 @@ export function CategorySheet({
   from,
   income,
   onClose,
+  onRenamed,
 }: {
   name: string
   /** Months the typical month averages, newest last. */
@@ -45,6 +47,8 @@ export function CategorySheet({
   /** Typical take-home pay per month. */
   income: number
   onClose: () => void
+  /** After a rename, the sheet follows the Category's new name. */
+  onRenamed?: (to: string) => void
 }) {
   const book = useBook()
   const { ix } = book
@@ -93,7 +97,7 @@ export function CategorySheet({
           )}
         </p>
       )}
-      <Settings name={name} />
+      <Settings name={name} onRenamed={onRenamed} onDeleted={onClose} />
       <Stores name={name} months={months} />
       <MonthTable name={name} trend={trend} />
     </Sheet>
@@ -101,7 +105,15 @@ export function CategorySheet({
 }
 
 /** Tag, Group and the Target's history. */
-function Settings({ name }: { name: string }) {
+function Settings({
+  name,
+  onRenamed,
+  onDeleted,
+}: {
+  name: string
+  onRenamed?: (to: string) => void
+  onDeleted: () => void
+}) {
   const { ix } = useBook()
   const saveCategory = useSaveCategory()
   const category: Category = ix.categories.get(name) ?? {
@@ -145,6 +157,11 @@ function Settings({ name }: { name: string }) {
               .join(' → ')
           : 'No Target yet. Set one on the Budget.'}
       </p>
+      <CategoryControls
+        name={name}
+        onRenamed={onRenamed}
+        onDeleted={onDeleted}
+      />
     </section>
   )
 }

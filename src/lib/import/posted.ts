@@ -14,6 +14,7 @@
 import { z } from 'zod'
 import { sha1Hex, twoDecimals } from './rows'
 import { EMPTY_RULES } from './rules'
+import { bankKey, resolveBankCategory } from './bankCategories'
 import { bucketCategory, isSpending, storeName } from './stores'
 import type { ParsedTxn } from './rows'
 import type { ImportRules } from './rules'
@@ -148,9 +149,17 @@ export async function preparePosted(input: {
   rules?: ImportRules
   /** This Household's owners; any but Joint become "<name> personal". */
   owners?: ReadonlyArray<string>
+  /** What each Bank category means (src/lib/import/bankCategories.ts). */
+  bankCategories?: ReadonlyMap<string, string>
 }): Promise<Prepared> {
   const rules = input.rules ?? EMPTY_RULES
-  const byName = new Map(input.categories.map((c) => [c.toLowerCase(), c]))
+  const meanings = input.bankCategories ?? new Map<string, string>()
+  const byName = new Map(input.categories.map((c) => [bankKey(c), c]))
+  // A bucket the import makes ("Home upkeep") follows a rename too.
+  const bucket = (name: string) =>
+    byName.has(bankKey(name))
+      ? name
+      : (resolveBankCategory(name, byName, meanings) ?? name)
   const have = new Set(input.existing.map((t) => t.id))
   const sameDay = new Map<string, Array<string>>()
   for (const t of input.existing) {
@@ -209,7 +218,7 @@ export async function preparePosted(input: {
     }
     const named = storeName(r.description, rules)
     const given = r.category
-      ? byName.get(r.category.trim().toLowerCase())
+      ? resolveBankCategory(r.category, byName, meanings)
       : undefined
     const usual = input.history.get(named.toLowerCase())
     // The one it replaces: same day and amount, the same description first.
@@ -236,12 +245,14 @@ export async function preparePosted(input: {
         old?.sourceCategory ??
         given ??
         usual?.category ??
-        bucketCategory(
-          UNCATEGORIZED,
-          r.description,
-          store,
-          rules,
-          input.owners,
+        bucket(
+          bucketCategory(
+            UNCATEGORIZED,
+            r.description,
+            store,
+            rules,
+            input.owners,
+          ),
         ),
       amount,
       filed: old

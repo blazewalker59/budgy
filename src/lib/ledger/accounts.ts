@@ -7,6 +7,7 @@
 import { and, between, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm'
 import {
   STATEMENTS_PER_BATCH,
+  loadBankCategories,
   loadImportRules,
   rowsPerInsert,
 } from './importer'
@@ -326,7 +327,7 @@ async function postTransactionsUnlocked(
 ): Promise<PostSummary> {
   const account = await findAccount(db, input.account)
   const dates = input.rows.map((r) => r.date).sort()
-  const [rules, owners, cats, history, inRange] = await Promise.all([
+  const [rules, owners, cats, history, inRange, meanings] = await Promise.all([
     loadImportRules(db),
     householdOwners(db),
     db
@@ -376,6 +377,7 @@ async function postTransactionsUnlocked(
             ),
           )
       : Promise.resolve([]),
+    loadBankCategories(db),
   ])
   const replacing = input.replaceStarting
     ? inRange.filter((t) => t.starting)
@@ -418,6 +420,7 @@ async function postTransactionsUnlocked(
         history: storeHistory(history),
         rules,
         owners,
+        bankCategories: meanings,
       })
     : null
   const prepared =
@@ -431,6 +434,7 @@ async function postTransactionsUnlocked(
       replacing,
       rules,
       owners,
+      bankCategories: meanings,
     }))
   const summary: PostSummary = {
     account: account.name,

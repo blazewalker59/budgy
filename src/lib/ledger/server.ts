@@ -17,6 +17,7 @@ import {
 } from './queries'
 import { RULES_KEY, loadImportRules } from './importer'
 import { keepBoth, mergeDuplicate } from './duplicates'
+import { deleteCategory, hideCategory, renameCategory } from './categories'
 import {
   clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
@@ -231,6 +232,29 @@ export const saveCategory = createServerFn({ method: 'POST' })
         })
     }),
   )
+
+/** Rename a Category everywhere it's named. */
+export const renameCategoryEverywhere = createServerFn({ method: 'POST' })
+  .validator((data: { from: string; to: string }) =>
+    z.object({ from: NAME, to: NAME }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => renameCategory(db, data.from, data.to)),
+  )
+
+/** Hide a Category from pickers and the Budget (or show it again). */
+export const setCategoryHidden = createServerFn({ method: 'POST' })
+  .validator((data: { name: string; hidden: boolean }) =>
+    z.object({ name: NAME, hidden: z.boolean() }).parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => hideCategory(db, data.name, data.hidden)),
+  )
+
+/** Delete a Category nothing is filed under. */
+export const removeCategory = createServerFn({ method: 'POST' })
+  .validator((data: { name: string }) => z.object({ name: NAME }).parse(data))
+  .handler(({ data }) => withMember(({ db }) => deleteCategory(db, data.name)))
 
 export type AccountEdit = Omit<Account, 'sourceName'> & { isNew: boolean }
 

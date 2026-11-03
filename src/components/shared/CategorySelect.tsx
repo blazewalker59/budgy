@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Dropdown } from './Dropdown'
 import { useBook } from '@/lib/ledger/book'
-import { TRANSFER, allCategoryNames } from '@/lib/model/ledger'
+import { TRANSFER } from '@/lib/model/ledger'
+import { pickableCategoryNames } from '@/lib/model/categories'
 import { cn } from '@/lib/utils'
 
 const NEW = '__new'
@@ -42,9 +43,11 @@ export function CategorySelect({
         }}
       />
     )
-  // Its usual Category, even when nothing else is filed there.
-  const names = new Set(allCategoryNames(ix))
+  // Its usual Category, even when nothing else is filed there; hidden
+  // ones only when already chosen.
+  const names = new Set(pickableCategoryNames(ix))
   if (defaultValue && defaultValue !== TRANSFER) names.add(defaultValue)
+  if (value && value !== TRANSFER) names.add(value)
   const usual = (n: string) =>
     n === defaultValue && value !== defaultValue ? 'usual' : undefined
   return (

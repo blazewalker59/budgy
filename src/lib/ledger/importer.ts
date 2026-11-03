@@ -10,6 +10,10 @@ import type { ImportRules } from '@/lib/import/rules'
 import { inHousehold } from '@/lib/households/scope'
 import { settings } from '@/lib/db/schema'
 import { parseImportRules } from '@/lib/import/rules'
+import {
+  BANK_CATEGORIES_KEY,
+  parseBankCategories,
+} from '@/lib/import/bankCategories'
 
 /** Each statement may bind at most 100 values in D1. */
 export const D1_MAX_VARIABLES = 100
@@ -33,4 +37,16 @@ export async function loadImportRules(db: Database): Promise<ImportRules> {
     .where(inHousehold(db, settings, eq(settings.key, RULES_KEY)))
     .get()
   return parseImportRules(row?.value)
+}
+
+/** What each Bank category means to this Household. */
+export async function loadBankCategories(
+  db: Database,
+): Promise<Map<string, string>> {
+  const row = await db
+    .select({ value: settings.value })
+    .from(settings)
+    .where(inHousehold(db, settings, eq(settings.key, BANK_CATEGORIES_KEY)))
+    .get()
+  return parseBankCategories(row?.value)
 }

@@ -23,6 +23,7 @@ export async function prepareIdentified(input: {
   history: Parameters<typeof preparePosted>[0]['history']
   rules: ImportRules
   owners?: ReadonlyArray<string>
+  bankCategories?: ReadonlyMap<string, string>
 }) {
   if (
     !input.namespace ||

@@ -400,7 +400,8 @@ export function vocabulary(ix: LedgerIndex): Array<Term> {
     const c = categoryOf(ix, t)
     cats.set(c, (cats.get(c) ?? 0) + 1)
   }
-  for (const c of ix.categories.keys()) if (!cats.has(c)) cats.set(c, 0)
+  for (const [c, category] of ix.categories)
+    if (!cats.has(c) && !category.hidden) cats.set(c, 0)
   for (const [s, n] of [...stores].sort((a, b) => b[1] - a[1]))
     terms.push({
       filter: { type: 'store', value: s },

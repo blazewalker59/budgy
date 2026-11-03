@@ -102,7 +102,12 @@ export async function loadLedger(db: Database): Promise<Ledger> {
     loadBaseline(db),
   ])
   return {
-    categories: cats.map(({ name, tag, group }) => ({ name, tag, group })),
+    categories: cats.map(({ name, tag, group, hidden }) => ({
+      name,
+      tag,
+      group,
+      ...(hidden ? { hidden: true } : {}),
+    })),
     accounts: accts.map(
       ({ name, sourceName, owner, kind, institution, closed, securedBy }) => ({
         name,
@@ -192,7 +197,7 @@ export function loadKept(db: Database): Promise<Array<string>> {
 }
 
 /** Where the rule suggestions a Member dismissed are remembered. */
-const DISMISSED_KEY = 'dismissed-rule-suggestions'
+export const DISMISSED_KEY = 'dismissed-rule-suggestions'
 
 function loadDismissed(db: Database): Promise<Array<string>> {
   return loadKeys(db, DISMISSED_KEY)
@@ -206,7 +211,10 @@ export async function dismissSuggestion(
   await addKey(db, DISMISSED_KEY, key)
 }
 
-async function loadKeys(db: Database, name: string): Promise<Array<string>> {
+export async function loadKeys(
+  db: Database,
+  name: string,
+): Promise<Array<string>> {
   const row = await db
     .select({ value: settings.value })
     .from(settings)

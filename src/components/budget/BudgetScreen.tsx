@@ -85,12 +85,20 @@ export function BudgetScreen({ owner }: { owner?: string }) {
 
   const names = useMemo(() => {
     const set = new Set([...ix.categories.keys(), ...history.keys()])
+    // A hidden Category stays out unless it's still spent in or targeted.
+    for (const name of set)
+      if (
+        ix.categories.get(name)?.hidden &&
+        !history.get(name)?.typical &&
+        targetFor(ix, name, from) === null
+      )
+        set.delete(name)
     return [...set].sort(
       (a, b) =>
         (history.get(b)?.typical ?? 0) - (history.get(a)?.typical ?? 0) ||
         a.localeCompare(b),
     )
-  }, [ix, history])
+  }, [ix, history, from])
   const group = (n: string) => ix.categories.get(n)?.group ?? 'everyday'
   const everyday = names.filter((n) => group(n) === 'everyday')
   const housing = names.filter((n) => group(n) === 'housing')
@@ -249,6 +257,7 @@ export function BudgetScreen({ owner }: { owner?: string }) {
           from={from}
           income={pay.monthly}
           onClose={() => setSheet(null)}
+          onRenamed={setSheet}
         />
       )}
       {paySheet && (

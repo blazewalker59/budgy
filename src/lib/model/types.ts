@@ -50,6 +50,8 @@ export interface Category {
   name: string
   tag: Tag
   group: Group
+  /** Hidden from pickers and the Budget; its purchases still count. */
+  hidden?: boolean
 }
 
 /** What kind of Account: where it sits in net worth. */

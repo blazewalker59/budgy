@@ -190,7 +190,10 @@ const householdId = () =>
     .notNull()
     .references(() => households.id)
 
-/** Budget Categories, by name (names are the key; no renames yet). */
+/**
+ * Budget Categories, by name. Names are the key every other row refers to,
+ * so a rename rewrites them all at once (src/lib/ledger/categories.ts).
+ */
 export const categories = sqliteTable(
   'categories',
   {
@@ -198,6 +201,8 @@ export const categories = sqliteTable(
     name: text('name').notNull(),
     tag: text('tag').$type<Tag>().notNull(),
     group: text('group').$type<Group>().notNull(),
+    /** Left out of pickers and the Budget; its purchases still count. */
+    hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.householdId, t.name] })],

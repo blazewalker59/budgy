@@ -20,12 +20,15 @@ import {
   moveTxn,
   noteTxn,
   recordBalances,
+  removeCategory,
   removeStartingPurchases,
+  renameCategoryEverywhere,
   saveAccount,
   saveCategory,
   saveLens,
   savePay,
   savePlan,
+  setCategoryHidden,
   setStoreRule,
   setTarget,
   setWorthBaseline,
@@ -46,6 +49,7 @@ import { clientMessage } from '@/lib/errors'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
 import { suggestionKey } from '@/lib/model/rules'
+import { renamedLedger } from '@/lib/model/categories'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -251,9 +255,46 @@ export function useSetTarget() {
 export function useSaveCategory() {
   return useEdit(
     (v: Category) => saveCategory({ data: v }),
+    (l, v) => {
+      const had = l.categories.find((c) => c.name === v.name)
+      const next: Category = { ...v }
+      if (had?.hidden) next.hidden = true
+      return {
+        ...l,
+        categories: [...l.categories.filter((c) => c.name !== v.name), next],
+      }
+    },
+  )
+}
+
+/** Rename a Category everywhere (src/lib/ledger/categories.ts). */
+export function useRenameCategory() {
+  return useEdit(
+    (v: { from: string; to: string }) => renameCategoryEverywhere({ data: v }),
+    (l, v) => renamedLedger(l, v.from, v.to.trim()),
+  )
+}
+
+export function useHideCategory() {
+  return useEdit(
+    (v: { name: string; hidden: boolean }) => setCategoryHidden({ data: v }),
     (l, v) => ({
       ...l,
-      categories: [...l.categories.filter((c) => c.name !== v.name), v],
+      categories: l.categories.map((c) => {
+        if (c.name !== v.name) return c
+        const { hidden: _h, ...rest } = c
+        return v.hidden ? { ...rest, hidden: true } : rest
+      }),
+    }),
+  )
+}
+
+export function useDeleteCategory() {
+  return useEdit(
+    (v: { name: string }) => removeCategory({ data: v }),
+    (l, v) => ({
+      ...l,
+      categories: l.categories.filter((c) => c.name !== v.name),
     }),
   )
 }

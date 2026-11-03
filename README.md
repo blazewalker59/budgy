@@ -69,7 +69,8 @@ Queue ([ADR 0012](docs/adr/0012-scheduled-sync-on-a-queue.md)); create it and
 its dead-letter queue once, before the first deploy that needs them:
 `wrangler queues create budgy-sync && wrangler queues create budgy-sync-dlq`.
 
-Worker secrets (`wrangler secret put <NAME> --env production`):
+Worker secrets (`wrangler secret put <NAME> --env production`; sign-in
+refuses to run without `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` (comma-separated; a secret so the
 Household's addresses stay out of the repository), and `BANK_CONNECTION_KEY`

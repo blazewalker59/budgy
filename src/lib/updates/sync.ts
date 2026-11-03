@@ -1,14 +1,16 @@
 /**
  * Syncing SimpleFIN accounts into the Budgy Accounts they're mapped to
- * (docs/adr/0010). One Bridge request per connection covers every account:
- * posted purchases go through the shared ingestion path with stable source
- * IDs, so overlapping windows never add a purchase twice, and each account's
- * balance is recorded. Pending transactions wait until they post.
+ * (docs/adr/0010, 0014). One routine Bridge request per connection covers
+ * every account; a newly linked one first reads back its history, up to
+ * about six months in windows of at most 90 days, newest first. Posted
+ * purchases go through the shared ingestion path with stable source IDs, so
+ * overlapping windows never add a purchase twice, and each account's balance
+ * is recorded. Pending transactions wait until they post.
  */
 import { and, eq, isNotNull } from 'drizzle-orm'
-import { readBridge } from './connections'
+import { ROUTINE_RESERVE, RequestLimitError, readBridge } from './connections'
 import { isSpending } from './exports'
-import type { SimplefinTransaction } from './simplefinClient'
+import type { SimplefinAccount, SimplefinTransaction } from './simplefinClient'
 import type { BankKeys } from './crypto'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { z } from 'zod'
@@ -18,24 +20,28 @@ import type { IncomingRow } from '@/lib/model/moneyIn'
 import { MAX_ROW_CENTS, postedRowInput } from '@/lib/import/posted'
 import { MAX_BALANCE_CENTS, isDebt } from '@/lib/model/accounts'
 import { recordMoneyIn } from '@/lib/moneyIn/service'
-import { bankAccounts, bankConnections } from '@/lib/db/schema'
+import { accounts, bankAccounts, bankConnections } from '@/lib/db/schema'
 import { inHousehold } from '@/lib/households/scope'
-import {
-  findAccount,
-  postTransactions,
-  recordBalances,
-} from '@/lib/ledger/accounts'
+import { postTransactions, recordBalances } from '@/lib/ledger/accounts'
 import { UserError, clientMessage } from '@/lib/errors'
 import { householdTimeZone } from '@/lib/households/locale'
 import { addDays, dateOn, today } from '@/lib/model/dates'
 
-/** How far a first sync reaches back. */
-const FIRST_DAYS = 45
 /** Each sync re-reads this many days, for late-posting purchases. */
 const OVERLAP_DAYS = 10
-/** Never ask Bridge for more than this, however long since the last sync. */
-const MAX_DAYS = 60
+/** Bridge serves at most 90 days from start-date to end-date. */
+export const WINDOW_DAYS = 90
+/** How far back a newly linked account's history goes, where the bank has it. */
+export const HISTORY_DAYS = 180
+/** History windows one run asks for at most, beyond the routine request. */
+const HISTORY_WINDOWS_PER_RUN = 4
 const SPENDING_KINDS = ['credit', 'checking', 'savings']
+const DAY = 86_400
+
+/** Unix seconds at the start of a UTC day, and back. */
+const startOf = (day: string) => Date.parse(`${day}T00:00:00Z`) / 1000
+const utcDay = (seconds: number) =>
+  new Date(seconds * 1000).toISOString().slice(0, 10)
 
 export interface SyncedAccount {
   account: string
@@ -103,6 +109,14 @@ function incomingRow(
   }
 }
 
+type Mapped = typeof bankAccounts.$inferSelect
+
+/** One request's span: Unix seconds, `end` exclusive (now when absent). */
+interface Window {
+  start: number
+  end?: number
+}
+
 export async function syncConnection(
   db: HouseholdDatabase,
   id: string,
@@ -121,44 +135,64 @@ export async function syncConnection(
     )
   if (!mapped.length)
     throw new UserError('Link a bank account to a Budgy account first.')
-  const timeZone = await householdTimeZone(db)
-  const until = today(timeZone)
-  const from = mapped
-    .map((m) =>
-      m.syncedThrough
-        ? addDays(m.syncedThrough, -OVERLAP_DAYS)
-        : addDays(until, -FIRST_DAYS),
-    )
-    .reduce((a, b) => (a < b ? a : b))
-  const start = [from, addDays(until, -MAX_DAYS)].sort().at(-1)!
-  // A day early, so no time zone drops the first day's purchases.
-  const purchasesFrom = Date.parse(`${addDays(start, -1)}T00:00:00Z`) / 1000
-  // An account not yet read for Money in reaches back the whole window once
-  // (docs/adr/0011); its purchases still keep to their own window.
-  const backfill = mapped.some((m) => !m.moneyInSince)
-  const fetchFrom = backfill ? addDays(until, -MAX_DAYS) : start
-  const found = await readBridge(
-    db,
-    id,
-    secret,
-    { start: Date.parse(`${addDays(fetchFrom, -1)}T00:00:00Z`) / 1000 },
-    transport,
-  )
-  const connection = await db
-    .select({ name: bankConnections.name })
-    .from(bankConnections)
-    .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
-    .get()
-  const by = `SimpleFIN (${connection?.name ?? 'connection'})`
-
-  const results: Array<SyncedAccount> = []
-  const covered = (
-    m: (typeof mapped)[number],
-    set: { syncedThrough?: string },
-  ) =>
+  const [timeZone, connection, ledgerAccounts] = await Promise.all([
+    householdTimeZone(db),
     db
+      .select({ name: bankConnections.name })
+      .from(bankConnections)
+      .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
+      .get(),
+    db
+      .select({
+        name: accounts.name,
+        kind: accounts.kind,
+        owner: accounts.owner,
+        closed: accounts.closed,
+      })
+      .from(accounts)
+      .where(inHousehold(db, accounts)),
+  ])
+  const until = today(timeZone)
+  const now = Math.floor(Date.now() / 1000)
+  const utcToday = utcDay(now)
+  // The newest window Bridge allows: 90 days back from now, to a UTC day.
+  const newest = startOf(addDays(utcToday, -(WINDOW_DAYS - 1)))
+  const oldest = addDays(utcToday, -(HISTORY_DAYS - 1))
+  const by = `SimpleFIN (${connection?.name ?? 'connection'})`
+  const accountOf = (m: Mapped) =>
+    ledgerAccounts.find((a) => a.name === m.account)
+  /** Purchases and Money in to read back for, not just a balance. */
+  const wantsHistory = (m: Mapped) => {
+    const account = accountOf(m)
+    return (
+      !m.historyComplete &&
+      !!account &&
+      !account.closed &&
+      SPENDING_KINDS.includes(account.kind)
+    )
+  }
+
+  // One result per account, however many windows it was read in.
+  const byAccount = new Map<string, SyncedAccount>()
+  const results = {
+    push(result: SyncedAccount) {
+      const seen = byAccount.get(result.account)
+      if (!seen) return void byAccount.set(result.account, result)
+      for (const key of ['added', 'moneyIn'] as const)
+        if (result[key] !== undefined)
+          seen[key] = (seen[key] ?? 0) + result[key]
+      if (result.balance) seen.balance = true
+      if (result.error) seen.error = result.error
+    },
+    get length() {
+      return byAccount.size
+    },
+  }
+  const save = (m: Mapped, set: Partial<Mapped>) => {
+    Object.assign(m, set)
+    return db
       .update(bankAccounts)
-      .set({ ...set, moneyInSince: m.moneyInSince ?? fetchFrom })
+      .set(set)
       .where(
         inHousehold(
           db,
@@ -169,7 +203,21 @@ export async function syncConnection(
           ),
         ),
       )
-  for (const m of mapped) {
+  }
+
+  /**
+   * Take one account's part of a response: its purchases and Money in from
+   * the window, and its balance. An older history window brings no balance,
+   * and no receipt unless it has purchases, so an empty one doesn't stand
+   * in for the account's latest update. Returns whether it was taken, and
+   * the posted times it had in the window.
+   */
+  const take = async (
+    m: Mapped,
+    found: Array<SimplefinAccount>,
+    window: Window,
+    older = false,
+  ): Promise<{ ok: boolean; posted: Array<number> }> => {
     const accountName = m.account!
     const source = found.find((a) => a.id === m.providerId)
     if (!source) {
@@ -177,15 +225,20 @@ export async function syncConnection(
         account: accountName,
         error: `SimpleFIN no longer shares ${m.name}.`,
       })
-      continue
+      return { ok: false, posted: [] }
     }
+    const account = accountOf(m)
+    // Closed (or gone) since: nothing to read for it.
+    if (!account || account.closed) return { ok: false, posted: [] }
+    const inWindow = source.transactions.filter(
+      (t) =>
+        !t.pending &&
+        !!t.posted &&
+        t.posted >= window.start &&
+        (window.end === undefined || t.posted < window.end),
+    )
+    const posted = inWindow.map((t) => t.posted!)
     try {
-      const account = await findAccount(db, accountName)
-      if (account.closed) {
-        // Nothing to read, so no reason to reach back for it again.
-        if (!m.moneyInSince) await covered(m, {})
-        continue
-      }
       const debt = isDebt(account)
       const result: SyncedAccount = { account: account.name }
       if (SPENDING_KINDS.includes(account.kind)) {
@@ -193,14 +246,13 @@ export async function syncConnection(
         const incoming: Array<IncomingRow> = []
         const unreadable: Array<SkippedRow> = []
         let excluded = 0
-        for (const t of source.transactions) {
+        for (const t of inWindow) {
           const row = purchaseRow(t, debt, timeZone)
-          const ours = !!t.posted && t.posted >= purchasesFrom
           if (row === 'excluded') {
-            if (ours) excluded++
+            excluded++
             const money = incomingRow(t, debt, timeZone)
             if (money) incoming.push(money)
-          } else if (row && ours) {
+          } else if (row) {
             // One row Budgy can't take (over $1M, say) mustn't stop the
             // rest, or this account would never get past it.
             const valid = postedRowInput.safeParse(row)
@@ -208,18 +260,26 @@ export async function syncConnection(
             else unreadable.push(skippedRow(row, valid.error))
           }
         }
-        const summary = await postTransactions(db, {
-          account: account.name,
-          rows,
-          commit: true,
-          importedBy: by,
-          via: 'simplefin',
-          sourceNamespace: `simplefin:${m.providerId}`,
-          excluded,
-          unreadable,
-          coverage: { from: start, to: until },
-        })
-        result.added = summary.added
+        if (!older || rows.length || unreadable.length) {
+          const summary = await postTransactions(db, {
+            account: account.name,
+            rows,
+            commit: true,
+            importedBy: by,
+            via: 'simplefin',
+            sourceNamespace: `simplefin:${m.providerId}`,
+            excluded,
+            unreadable,
+            coverage: {
+              from: dateOn(new Date(window.start * 1000), timeZone),
+              to:
+                window.end === undefined
+                  ? until
+                  : dateOn(new Date((window.end - 1) * 1000), timeZone),
+            },
+          })
+          result.added = summary.added
+        }
         if (!debt)
           result.moneyIn = await recordMoneyIn(
             db,
@@ -228,30 +288,30 @@ export async function syncConnection(
             `simplefin:${m.providerId}`,
           )
       }
-      // SimpleFIN shows what's owed as negative; Budgy as positive.
-      const cents = Math.round(Number(source.balance) * 100)
-      if (!plausibleBalance(cents)) {
-        result.error = `SimpleFIN’s balance for ${m.name} couldn’t be read, so it wasn’t recorded.`
-        await covered(m, { syncedThrough: until })
-        results.push(result)
-        continue
+      if (!older) {
+        // SimpleFIN shows what's owed as negative; Budgy as positive.
+        const cents = Math.round(Number(source.balance) * 100)
+        if (!plausibleBalance(cents)) {
+          result.error = `SimpleFIN’s balance for ${m.name} couldn’t be read, so it wasn’t recorded.`
+        } else {
+          await recordBalances(
+            db,
+            [
+              {
+                account: account.name,
+                date: source.balanceDate
+                  ? dateOn(new Date(source.balanceDate * 1000), timeZone)
+                  : until,
+                amount: debt ? -cents : cents,
+              },
+            ],
+            by,
+          )
+          result.balance = true
+        }
       }
-      await recordBalances(
-        db,
-        [
-          {
-            account: account.name,
-            date: source.balanceDate
-              ? dateOn(new Date(source.balanceDate * 1000), timeZone)
-              : until,
-            amount: debt ? -cents : cents,
-          },
-        ],
-        by,
-      )
-      result.balance = true
-      await covered(m, { syncedThrough: until })
       results.push(result)
+      return { ok: true, posted }
     } catch (error) {
       results.push({
         account: accountName,
@@ -260,7 +320,103 @@ export async function syncConnection(
           'This sync didn’t finish. Budgy will try again.',
         ),
       })
+      return { ok: false, posted }
     }
   }
-  return results
+
+  /**
+   * Where an account's history stands after a window it was read in. One
+   * with nothing posted in it means the bank has no older history (a quiet
+   * account's gap of weeks doesn't: only an empty window does).
+   */
+  const historyAfter = (window: Window, posted: Array<number>) => {
+    const from = utcDay(window.start)
+    return {
+      historyFrom: from,
+      historyComplete: !posted.length || from <= oldest,
+    }
+  }
+
+  // Routine: one request for every account already reading (and any that
+  // only want a balance), from the earliest one's last day less the overlap.
+  const first = mapped.filter((m) => wantsHistory(m) && !m.syncedThrough)
+  const routine = mapped.filter((m) => !first.includes(m))
+  if (routine.length) {
+    const from = routine
+      .map((m) => addDays(m.syncedThrough ?? until, -OVERLAP_DAYS))
+      .reduce((a, b) => (a < b ? a : b))
+    // A day early, so no time zone drops the first day's purchases.
+    const window = { start: Math.max(startOf(addDays(from, -1)), newest) }
+    const { accounts: found } = await readBridge(
+      db,
+      id,
+      secret,
+      { start: window.start },
+      transport,
+    )
+    for (const m of routine) {
+      const { ok } = await take(m, found, window)
+      if (!ok) continue
+      const complete = !wantsHistory(m)
+      await save(m, {
+        syncedThrough: until,
+        moneyInSince: m.moneyInSince ?? utcDay(window.start),
+        ...(complete && {
+          historyComplete: true,
+          historyFrom: m.historyFrom ?? utcDay(window.start),
+        }),
+      })
+    }
+  }
+
+  // History, newest window first: accounts reading back from the same day
+  // share one request for just them. Each window is asked for once a run;
+  // what's left (today's requests used up, a failure) resumes next run.
+  const asked = new Set<string>()
+  const windowOf = (m: Mapped) => `${m.providerId}\u0000${m.historyFrom ?? ''}`
+  for (let n = 0; n < HISTORY_WINDOWS_PER_RUN; n++) {
+    const due = mapped.filter((m) => wantsHistory(m) && !asked.has(windowOf(m)))
+    if (!due.length) break
+    const next = due
+      .map((m) => m.historyFrom ?? '')
+      .reduce((a, b) => (a === '' || b === '' ? '' : a > b ? a : b))
+    const group = due.filter((m) => (m.historyFrom ?? '') === next)
+    for (const m of group) asked.add(windowOf(m))
+    const window: Window = next
+      ? {
+          start: Math.max(startOf(next) - WINDOW_DAYS * DAY, startOf(oldest)),
+          end: startOf(next),
+        }
+      : { start: newest }
+    let found: Array<SimplefinAccount>
+    try {
+      ;({ accounts: found } = await readBridge(
+        db,
+        id,
+        secret,
+        {
+          ...window,
+          accounts: group.map((m) => m.providerId),
+          // An account's first window is its sync; older ones can wait.
+          reserve: next ? ROUTINE_RESERVE : 0,
+        },
+        transport,
+      ))
+    } catch (error) {
+      // Nothing synced yet this run: the caller should hear why.
+      if (!routine.length && !results.length) throw error
+      if (!(error instanceof RequestLimitError)) break
+      continue
+    }
+    for (const m of group) {
+      const { ok, posted } = await take(m, found, window, !!next)
+      if (!ok) continue
+      await save(m, {
+        ...historyAfter(window, posted),
+        ...(!m.syncedThrough && { syncedThrough: until }),
+        moneyInSince: utcDay(window.start),
+      })
+    }
+  }
+  return [...byAccount.values()]
 }

@@ -281,8 +281,8 @@ function AccountCard({
             : 'No balance recorded yet'}
           {bank
             ? bank.syncedThrough
-              ? `. Synced through ${bank.syncedThrough}.`
-              : '. Waiting for the first sync.'
+              ? `. Synced through ${bank.syncedThrough}.${spending && !bank.historyComplete ? ' Older history is still coming in.' : ''}`
+              : '. Its first sync starts shortly and brings in up to 6 months of history, where the bank allows.'
             : '.'}
         </p>
       )}

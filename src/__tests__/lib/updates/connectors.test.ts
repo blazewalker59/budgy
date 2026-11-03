@@ -779,7 +779,10 @@ describe('SimpleFIN sync', () => {
     expect(await db.select().from(balances)).toMatchObject([
       { householdId: 'a', account: 'Card', amount: 12_050 },
     ])
-    expect(urls.at(-1)).toMatch(/accounts\?start-date=\d+&version=2$/)
+    // Its first sync reads its history, for just this account.
+    expect(urls.at(-1)).toMatch(
+      /accounts\?start-date=\d+&end-date=\d+&account=ACT-1&version=2$/,
+    )
 
     // The next sync overlaps; nothing is added twice, and a posted
     // pending purchase arrives under its own ID.
@@ -787,6 +790,7 @@ describe('SimpleFIN sync', () => {
     expect(await syncConnection(a, id, KEY, transport)).toEqual([
       { account: 'Card', added: 1, balance: true },
     ])
+    expect(urls.at(-1)).toMatch(/accounts\?start-date=\d+&version=2$/)
     expect(await db.select().from(transactions)).toHaveLength(3)
     expect((await listAccountUpdates(b))[0].latest).toBeNull()
   })
@@ -850,21 +854,24 @@ describe('SimpleFIN sync', () => {
       ).rejects.toThrow('up to $100,000,000')
   })
 
-  it('reads back to the last sync with an overlap, and 60 days the first time for Money in', async () => {
+  it('reads back to the last sync with an overlap once its history is in', async () => {
     const { a, id, transport, urls } = await linked([sapphire])
     const startDay = (url: string) =>
       new Date(Number(new URL(url).searchParams.get('start-date')) * 1000)
         .toISOString()
         .slice(0, 10)
+    urls.length = 0 // discovery, on connecting
     await syncConnection(a, id, KEY, transport)
     const today = new Date().toISOString().slice(0, 10)
     const days = (from: string) =>
       Math.round((Date.parse(today) - Date.parse(from)) / 86_400_000)
-    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(60)
-    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(62)
+    // Nothing in its first 90 days: the bank has no more history.
+    expect(urls).toHaveLength(1)
+    expect(days(startDay(urls[0]))).toBe(89)
     await syncConnection(a, id, KEY, transport)
-    expect(days(startDay(urls.at(-1)!))).toBeGreaterThanOrEqual(10)
-    expect(days(startDay(urls.at(-1)!))).toBeLessThanOrEqual(12)
+    expect(urls).toHaveLength(2)
+    expect(days(startDay(urls[1]))).toBeGreaterThanOrEqual(10)
+    expect(days(startDay(urls[1]))).toBeLessThanOrEqual(12)
   })
 
   it('links a purchase already uploaded by export instead of adding it again', async () => {
@@ -963,53 +970,6 @@ describe('SimpleFIN sync', () => {
     const again = await syncConnection(f.a, id, KEY, live.transport)
     expect(again.find((r) => r.account === 'Checking')?.moneyIn).toBe(0)
     expect(await f.db.select().from(moneyIn)).toHaveLength(1)
-  })
-
-  it('reaches back once for Money in without adding older purchases', async () => {
-    const f = await fixture()
-    await saveAccount(
-      f.a,
-      { name: 'Checking', ...card, kind: 'checking' },
-      true,
-    )
-    const checking = {
-      ...sapphire,
-      id: 'CHK',
-      name: 'Checking',
-      balance: '500.25',
-      transactions: [
-        txn('c1', '600', 'VENMO CASHOUT', { posted: daysAgo(55) }),
-        txn('c2', '-40', 'Old Hardware', { posted: daysAgo(55) }),
-        txn('c3', '-12', 'Coffee'),
-      ],
-    }
-    const live = liveBridge([checking])
-    const { id } = await connectSimplefin(
-      f.a,
-      me,
-      { name: 'Bridge', setupToken: SETUP },
-      KEY,
-      live.transport,
-    )
-    await mapBankAccount(f.a, {
-      connectionId: id,
-      providerId: 'CHK',
-      account: 'Checking',
-    })
-    // As if the Account had synced before Money in existed.
-    await f.db.update(bankAccounts).set({
-      syncedThrough: new Date(daysAgo(3) * 1000).toISOString().slice(0, 10),
-    })
-    const [result] = await syncConnection(f.a, id, KEY, live.transport)
-    expect(result).toMatchObject({ added: 1, moneyIn: 1 })
-    expect(
-      (await f.db.select().from(transactions)).map((t) => t.description),
-    ).toEqual(['Coffee'])
-    expect(await f.db.select().from(moneyIn)).toMatchObject([
-      { description: 'VENMO CASHOUT', amount: 60_000, use: 'review' },
-    ])
-    const [link] = await f.db.select().from(bankAccounts)
-    expect(link.moneyInSince).not.toBeNull()
   })
 
   /** Household A and B each with a linked connection, Bridge per access. */
@@ -1125,7 +1085,8 @@ describe('SimpleFIN sync', () => {
     ])
     await consumeSyncBatch(f.env.DB, batch, KEY, f.transport)
     expect(settled).toEqual([{ acked: true }])
-    expect(f.requests).toEqual(['b'])
+    // Its first sync: the newest window of history, then the one before.
+    expect(f.requests).toEqual(['b', 'b'])
     expect(await shops(f.db)).toEqual(['b:b shop'])
   })
 

@@ -17,6 +17,7 @@ import {
   revokeUploadToken,
 } from './uploads'
 import { syncConnection } from './sync'
+import { queueFirstSync } from './syncQueue'
 import { bankKeys } from './crypto'
 import type { BankAccountChoice } from './connections'
 import type { AccountExportInput } from './ingest'
@@ -117,7 +118,17 @@ export const linkBankAccount = createServerFn({ method: 'POST' })
         })
         .parse(data),
   )
-  .handler(({ data }) => withMember(({ db }) => mapBankAccount(db, data)))
+  .handler(({ data }) =>
+    withMember(async ({ db }) => {
+      await mapBankAccount(db, data)
+      if (data.account !== null)
+        await queueFirstSync(
+          db,
+          [data.connectionId],
+          getCloudflareEnv().SYNC_QUEUE,
+        )
+    }),
+  )
 
 const bankKey = {
   connectionId: z.string().min(1).max(64),
@@ -150,7 +161,15 @@ export const addFromBank = createServerFn({ method: 'POST' })
       .parse(data),
   )
   .handler(({ data }) =>
-    withMember(({ db }) => addBankAccounts(db, data.choices)),
+    withMember(async ({ db }) => {
+      const added = await addBankAccounts(db, data.choices)
+      await queueFirstSync(
+        db,
+        data.choices.map((c) => c.connectionId),
+        getCloudflareEnv().SYNC_QUEUE,
+      )
+      return added
+    }),
   )
 
 export const disconnectBank = createServerFn({ method: 'POST' })

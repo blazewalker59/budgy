@@ -252,7 +252,8 @@ function ConnectStep() {
       <Option title="Sync from your bank">
         <p className="text-muted">
           SimpleFIN Bridge reads your banks and cards, and Budgy checks it a few
-          times a day. Your bank logins stay with Bridge.
+          times a day. Your bank logins stay with Bridge. Each account you link
+          brings in up to 6 months of history, where the bank allows.
         </p>
         <div className="text-xs">
           <SimplefinNote />
@@ -319,8 +320,9 @@ function HistoryStep() {
     <div className="space-y-3 text-sm">
       <p className="text-muted">
         Typical months, the starting point for Targets, come from the last 3
-        full months. Bank syncs often reach back only a few weeks, so upload
-        older purchases from each card and bank, back to {since} or earlier.
+        full months. A linked bank brings in up to 6 months where the bank
+        allows, but some only share a few weeks. Upload older purchases for any
+        card or bank that doesn’t reach back to {since}.
       </p>
       <p className="text-muted">
         On Accounts, open the account and choose{' '}

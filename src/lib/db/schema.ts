@@ -566,6 +566,11 @@ export const bankConnections = sqliteTable(
     /** Bridge asks for at most 24 requests a day per connection. */
     requestDay: text('request_day'),
     requestCount: integer('request_count').notNull().default(0),
+    /**
+     * A first sync is queued until then (a Member just linked accounts), so
+     * linking several in a row queues one, not one each.
+     */
+    syncQueuedUntil: integer('sync_queued_until', { mode: 'timestamp_ms' }),
   },
   (t) => [index('bank_connections_household_idx').on(t.householdId)],
 )
@@ -595,6 +600,15 @@ export const bankAccounts = sqliteTable(
      * sync has reached back the full window for it once.
      */
     moneyInSince: text('money_in_since'),
+    /**
+     * The oldest day its history has been read back to (a UTC day, the
+     * start of the last window asked for). Null until its first sync.
+     */
+    historyFrom: text('history_from'),
+    /** No more history to read: the cap reached, or the bank's ran out. */
+    historyComplete: integer('history_complete', { mode: 'boolean' })
+      .notNull()
+      .default(false),
   },
   (t) => [
     primaryKey({ columns: [t.householdId, t.connectionId, t.providerId] }),

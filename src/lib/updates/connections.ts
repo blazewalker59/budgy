@@ -3,7 +3,7 @@
  * a one-time setup token, discover its accounts, and map each one to a Budgy
  * Account. Discovery imports nothing; syncing mapped accounts is sync.ts.
  */
-import { and, count, eq, isNull, sql } from 'drizzle-orm'
+import { and, count, eq, inArray, isNull, sql } from 'drizzle-orm'
 import {
   connectionKeyReady,
   currentKey,
@@ -16,7 +16,11 @@ import {
   fetchSimplefin,
 } from './simplefinClient'
 import type { BankKeys } from './crypto'
-import type { SimplefinAccount } from './simplefinClient'
+import type {
+  SimplefinAccount,
+  SimplefinIssue,
+  SimplefinOptions,
+} from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { Account } from '@/lib/model/types'
 import { hashToken } from '@/lib/agents/tokens'
@@ -29,8 +33,27 @@ import { UserError } from '@/lib/errors'
 
 /** One Bridge connection covers many banks; a few is plenty. */
 export const MAX_CONNECTIONS = 5
-/** Bridge asks clients to stay under 24 requests a day per connection. */
-const DAILY_REQUESTS = 20
+/**
+ * Bridge asks clients to stay under 24 requests a day per connection, for
+ * all accounts and for single accounts (separate quotas). Budgy counts both
+ * kinds together, so neither can pass 20 (docs/adr/0014).
+ */
+export const DAILY_REQUESTS = 20
+/**
+ * Requests Budgy makes on its own beyond a routine sync (older history,
+ * retrying single accounts) stop with this many left, so the day's
+ * scheduled syncs and a Member's Sync now always have room.
+ */
+export const ROUTINE_RESERVE = 4
+
+/** Today's request allowance is used up; the next run picks up from here. */
+export class RequestLimitError extends UserError {
+  constructor() {
+    super(
+      'This connection has reached today’s SimpleFIN request limit. Try again tomorrow.',
+    )
+  }
+}
 const NOT_CONFIGURED =
   'Bank connections aren’t set up on this Budgy server yet (BANK_CONNECTION_KEY).'
 
@@ -88,7 +111,7 @@ export async function connectSimplefin(
 }
 
 /** Count a Bridge request against today's allowance, or refuse it. */
-async function spendRequest(db: HouseholdDatabase, id: string) {
+async function spendRequest(db: HouseholdDatabase, id: string, reserve = 0) {
   const day = today(await householdTimeZone(db))
   const spent = await db
     .update(bankConnections)
@@ -102,15 +125,12 @@ async function spendRequest(db: HouseholdDatabase, id: string) {
         bankConnections,
         and(
           eq(bankConnections.id, id),
-          sql`(${bankConnections.requestDay} is not ${day} or ${bankConnections.requestCount} < ${DAILY_REQUESTS})`,
+          sql`(${bankConnections.requestDay} is not ${day} or ${bankConnections.requestCount} < ${DAILY_REQUESTS - reserve})`,
         ),
       ),
     )
     .returning({ id: bankConnections.id })
-  if (!spent.length)
-    throw new UserError(
-      'This connection has reached today’s SimpleFIN request limit. Try again tomorrow.',
-    )
+  if (!spent.length) throw new RequestLimitError()
 }
 
 /** Refresh the list of accounts Bridge shares, with no transactions. */
@@ -124,17 +144,21 @@ export async function discoverAccounts(
 }
 
 /**
- * One request to Bridge for a connection, within its daily allowance. What
- * it lists refreshes the discovered accounts; a failure marks the connection
- * as needing attention, with a safe message.
+ * One request to Bridge for a connection, within its daily allowance (less
+ * `reserve`, for requests Budgy makes on its own). What it lists refreshes
+ * the discovered accounts; a failure marks the connection as needing
+ * attention, with a safe message.
  */
 export async function readBridge(
   db: HouseholdDatabase,
   id: string,
   secret: BankKeys,
-  options: Parameters<typeof fetchSimplefin>[1],
+  options: SimplefinOptions & { reserve?: number },
   transport: typeof fetch = fetch,
-): Promise<Array<SimplefinAccount>> {
+): Promise<{
+  accounts: Array<SimplefinAccount>
+  issues: Array<SimplefinIssue>
+}> {
   const connection = await db
     .select()
     .from(bankConnections)
@@ -143,7 +167,8 @@ export async function readBridge(
   if (!connection) throw new UserError('That bank connection no longer exists.')
   if (!connectionKeyReady(currentKey(secret)))
     throw new UserError(NOT_CONFIGURED)
-  await spendRequest(db, id)
+  const { reserve, ...request } = options
+  await spendRequest(db, id, reserve)
   let found: Awaited<ReturnType<typeof fetchSimplefin>>
   try {
     const { access, resealed } = await openAccess(
@@ -158,7 +183,7 @@ export async function readBridge(
         .update(bankConnections)
         .set({ encryptedAccess: resealed })
         .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
-    found = await fetchSimplefin(access, options, transport)
+    found = await fetchSimplefin(access, request, transport)
   } catch (error) {
     const message =
       error instanceof SimplefinError
@@ -197,12 +222,24 @@ export async function readBridge(
         },
       }),
   )
-  // Everything is absent until Bridge lists it again; mappings are kept.
+  // Everything is absent until Bridge lists it again; mappings are kept. A
+  // request for some accounts says nothing about the others.
   await db.batch([
     db
       .update(bankAccounts)
       .set({ present: false })
-      .where(inHousehold(db, bankAccounts, eq(bankAccounts.connectionId, id))),
+      .where(
+        inHousehold(
+          db,
+          bankAccounts,
+          and(
+            eq(bankAccounts.connectionId, id),
+            request.accounts
+              ? inArray(bankAccounts.providerId, [...request.accounts])
+              : undefined,
+          ),
+        ),
+      ),
     ...statements,
     db
       .update(bankConnections)
@@ -215,7 +252,7 @@ export async function readBridge(
       })
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id))),
   ])
-  return found.accounts
+  return { accounts: found.accounts, issues: found.issues }
 }
 
 /**
@@ -263,7 +300,23 @@ export async function mapBankAccount(
       )
     name = account.name
   }
-  await db.update(bankAccounts).set({ account: name }).where(where)
+  if (name === found.account) return
+  await db
+    .update(bankAccounts)
+    .set({ account: name, ...FRESH_HISTORY })
+    .where(where)
+}
+
+/**
+ * A new link starts from nothing: its first sync reads back the whole
+ * history window again (docs/adr/0014). Source IDs keep that from adding
+ * anything twice.
+ */
+const FRESH_HISTORY = {
+  syncedThrough: null,
+  moneyInSince: null,
+  historyFrom: null,
+  historyComplete: false,
 }
 
 /** A discovered account Budgy can feed from. */
@@ -353,7 +406,7 @@ export async function addBankAccounts(
     statements.push(
       db
         .update(bankAccounts)
-        .set({ account: name })
+        .set({ account: name, ...FRESH_HISTORY })
         .where(
           inHousehold(
             db,
@@ -415,6 +468,8 @@ export async function listConnections(db: HouseholdDatabase) {
         account: bankAccounts.account,
         present: bankAccounts.present,
         syncedThrough: bankAccounts.syncedThrough,
+        historyFrom: bankAccounts.historyFrom,
+        historyComplete: bankAccounts.historyComplete,
       })
       .from(bankAccounts)
       .where(inHousehold(db, bankAccounts))

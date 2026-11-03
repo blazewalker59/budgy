@@ -254,6 +254,8 @@ function ConnectForm({
       </label>
       <p className="text-muted">
         Each setup token works once. Accounts aren’t synced until you link them.
+        Linking one brings in up to 6 months of its history, where the bank
+        allows.
       </p>
       <div className="flex gap-2">
         <button

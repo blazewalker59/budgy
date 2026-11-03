@@ -37,6 +37,8 @@ const bank = (providerId: string, name: string, over = {}) => ({
   account: null,
   present: true,
   syncedThrough: null,
+  historyFrom: null,
+  historyComplete: false,
   ...over,
 })
 

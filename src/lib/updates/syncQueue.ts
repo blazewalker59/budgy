@@ -6,11 +6,12 @@
  * stop the rest. A message names a Household and connection, nothing more:
  * the credential stays encrypted in D1.
  */
-import { and, eq, isNotNull } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { syncConnection } from './sync'
 import { SimplefinError } from './simplefinClient'
 import type { BankKeys } from './crypto'
+import type { HouseholdDatabase } from '@/lib/households/scope'
 import { dbFromD1 } from '@/lib/db'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
 import { householdDatabase, inHousehold } from '@/lib/households/scope'
@@ -34,6 +35,62 @@ export const MAX_ATTEMPTS = 3
 const RETRY_DELAY_SECONDS = 600
 /** Cloudflare's limit for one sendBatch call. */
 const SEND_BATCH = 100
+
+/**
+ * How long after linking an account its first sync runs. Accounts linked
+ * one after another within it share one sync (docs/adr/0014).
+ */
+export const FIRST_SYNC_DELAY_SECONDS = 30
+
+/**
+ * A Member linked accounts: queue each connection's sync, which reads
+ * back their history, rather than make the Member wait for it. Linking
+ * still succeeds if this can't (no queue locally, say); the next scheduled
+ * sync reads them then.
+ */
+export async function queueFirstSync(
+  db: HouseholdDatabase,
+  connectionIds: Iterable<string>,
+  queue: Queue<SyncMessage> | undefined,
+): Promise<number> {
+  if (!queue) return 0
+  let queued = 0
+  for (const connectionId of new Set(connectionIds)) {
+    try {
+      const now = new Date()
+      const claimed = await db
+        .update(bankConnections)
+        .set({
+          syncQueuedUntil: new Date(
+            now.getTime() + FIRST_SYNC_DELAY_SECONDS * 1000,
+          ),
+        })
+        .where(
+          inHousehold(
+            db,
+            bankConnections,
+            and(
+              eq(bankConnections.id, connectionId),
+              or(
+                isNull(bankConnections.syncQueuedUntil),
+                lt(bankConnections.syncQueuedUntil, now),
+              ),
+            ),
+          ),
+        )
+        .returning({ id: bankConnections.id })
+      if (!claimed.length) continue
+      await queue.send(
+        { householdId: db.householdId, connectionId },
+        { delaySeconds: FIRST_SYNC_DELAY_SECONDS },
+      )
+      queued++
+    } catch (error) {
+      console.error('SimpleFIN first sync not queued:', errorCode(error))
+    }
+  }
+  return queued
+}
 
 /** The cron: one message per connection with a linked account. */
 export async function enqueueSyncs(

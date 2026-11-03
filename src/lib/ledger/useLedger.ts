@@ -29,8 +29,10 @@ import {
   savePay,
   savePlan,
   setCategoryHidden,
+  setSetup,
   setStoreRule,
   setTarget,
+  setTargets,
   setWorthBaseline,
 } from './server'
 import type { AccountEdit } from './server'
@@ -44,12 +46,14 @@ import type {
   StoreRule,
   Tag,
 } from '@/lib/model/types'
+import type { SetupChange } from '@/lib/ledger/setup'
 import { newCategory } from '@/lib/model/defaults'
 import { clientMessage } from '@/lib/errors'
 import { ANY_SOURCE, TRANSFER } from '@/lib/model/ledger'
 import { filedFirst, pairKey } from '@/lib/model/duplicates'
 import { suggestionKey } from '@/lib/model/rules'
 import { renamedLedger } from '@/lib/model/categories'
+import { markStep } from '@/lib/model/setup'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -248,6 +252,44 @@ export function useSetTarget() {
             },
             v.category,
           )
+    },
+  )
+}
+
+/** Skip a setup step, mark one done, or put the checklist away. */
+export function useSetup() {
+  return useEdit(
+    (v: SetupChange) => setSetup({ data: v }),
+    (l, v) => ({
+      ...l,
+      setup:
+        'step' in v
+          ? markStep(l.setup, v.step, v.mark)
+          : { ...l.setup, dismissed: v.dismissed },
+    }),
+  )
+}
+
+/** Many Targets from one month on (setup's "accept all"). */
+export function useSetTargets() {
+  return useEdit(
+    (v: {
+      startsMonth: string
+      targets: Array<{ category: string; amount: number }>
+    }) => setTargets({ data: v }),
+    (l, v) => {
+      const names = new Set(v.targets.map((t) => t.category))
+      let next: Ledger = {
+        ...l,
+        targets: [
+          ...l.targets.filter(
+            (t) => !(names.has(t.category) && t.startsMonth === v.startsMonth),
+          ),
+          ...v.targets.map((t) => ({ ...t, startsMonth: v.startsMonth })),
+        ],
+      }
+      for (const name of names) next = withCategory(next, name)
+      return next
     },
   )
 }

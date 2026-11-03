@@ -4,6 +4,7 @@
  */
 
 import type { Lens } from './lens'
+import type { SetupMarks } from './setup'
 
 /** How much a Category matters: Need, Nice to have, or Fluff. */
 export type Tag = 'need' | 'nice' | 'fluff'
@@ -211,4 +212,6 @@ export interface Ledger {
   dismissed: Array<string>
   /** The day net worth history counts from; null for `autoBaseline`. */
   baseline: string | null
+  /** What setup can't read from the rest (src/lib/model/setup.ts). */
+  setup: SetupMarks
 }

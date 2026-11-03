@@ -4,6 +4,7 @@
  */
 
 import { and, eq, sql } from 'drizzle-orm'
+import { loadSetup } from './setup'
 import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Ledger } from '@/lib/model/types'
 import { householdRow, inHousehold } from '@/lib/households/scope'
@@ -39,6 +40,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
     kept,
     dismissed,
     baseline,
+    setup,
   ] = await Promise.all([
     db.select().from(categories).where(inHousehold(db, categories)),
     db.select().from(accounts).where(inHousehold(db, accounts)),
@@ -100,6 +102,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
     loadKept(db),
     loadDismissed(db),
     loadBaseline(db),
+    loadSetup(db),
   ])
   return {
     categories: cats.map(({ name, tag, group, hidden }) => ({
@@ -154,6 +157,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
     kept,
     dismissed,
     baseline,
+    setup,
   }
 }
 

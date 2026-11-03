@@ -88,6 +88,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
     kept: [],
     dismissed: [],
     baseline: null,
+    setup: { skipped: [], done: [], dismissed: false },
     ...over,
   }
 }

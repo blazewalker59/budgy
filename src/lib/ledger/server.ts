@@ -19,6 +19,8 @@ import { RULES_KEY, loadImportRules } from './importer'
 import { keepBoth, mergeDuplicate } from './duplicates'
 import { deleteCategory, hideCategory, renameCategory } from './categories'
 import { fileBankCategory, listBankCategories } from './bankCategories'
+import { saveTargets } from './targets'
+import { saveSetup } from './setup'
 import {
   clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
@@ -28,6 +30,7 @@ import {
   removeStarting,
   saveAccount as saveAccountRow,
 } from './accounts'
+import type { SetupChange } from './setup'
 import type {
   Account,
   Balance,
@@ -54,6 +57,7 @@ import {
   transactions,
 } from '@/lib/db/schema'
 import { CADENCES, TAGS } from '@/lib/model/types'
+import { SETUP_STEPS } from '@/lib/model/setup'
 import { payInput } from '@/lib/model/pay'
 import { completeRules, importRulesSchema } from '@/lib/import/rules'
 import { postedRowInput } from '@/lib/import/posted'
@@ -209,6 +213,41 @@ export const setTarget = createServerFn({ method: 'POST' })
           set: { amount: data.amount },
         })
     }),
+  )
+
+/** Skip a setup step, mark one done, or put the checklist away. */
+export const setSetup = createServerFn({ method: 'POST' })
+  .validator((data: SetupChange) =>
+    z
+      .union([
+        z.object({
+          step: z.enum(SETUP_STEPS),
+          mark: z.enum(['skipped', 'done']).nullable(),
+        }),
+        z.object({ dismissed: z.boolean() }),
+      ])
+      .parse(data),
+  )
+  .handler(({ data }) => withMember(({ db }) => saveSetup(db, data)))
+
+/** Set many Targets from one month on, in one go (setup's "accept all"). */
+export const setTargets = createServerFn({ method: 'POST' })
+  .validator(
+    (data: {
+      startsMonth: string
+      targets: Array<{ category: string; amount: number }>
+    }) =>
+      z
+        .object({
+          startsMonth: MONTH,
+          targets: z
+            .array(z.object({ category: NAME, amount: CENTS }))
+            .max(100),
+        })
+        .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => saveTargets(db, data.startsMonth, data.targets)),
   )
 
 export const saveCategory = createServerFn({ method: 'POST' })

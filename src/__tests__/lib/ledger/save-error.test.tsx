@@ -68,6 +68,7 @@ function ledger(category: string | null): Ledger {
     kept: [],
     dismissed: [],
     baseline: null,
+    setup: { skipped: [], done: [], dismissed: false },
   }
 }
 

@@ -7,6 +7,8 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  addLabel,
+  changeLabel,
   deleteAccount,
   deleteBalance,
   deleteLens,
@@ -16,11 +18,13 @@ import {
   getLedger,
   getSession,
   keepDuplicatePair,
+  labelManyAccounts,
   mergeDuplicatePair,
   moveTxn,
   noteTxn,
   recordBalances,
   removeCategory,
+  removeLabel,
   removeStartingPurchases,
   renameCategoryEverywhere,
   saveAccount,
@@ -37,6 +41,7 @@ import {
 } from './server'
 import type { AccountEdit } from './server'
 import type {
+  AccountLabel,
   Balance,
   Category,
   Ledger,
@@ -54,6 +59,11 @@ import { filedFirst, pairKey } from '@/lib/model/duplicates'
 import { suggestionKey } from '@/lib/model/rules'
 import { renamedLedger } from '@/lib/model/categories'
 import { markStep } from '@/lib/model/setup'
+import {
+  labeledLedger,
+  relabeledLedger,
+  unlabeledLedger,
+} from '@/lib/model/labels'
 
 export const SESSION_KEY = ['session'] as const
 export const LEDGER_KEY = ['ledger'] as const
@@ -350,6 +360,46 @@ export function useSaveAccount() {
         ? l.accounts.map((a) => (a.name === v.name ? { ...a, ...v } : a))
         : [...l.accounts, { ...v, sourceName: v.name }],
     }),
+  )
+}
+
+/** Add an Account label. */
+export function useAddLabel() {
+  return useEdit(
+    (v: AccountLabel) => addLabel({ data: v }),
+    (l, v) => ({
+      ...l,
+      labels: [...l.labels, { ...v, name: v.name.trim() }].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    }),
+  )
+}
+
+/** Rename or recolour an Account label; its Accounts follow a rename. */
+export function useChangeLabel() {
+  return useEdit(
+    (v: AccountLabel & { from: string }) => changeLabel({ data: v }),
+    (l, { from, ...next }) =>
+      relabeledLedger(l, from, { ...next, name: next.name.trim() }),
+  )
+}
+
+export function useDeleteLabel() {
+  return useEdit(
+    (v: { name: string }) => removeLabel({ data: v }),
+    (l, v) => unlabeledLedger(l, v.name),
+  )
+}
+
+/** Give several Accounts one label, each with its "Shown as". */
+export function useLabelAccounts() {
+  return useEdit(
+    (v: {
+      label: string
+      accounts: Array<{ name: string; displayName: string | null }>
+    }) => labelManyAccounts({ data: v }),
+    (l, v) => labeledLedger(l, v.label, v.accounts),
   )
 }
 

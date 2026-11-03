@@ -176,6 +176,13 @@
       "when": 1793674361552,
       "tag": "0024_connection_issues",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1793678095137,
+      "tag": "0025_account_labels",
+      "breakpoints": true
     }
   ]
 }

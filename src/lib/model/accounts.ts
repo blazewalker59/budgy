@@ -7,6 +7,7 @@
 import { z } from 'zod'
 import { lastDayOf, monthRange } from './dates'
 import { ACCOUNT_KINDS, DEBT_KINDS } from './types'
+import { displayNameInput, labelName } from './labels'
 import type { Account, AccountKind, Balance, Ledger } from './types'
 
 export const accountInput = z.object({
@@ -28,6 +29,9 @@ export const accountInput = z.object({
     .max(60)
     .nullish()
     .transform((s) => s || null),
+  /** Left out: kept as it is. Null: none. */
+  label: labelName.nullish(),
+  displayName: displayNameInput,
 })
 
 /** A Balance is at most $100,000,000 either way. */

@@ -20,6 +20,13 @@ import { keepBoth, mergeDuplicate } from './duplicates'
 import { deleteCategory, hideCategory, renameCategory } from './categories'
 import { fileBankCategory, listBankCategories } from './bankCategories'
 import { saveTargets } from './targets'
+import {
+  MAX_LABELLED,
+  createLabel,
+  deleteLabel,
+  labelAccounts,
+  updateLabel,
+} from './labels'
 import { saveSetup } from './setup'
 import {
   clearBalances as clearBalanceRows,
@@ -33,6 +40,7 @@ import {
 import type { SetupChange } from './setup'
 import type {
   Account,
+  AccountLabel,
   Balance,
   PaySchedule,
   Plan,
@@ -45,6 +53,7 @@ import { savedLensInput } from '@/lib/model/lens'
 import { ANY_SOURCE } from '@/lib/model/ledger'
 import { suggestionKey } from '@/lib/model/rules'
 import { accountInput, balanceInput } from '@/lib/model/accounts'
+import { displayNameInput, labelInput, labelName } from '@/lib/model/labels'
 import { sessionState, withMember } from '@/lib/auth/session'
 import {
   budgetTargets,
@@ -324,6 +333,53 @@ export const saveAccount = createServerFn({ method: 'POST' })
   )
   .handler(({ data: { isNew, ...account } }) =>
     withMember(({ db }) => saveAccountRow(db, account, isNew)),
+  )
+
+/** Add an Account label to the Household. */
+export const addLabel = createServerFn({ method: 'POST' })
+  .validator((data: AccountLabel) => labelInput.parse(data))
+  .handler(({ data }) => withMember(({ db }) => createLabel(db, data)))
+
+/** Rename or recolour an Account label; its Accounts follow a rename. */
+export const changeLabel = createServerFn({ method: 'POST' })
+  .validator((data: { from: string; name: string; color: string }) =>
+    labelInput.extend({ from: labelName }).parse(data),
+  )
+  .handler(({ data: { from, ...next } }) =>
+    withMember(({ db }) => updateLabel(db, from, next)),
+  )
+
+/** Delete an Account label; its Accounts keep their "Shown as". */
+export const removeLabel = createServerFn({ method: 'POST' })
+  .validator((data: { name: string }) =>
+    z.object({ name: labelName }).parse(data),
+  )
+  .handler(({ data }) => withMember(({ db }) => deleteLabel(db, data.name)))
+
+/** Give several Accounts one label (and a "Shown as" each), all at once. */
+export const labelManyAccounts = createServerFn({ method: 'POST' })
+  .validator(
+    (data: {
+      label: string
+      accounts: Array<{ name: string; displayName: string | null }>
+    }) =>
+      z
+        .object({
+          label: labelName,
+          accounts: z
+            .array(
+              z.object({
+                name: z.string().trim().min(1).max(60),
+                displayName: displayNameInput.transform((s) => s ?? null),
+              }),
+            )
+            .min(1)
+            .max(MAX_LABELLED),
+        })
+        .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => labelAccounts(db, data.label, data.accounts)),
   )
 
 /** Save the Lens under a name (or rename one), for the whole Household. */

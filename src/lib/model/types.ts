@@ -5,6 +5,7 @@
 
 import type { Lens } from './lens'
 import type { SetupMarks } from './setup'
+import type { LabelColor } from './labels'
 
 /** How much a Category matters: Need, Nice to have, or Fluff. */
 export type Tag = 'need' | 'nice' | 'fluff'
@@ -100,6 +101,16 @@ export interface Account {
   closed: boolean
   /** A loan's property (a mortgage's home), for that property's equity. */
   securedBy: string | null
+  /** Its Account label's name, if it has one (src/lib/model/labels.ts). */
+  label?: string | null
+  /** "Shown as" beside the label on the Accounts screen; `name` is its id. */
+  displayName?: string | null
+}
+
+/** A coloured chip naming a group of Accounts ("Addie"); not an Owner. */
+export interface AccountLabel {
+  name: string
+  color: LabelColor
 }
 
 export interface Balance {
@@ -199,6 +210,8 @@ export interface SavedLens {
 export interface Ledger {
   categories: Array<Category>
   accounts: Array<Account>
+  /** The Household's Account labels, by name. */
+  labels: Array<AccountLabel>
   txns: Array<Txn>
   pay: Array<PaySchedule>
   balances: Array<Balance>

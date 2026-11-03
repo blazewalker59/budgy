@@ -484,6 +484,8 @@ export function budgyTools(
             institution: a.institution,
             closed: a.closed,
             ...(a.securedBy ? { securedBy: a.securedBy } : {}),
+            ...(a.label ? { label: a.label } : {}),
+            ...(a.displayName ? { shownAs: a.displayName } : {}),
             balance: (() => {
               const bal = latestBalances(b.ix.ledger.balances).get(a.name)
               return bal ? { amount: usd(bal.amount), asOf: bal.date } : null

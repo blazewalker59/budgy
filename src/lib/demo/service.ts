@@ -23,6 +23,7 @@ import type { StepState } from '@/lib/model/setup'
 import {
   account,
   accountInputs,
+  accountLabels,
   accountUpdateLocks,
   accountUpdates,
   accounts,
@@ -70,6 +71,7 @@ export const DEMO_HOUSEHOLD_TABLES: ReadonlyArray<
   householdInvites,
   categories,
   accounts,
+  accountLabels,
   balances,
   transactions,
   accountUpdates,

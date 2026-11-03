@@ -9,6 +9,7 @@ import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Ledger } from '@/lib/model/types'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import {
+  accountLabels,
   accounts,
   balances,
   budgetTargets,
@@ -30,6 +31,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
   const [
     cats,
     accts,
+    labels,
     txns,
     pay,
     rules,
@@ -44,6 +46,11 @@ export async function loadLedger(db: Database): Promise<Ledger> {
   ] = await Promise.all([
     db.select().from(categories).where(inHousehold(db, categories)),
     db.select().from(accounts).where(inHousehold(db, accounts)),
+    db
+      .select({ name: accountLabels.name, color: accountLabels.color })
+      .from(accountLabels)
+      .where(inHousehold(db, accountLabels))
+      .orderBy(accountLabels.name),
     db
       .select({
         id: transactions.id,
@@ -112,7 +119,7 @@ export async function loadLedger(db: Database): Promise<Ledger> {
       ...(hidden ? { hidden: true } : {}),
     })),
     accounts: accts.map(
-      ({ name, sourceName, owner, kind, institution, closed, securedBy }) => ({
+      ({
         name,
         sourceName,
         owner,
@@ -120,8 +127,21 @@ export async function loadLedger(db: Database): Promise<Ledger> {
         institution,
         closed,
         securedBy,
+        label,
+        displayName,
+      }) => ({
+        name,
+        sourceName,
+        owner,
+        kind,
+        institution,
+        closed,
+        securedBy,
+        label,
+        displayName,
       }),
     ),
+    labels,
     balances: held,
     lenses: lenses.map((l) => ({
       ...l,

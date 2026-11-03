@@ -21,6 +21,7 @@ import {
 import type { Lens } from '@/lib/model/lens'
 import type { ExportFormat } from '@/lib/updates/exports'
 import type { MoneyInUse } from '@/lib/model/moneyIn'
+import type { LabelColor } from '@/lib/model/labels'
 import type {
   AccountKind,
   Cadence,
@@ -232,9 +233,39 @@ export const accounts = sqliteTable(
     closed: integer('closed', { mode: 'boolean' }).notNull().default(false),
     /** A loan's property (a mortgage's home), for that property's equity. */
     securedBy: text('secured_by'),
+    /** An Account label's name, from this Household's `account_labels`. */
+    label: text('label'),
+    /**
+     * "Shown as": a short name on the Accounts screen beside the label
+     * ("529" for "Addie 529"). Not unique; `name` stays the identifier.
+     */
+    displayName: text('display_name'),
     createdAt: createdAt(),
   },
   (t) => [primaryKey({ columns: [t.householdId, t.name] })],
+)
+
+/**
+ * A Household's Account labels: a coloured chip on the Accounts screen
+ * ("Addie"), apart from whose spending an Account is (its Owner). Names are
+ * unique in any case; a rename rewrites the Accounts using it at once.
+ */
+export const accountLabels = sqliteTable(
+  'account_labels',
+  {
+    householdId: householdId(),
+    name: text('name').notNull(),
+    /** A key of LABEL_COLORS (src/lib/model/labels.ts), never a raw colour. */
+    color: text('color').$type<LabelColor>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.householdId, t.name] }),
+    uniqueIndex('account_labels_name_unique').on(
+      t.householdId,
+      sql`lower(${t.name})`,
+    ),
+  ],
 )
 
 /**

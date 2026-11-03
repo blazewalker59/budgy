@@ -11,6 +11,7 @@ import {
   loadImportRules,
   rowsPerInsert,
 } from './importer'
+import { findLabel, labelIfOurs } from './labels'
 import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import type { Account, Balance } from '@/lib/model/types'
 import type { PostedRow, Prepared } from '@/lib/import/posted'
@@ -64,12 +65,25 @@ export async function findAccount(
   return found
 }
 
-/** Add an Account, or change one's owner, kind, institution or closing. */
+/**
+ * Add an Account, or change one's owner, kind, institution, closing, label
+ * or "Shown as". A label or "Shown as" left out stays as it is.
+ */
 export async function saveAccount(
   db: Database,
-  a: Omit<Account, 'sourceName'>,
+  input: Omit<Account, 'sourceName'>,
   isNew: boolean,
 ): Promise<void> {
+  const { label: wanted, displayName, ...a } = input
+  const label = wanted ? (await findLabel(db, wanted)).name : wanted
+  const labelling = {
+    ...(label === undefined
+      ? {}
+      : { label: label === null ? null : labelIfOurs(db, label) }),
+    ...(displayName === undefined
+      ? {}
+      : { displayName: displayName?.trim() || null }),
+  }
   if (isNew) {
     const taken = await db
       .select({ name: accounts.name })
@@ -85,7 +99,7 @@ export async function saveAccount(
       throw new UserError(`There's already an account named ${a.name}.`)
     await db
       .insert(accounts)
-      .values(householdRow(db, { ...a, sourceName: a.name }))
+      .values(householdRow(db, { ...a, ...labelling, sourceName: a.name }))
     return
   }
   await db
@@ -96,6 +110,7 @@ export async function saveAccount(
       institution: a.institution,
       closed: a.closed,
       securedBy: a.kind === 'loan' ? a.securedBy : null,
+      ...labelling,
     })
     .where(inHousehold(db, accounts, eq(accounts.name, a.name)))
 }

@@ -78,6 +78,7 @@ export function ledger(over: Partial<Ledger> = {}): Ledger {
         securedBy: null,
       },
     ],
+    labels: [],
     txns: [],
     pay: [],
     balances: [],

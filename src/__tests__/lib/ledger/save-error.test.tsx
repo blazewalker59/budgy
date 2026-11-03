@@ -58,6 +58,7 @@ function ledger(category: string | null): Ledger {
   return {
     categories: [],
     accounts: [],
+    labels: [],
     txns: [txn({ id: 't1', category })],
     pay: [],
     balances: [],

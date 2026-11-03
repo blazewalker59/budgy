@@ -86,7 +86,8 @@ function householdName(name: string): string {
 
 function chosenTimeZone(timeZone: string | undefined): string {
   if (timeZone === undefined) return DEFAULT_TIME_ZONE
-  if (!isTimeZone(timeZone)) throw new UserError('Choose a time zone from the list')
+  if (!isTimeZone(timeZone))
+    throw new UserError('Choose a time zone from the list')
   return timeZone
 }
 

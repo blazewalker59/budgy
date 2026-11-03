@@ -9,18 +9,19 @@ import { householdRow } from '@/lib/households/scope'
 import { budgetTargets, categories } from '@/lib/db/schema'
 import { newCategory } from '@/lib/model/defaults'
 import { TRANSFER } from '@/lib/model/ledger'
+import { UserError } from '@/lib/errors'
 
 export async function saveTargets(
   db: Database,
   startsMonth: string,
   targets: ReadonlyArray<{ category: string; amount: number }>,
 ): Promise<void> {
-  if (!/^\d{4}-\d{2}$/.test(startsMonth)) throw new Error('Choose a month.')
+  if (!/^\d{4}-\d{2}$/.test(startsMonth)) throw new UserError('Choose a month.')
   if (targets.some((t) => t.category === TRANSFER))
-    throw new Error('Transfers have no Target.')
+    throw new UserError('Transfers have no Target.')
   const names = new Set(targets.map((t) => t.category))
   if (names.size !== targets.length)
-    throw new Error('Each category once, please.')
+    throw new UserError('Each category once, please.')
   if (!targets.length) return
   const statements = [
     ...[...names].map((name) =>

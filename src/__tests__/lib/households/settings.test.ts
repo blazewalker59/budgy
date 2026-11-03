@@ -28,6 +28,8 @@ const partner = {
   emailVerified: true,
 }
 const other = { id: 'other', email: 'other@example.com', emailVerified: true }
+/** Creators on ALLOWED_EMAILS. */
+const CREATORS = 'owner@example.com,other@example.com'
 const open: Array<DatabaseSync> = []
 afterEach(() => {
   for (const sqlite of open.splice(0)) sqlite.close()
@@ -39,11 +41,11 @@ async function fixture() {
   await db
     .insert(user)
     .values([owner, partner, other].map((p) => ({ ...p, name: p.id })))
-  const ours = await createHousehold(db, owner, 'Ours', {
+  const ours = await createHousehold(db, owner, 'Ours', CREATORS, {
     timeZone: 'America/Chicago',
     people: ['Sam', ' Riley '],
   })
-  const theirs = await createHousehold(db, other, 'Theirs')
+  const theirs = await createHousehold(db, other, 'Theirs', CREATORS)
   return { db, newClient, ours, theirs }
 }
 
@@ -98,7 +100,9 @@ describe('Creating a Household with its basics', () => {
     open.push(sqlite)
     await db.insert(user).values({ ...owner, name: 'owner' })
     await expect(
-      createHousehold(db, owner, 'Ours', { timeZone: 'Nowhere/Land' }),
+      createHousehold(db, owner, 'Ours', CREATORS, {
+        timeZone: 'Nowhere/Land',
+      }),
     ).rejects.toThrow('Choose a time zone from the list')
     expect(await findMemberHousehold(db, owner.id)).toBeNull()
     expect(

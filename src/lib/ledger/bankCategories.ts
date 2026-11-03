@@ -18,6 +18,7 @@ import {
   storeBankCategories,
 } from '@/lib/import/bankCategories'
 import { TRANSFER } from '@/lib/model/ledger'
+import { UserError } from '@/lib/errors'
 
 export interface BankCategoryUse {
   /** As the bank names it (the most common spelling). */
@@ -102,11 +103,11 @@ export async function fileBankCategory(
   category: string | null,
 ): Promise<{ moved: number }> {
   const key = bankKey(name)
-  if (!key) throw new Error('Name the bank’s category.')
+  if (!key) throw new UserError('Name the bank’s category.')
   if (category !== null) {
     category = category.trim()
     if (!category || category === UNCATEGORIZED)
-      throw new Error('Choose a category.')
+      throw new UserError('Choose a category.')
     if (category !== TRANSFER) await ensureCategory(db, category)
   }
   const meanings = await loadBankCategories(db)

@@ -1,3 +1,4 @@
+import { UserError } from '@/lib/errors'
 /**
  * A Household's basics as a Member sets them: its time zone and the people
  * in it. Pure, so the browser and the server check them the same way.
@@ -55,13 +56,13 @@ export function cleanOwners(people: ReadonlyArray<string>): Array<string> {
     const name = raw.trim().replace(/\s+/g, ' ')
     if (!name) continue
     if (name.length > MAX_PERSON)
-      throw new Error(`Keep each name to ${MAX_PERSON} characters`)
+      throw new UserError(`Keep each name to ${MAX_PERSON} characters`)
     if (seen.has(name.toLowerCase())) continue
     seen.add(name.toLowerCase())
     out.push(name)
   }
   if (out.length > MAX_PEOPLE + 1)
-    throw new Error(`Name up to ${MAX_PEOPLE} people`)
+    throw new UserError(`Name up to ${MAX_PEOPLE} people`)
   return out
 }
 

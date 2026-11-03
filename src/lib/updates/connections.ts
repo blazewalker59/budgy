@@ -269,7 +269,7 @@ export async function mapBankAccount(
 /** A discovered account Budgy can feed from. */
 function linkable(found: { currency: string }) {
   if (found.currency.toUpperCase() !== 'USD')
-    throw new Error('Budgy only supports USD accounts.')
+    throw new UserError('Budgy only supports USD accounts.')
 }
 
 /** For a discovered account: a new Budgy Account for it, or an existing one. */
@@ -312,17 +312,17 @@ export async function addBankAccounts(
         b.providerId === choice.providerId,
     )
     if (!found || !found.present)
-      throw new Error('That bank account no longer exists.')
-    if (chosen.has(key)) throw new Error(`${found.name} is chosen twice.`)
+      throw new UserError('That bank account no longer exists.')
+    if (chosen.has(key)) throw new UserError(`${found.name} is chosen twice.`)
     chosen.add(key)
     if (found.account)
-      throw new Error(`${found.name} already feeds ${found.account}.`)
+      throw new UserError(`${found.name} already feeds ${found.account}.`)
     linkable(found)
     let name: string
     if ('create' in choice) {
       name = choice.create.name.trim()
       if (byName.has(name.toLowerCase()))
-        throw new Error(`There's already an account named ${name}.`)
+        throw new UserError(`There's already an account named ${name}.`)
       statements.push(
         db.insert(accounts).values(
           householdRow(db, {
@@ -339,15 +339,16 @@ export async function addBankAccounts(
       added++
     } else {
       const account = byName.get(choice.link.trim().toLowerCase())
-      if (!account) throw new Error(`No account named "${choice.link}".`)
-      if (account.closed) throw new Error(`Reopen ${account.name} to link it.`)
+      if (!account) throw new UserError(`No account named "${choice.link}".`)
+      if (account.closed)
+        throw new UserError(`Reopen ${account.name} to link it.`)
       const feeding = fed.get(account.name.toLowerCase())
       if (feeding)
-        throw new Error(`${account.name} is already linked to ${feeding}.`)
+        throw new UserError(`${account.name} is already linked to ${feeding}.`)
       name = account.name
     }
     if (names.has(name.toLowerCase()))
-      throw new Error(`${name} is chosen for two bank accounts.`)
+      throw new UserError(`${name} is chosen for two bank accounts.`)
     names.add(name.toLowerCase())
     statements.push(
       db

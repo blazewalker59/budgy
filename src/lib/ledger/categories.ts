@@ -28,6 +28,7 @@ import {
   bankKey,
   storeBankCategories,
 } from '@/lib/import/bankCategories'
+import { UserError } from '@/lib/errors'
 
 /** Not Categories a Member can rename, hide or delete. */
 const FIXED = new Set([TRANSFER, UNCATEGORIZED].map((n) => n.toLowerCase()))
@@ -38,13 +39,13 @@ async function findCategory(db: Database, name: string) {
     .from(categories)
     .where(inHousehold(db, categories, eq(categories.name, name)))
     .get()
-  if (!found) throw new Error(`There’s no category called ${name}.`)
+  if (!found) throw new UserError(`There’s no category called ${name}.`)
   return found
 }
 
 function changeable(name: string) {
   if (FIXED.has(name.toLowerCase()))
-    throw new Error(`${name} can’t be changed.`)
+    throw new UserError(`${name} can’t be changed.`)
 }
 
 export interface CategoryUses {
@@ -156,7 +157,7 @@ export async function renameCategory(
   to = to.trim()
   changeable(from)
   if (!to || to.length > 60)
-    throw new Error('Name the category (up to 60 characters).')
+    throw new UserError('Name the category (up to 60 characters).')
   changeable(to)
   if (to === from) return
   await findCategory(db, from)
@@ -171,7 +172,7 @@ export async function renameCategory(
       ),
     )
   if (taken.some((c) => c.name !== from) || inUse(await categoryUses(db, to)))
-    throw new Error(`There’s already a category called ${to}.`)
+    throw new UserError(`There’s already a category called ${to}.`)
 
   const [lenses, dismissed, meanings] = await Promise.all([
     lensesNaming(db, from, to),
@@ -266,7 +267,7 @@ export async function deleteCategory(db: Database, name: string) {
   changeable(name)
   await findCategory(db, name)
   if (inUse(await categoryUses(db, name)))
-    throw new Error(`${name} is in use. Hide it instead.`)
+    throw new UserError(`${name} is in use. Hide it instead.`)
   const lenses = await lensesNaming(db, name, null)
   const unused = and(
     sql`not exists (select 1 from ${transactions} where ${transactions.householdId} = ${db.householdId} and (${transactions.category} = ${name} or ${transactions.sourceCategory} = ${name}))`,
@@ -280,7 +281,7 @@ export async function deleteCategory(db: Database, name: string) {
     .delete(categories)
     .where(inHousehold(db, categories, and(eq(categories.name, name), unused)))
     .returning({ name: categories.name })
-  if (!gone.length) throw new Error(`${name} is in use. Hide it instead.`)
+  if (!gone.length) throw new UserError(`${name} is in use. Hide it instead.`)
   for (const l of lenses)
     await db
       .update(savedLenses)

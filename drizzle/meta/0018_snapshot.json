@@ -103,9 +103,7 @@
       "indexes": {
         "account_userId_idx": {
           "name": "account_userId_idx",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -114,12 +112,8 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -159,22 +153,15 @@
           "name": "account_inputs_household_id_households_id_fk",
           "tableFrom": "account_inputs",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "account_inputs_household_id_account_pk": {
-          "columns": [
-            "household_id",
-            "account"
-          ],
+          "columns": ["household_id", "account"],
           "name": "account_inputs_household_id_account_pk"
         }
       },
@@ -219,22 +206,15 @@
           "name": "account_update_locks_household_id_households_id_fk",
           "tableFrom": "account_update_locks",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "account_update_locks_household_id_account_pk": {
-          "columns": [
-            "household_id",
-            "account"
-          ],
+          "columns": ["household_id", "account"],
           "name": "account_update_locks_household_id_account_pk"
         }
       },
@@ -373,11 +353,7 @@
       "indexes": {
         "account_updates_account_idx": {
           "name": "account_updates_account_idx",
-          "columns": [
-            "household_id",
-            "account",
-            "started_at"
-          ],
+          "columns": ["household_id", "account", "started_at"],
           "isUnique": false
         }
       },
@@ -386,22 +362,15 @@
           "name": "account_updates_household_id_households_id_fk",
           "tableFrom": "account_updates",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "account_updates_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "account_updates_household_id_id_pk"
         }
       },
@@ -484,22 +453,15 @@
           "name": "accounts_household_id_households_id_fk",
           "tableFrom": "accounts",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "accounts_household_id_name_pk": {
-          "columns": [
-            "household_id",
-            "name"
-          ],
+          "columns": ["household_id", "name"],
           "name": "accounts_household_id_name_pk"
         }
       },
@@ -590,16 +552,12 @@
       "indexes": {
         "api_tokens_token_hash_unique": {
           "name": "api_tokens_token_hash_unique",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "api_tokens_member_idx": {
           "name": "api_tokens_member_idx",
-          "columns": [
-            "member_id"
-          ],
+          "columns": ["member_id"],
           "isUnique": false
         }
       },
@@ -608,12 +566,8 @@
           "name": "api_tokens_household_id_households_id_fk",
           "tableFrom": "api_tokens",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -675,23 +629,15 @@
           "name": "balances_household_id_households_id_fk",
           "tableFrom": "balances",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "balances_household_id_account_date_pk": {
-          "columns": [
-            "household_id",
-            "account",
-            "date"
-          ],
+          "columns": ["household_id", "account", "date"],
           "name": "balances_household_id_account_date_pk"
         }
       },
@@ -776,10 +722,7 @@
       "indexes": {
         "bank_accounts_account_unique": {
           "name": "bank_accounts_account_unique",
-          "columns": [
-            "household_id",
-            "account"
-          ],
+          "columns": ["household_id", "account"],
           "isUnique": true
         }
       },
@@ -788,23 +731,15 @@
           "name": "bank_accounts_household_id_households_id_fk",
           "tableFrom": "bank_accounts",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "bank_accounts_household_id_connection_id_provider_id_pk": {
-          "columns": [
-            "household_id",
-            "connection_id",
-            "provider_id"
-          ],
+          "columns": ["household_id", "connection_id", "provider_id"],
           "name": "bank_accounts_household_id_connection_id_provider_id_pk"
         }
       },
@@ -904,16 +839,12 @@
       "indexes": {
         "bank_connections_access_hash_unique": {
           "name": "bank_connections_access_hash_unique",
-          "columns": [
-            "access_hash"
-          ],
+          "columns": ["access_hash"],
           "isUnique": true
         },
         "bank_connections_household_idx": {
           "name": "bank_connections_household_idx",
-          "columns": [
-            "household_id"
-          ],
+          "columns": ["household_id"],
           "isUnique": false
         }
       },
@@ -922,12 +853,8 @@
           "name": "bank_connections_household_id_households_id_fk",
           "tableFrom": "bank_connections",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -974,23 +901,15 @@
           "name": "budget_targets_household_id_households_id_fk",
           "tableFrom": "budget_targets",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "budget_targets_household_id_category_starts_month_pk": {
-          "columns": [
-            "household_id",
-            "category",
-            "starts_month"
-          ],
+          "columns": ["household_id", "category", "starts_month"],
           "name": "budget_targets_household_id_category_starts_month_pk"
         }
       },
@@ -1051,22 +970,15 @@
           "name": "categories_household_id_households_id_fk",
           "tableFrom": "categories",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "categories_household_id_name_pk": {
-          "columns": [
-            "household_id",
-            "name"
-          ],
+          "columns": ["household_id", "name"],
           "name": "categories_household_id_name_pk"
         }
       },
@@ -1144,23 +1056,17 @@
       "indexes": {
         "household_invites_token_hash_unique": {
           "name": "household_invites_token_hash_unique",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "household_invites_email_idx": {
           "name": "household_invites_email_idx",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": false
         },
         "household_invites_household_idx": {
           "name": "household_invites_household_idx",
-          "columns": [
-            "household_id"
-          ],
+          "columns": ["household_id"],
           "isUnique": false
         }
       },
@@ -1169,12 +1075,8 @@
           "name": "household_invites_household_id_households_id_fk",
           "tableFrom": "household_invites",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1219,9 +1121,7 @@
       "indexes": {
         "household_members_member_unique": {
           "name": "household_members_member_unique",
-          "columns": [
-            "member_id"
-          ],
+          "columns": ["member_id"],
           "isUnique": true
         }
       },
@@ -1230,22 +1130,15 @@
           "name": "household_members_household_id_households_id_fk",
           "tableFrom": "household_members",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "household_members_household_id_member_id_pk": {
-          "columns": [
-            "household_id",
-            "member_id"
-          ],
+          "columns": ["household_id", "member_id"],
           "name": "household_members_household_id_member_id_pk"
         }
       },
@@ -1367,22 +1260,15 @@
           "name": "imports_household_id_households_id_fk",
           "tableFrom": "imports",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "imports_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "imports_household_id_id_pk"
         }
       },
@@ -1502,19 +1388,12 @@
       "indexes": {
         "money_in_month_idx": {
           "name": "money_in_month_idx",
-          "columns": [
-            "household_id",
-            "month"
-          ],
+          "columns": ["household_id", "month"],
           "isUnique": false
         },
         "money_in_source_unique": {
           "name": "money_in_source_unique",
-          "columns": [
-            "household_id",
-            "account",
-            "source_key"
-          ],
+          "columns": ["household_id", "account", "source_key"],
           "isUnique": true
         }
       },
@@ -1523,22 +1402,15 @@
           "name": "money_in_household_id_households_id_fk",
           "tableFrom": "money_in",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "money_in_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "money_in_household_id_id_pk"
         }
       },
@@ -1612,22 +1484,15 @@
           "name": "pay_schedules_household_id_households_id_fk",
           "tableFrom": "pay_schedules",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "pay_schedules_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "pay_schedules_household_id_id_pk"
         }
       },
@@ -1716,22 +1581,15 @@
           "name": "planned_expenses_household_id_households_id_fk",
           "tableFrom": "planned_expenses",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "planned_expenses_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "planned_expenses_household_id_id_pk"
         }
       },
@@ -1773,9 +1631,7 @@
       "indexes": {
         "rate_limit_key_unique": {
           "name": "rate_limit_key_unique",
-          "columns": [
-            "key"
-          ],
+          "columns": ["key"],
           "isUnique": true
         }
       },
@@ -1837,22 +1693,15 @@
           "name": "saved_lenses_household_id_households_id_fk",
           "tableFrom": "saved_lenses",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "saved_lenses_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "saved_lenses_household_id_id_pk"
         }
       },
@@ -1923,16 +1772,12 @@
       "indexes": {
         "session_token_unique": {
           "name": "session_token_unique",
-          "columns": [
-            "token"
-          ],
+          "columns": ["token"],
           "isUnique": true
         },
         "session_userId_idx": {
           "name": "session_userId_idx",
-          "columns": [
-            "user_id"
-          ],
+          "columns": ["user_id"],
           "isUnique": false
         }
       },
@@ -1941,12 +1786,8 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1994,22 +1835,15 @@
           "name": "settings_household_id_households_id_fk",
           "tableFrom": "settings",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "settings_household_id_key_pk": {
-          "columns": [
-            "household_id",
-            "key"
-          ],
+          "columns": ["household_id", "key"],
           "name": "settings_household_id_key_pk"
         }
       },
@@ -2061,23 +1895,15 @@
           "name": "store_rules_household_id_households_id_fk",
           "tableFrom": "store_rules",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "store_rules_household_id_source_category_store_pk": {
-          "columns": [
-            "household_id",
-            "source_category",
-            "store"
-          ],
+          "columns": ["household_id", "source_category", "store"],
           "name": "store_rules_household_id_source_category_store_pk"
         }
       },
@@ -2190,19 +2016,12 @@
       "indexes": {
         "transactions_month_idx": {
           "name": "transactions_month_idx",
-          "columns": [
-            "household_id",
-            "month"
-          ],
+          "columns": ["household_id", "month"],
           "isUnique": false
         },
         "transactions_source_unique": {
           "name": "transactions_source_unique",
-          "columns": [
-            "household_id",
-            "account",
-            "source_key"
-          ],
+          "columns": ["household_id", "account", "source_key"],
           "isUnique": true
         }
       },
@@ -2211,22 +2030,15 @@
           "name": "transactions_household_id_households_id_fk",
           "tableFrom": "transactions",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {
         "transactions_household_id_id_pk": {
-          "columns": [
-            "household_id",
-            "id"
-          ],
+          "columns": ["household_id", "id"],
           "name": "transactions_household_id_id_pk"
         }
       },
@@ -2318,17 +2130,12 @@
       "indexes": {
         "upload_tokens_token_hash_unique": {
           "name": "upload_tokens_token_hash_unique",
-          "columns": [
-            "token_hash"
-          ],
+          "columns": ["token_hash"],
           "isUnique": true
         },
         "upload_tokens_account_idx": {
           "name": "upload_tokens_account_idx",
-          "columns": [
-            "household_id",
-            "account"
-          ],
+          "columns": ["household_id", "account"],
           "isUnique": false
         }
       },
@@ -2337,12 +2144,8 @@
           "name": "upload_tokens_household_id_households_id_fk",
           "tableFrom": "upload_tokens",
           "tableTo": "households",
-          "columnsFrom": [
-            "household_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["household_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -2410,9 +2213,7 @@
       "indexes": {
         "user_email_unique": {
           "name": "user_email_unique",
-          "columns": [
-            "email"
-          ],
+          "columns": ["email"],
           "isUnique": true
         }
       },
@@ -2472,9 +2273,7 @@
       "indexes": {
         "verification_identifier_idx": {
           "name": "verification_identifier_idx",
-          "columns": [
-            "identifier"
-          ],
+          "columns": ["identifier"],
           "isUnique": false
         }
       },

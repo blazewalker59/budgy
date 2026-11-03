@@ -9,7 +9,23 @@ const mocks = vi.hoisted(() => ({
   keep: vi.fn(),
   pairs: [] as Array<unknown>,
 }))
-vi.mock('@/lib/ledger/book', () => ({ useBook: () => ({ ix: {} }) }))
+vi.mock('@/lib/ledger/book', () => ({
+  useBook: () => ({
+    ix: {
+      ledger: {
+        accounts: [
+          {
+            name: 'Sam Apple Card',
+            owner: 'Sam',
+            label: 'Sam',
+            displayName: 'Apple Card',
+          },
+        ],
+        labels: [{ name: 'Sam', color: 'teal' }],
+      },
+    },
+  }),
+}))
 vi.mock('@/lib/ledger/useLedger', () => ({
   useMergeDuplicate: () => ({ mutate: mocks.merge, isPending: false }),
   useKeepDuplicate: () => ({ mutate: mocks.keep, isPending: false }),
@@ -65,9 +81,12 @@ describe('Duplicates', () => {
     fireEvent.click(screen.getByRole('button', { name: /2 possible/ }))
     expect(screen.getAllByRole('button', { name: 'Merge' })).toHaveLength(2)
     // Only how the two differ: where each came from, a second name.
-    expect(
-      screen.getByText(/Sam Apple Card · Shopping · starting \+ bank sync/),
-    ).toBeTruthy()
+    const line = screen.getAllByText(/· Shopping · starting \+ bank sync/)[0]
+    // The Account by its label chip and short name, its full name spoken.
+    expect(line.textContent).toMatch(
+      /^SamApple CardSam Apple Card · Shopping · starting \+ bank sync$/,
+    )
+    expect(line.querySelector('.sr-only')?.textContent).toBe('Sam Apple Card')
     expect(screen.getByText('/ Delta Air Lines')).toBeTruthy()
 
     fireEvent.click(screen.getAllByRole('button', { name: 'Merge' })[0])

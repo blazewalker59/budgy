@@ -10,6 +10,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { FileUp, Trash2 } from 'lucide-react'
 import { OwnerInput } from './AccountsScreen'
 import { RemoveStarting } from './RemoveStarting'
+import { AccountName } from './AccountName'
+import { LabelFields } from './AccountLabels'
 import type { Account, AccountKind } from '@/lib/model/types'
 import type { ParsedHistory } from '@/lib/import/history'
 import type { PostSummary } from '@/lib/ledger/server'
@@ -69,7 +71,23 @@ export function AccountSheet({
   if (!account) return null
   const debt = isDebt(account)
   return (
-    <Sheet title={name} onClose={onClose}>
+    <Sheet
+      title={name}
+      heading={
+        account.label || account.displayName ? (
+          <span className="flex min-w-0 flex-col">
+            <AccountName account={account} chipClassName="text-xs" />
+            <span
+              aria-hidden
+              className="truncate text-xs font-normal text-muted"
+            >
+              {name}
+            </span>
+          </span>
+        ) : undefined
+      }
+      onClose={onClose}
+    >
       <Details account={account} />
       {account.kind === 'property' && <EquityLine name={name} />}
       <UpdateBalance account={account} today={book.today} />
@@ -130,7 +148,10 @@ export function AccountSheet({
   )
 }
 
-/** Owner, kind and institution, and for a loan, what it's against. */
+/**
+ * Owner, kind and institution, for a loan what it's against, and its label
+ * and "Shown as".
+ */
 function Details({ account }: { account: Account }) {
   const { ix } = useBook()
   const saveAccount = useSaveAccount()
@@ -140,7 +161,7 @@ function Details({ account }: { account: Account }) {
   const [owner, setOwner] = useState(account.owner)
   const [institution, setInstitution] = useState(account.institution ?? '')
   const save = (patch: Partial<Account>) => {
-    const { sourceName: _s, ...rest } = account
+    const { sourceName: _s, label: _l, displayName: _d, ...rest } = account
     saveAccount.mutate({ ...rest, ...patch, isNew: false })
   }
   return (
@@ -190,6 +211,7 @@ function Details({ account }: { account: Account }) {
           />
         </label>
       )}
+      <LabelFields account={account} />
     </section>
   )
 }
@@ -214,7 +236,7 @@ function CloseOrDelete({
   const recordBalances = useRecordBalances()
   const [asking, setAsking] = useState<'close' | 'delete' | null>(null)
   const save = (closed: boolean) => {
-    const { sourceName: _s, ...rest } = account
+    const { sourceName: _s, label: _l, displayName: _d, ...rest } = account
     saveAccount.mutate({ ...rest, closed, isNew: false })
   }
   if (asking === 'close')

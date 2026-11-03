@@ -33,6 +33,7 @@ import {
   SIMPLEFIN_BRIDGE,
 } from '@/components/accounts/BankConnections'
 import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
+import { AccountName } from '@/components/accounts/AccountName'
 import { Dropdown } from '@/components/shared/Dropdown'
 
 type UpdateState = NonNullable<
@@ -252,8 +253,15 @@ function SignInRow({
           className={`size-2 shrink-0 rounded-full ${TONE_DOT.nice}`}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold">
-            {accounts.map((a) => a.name).join(', ')}
+          <span className="flex min-w-0 items-center overflow-hidden whitespace-nowrap text-sm font-semibold">
+            {accounts.map((a, i) => (
+              <span key={a.name} className="inline-flex min-w-0 items-center">
+                <AccountName account={a} />
+                {i < accounts.length - 1 && (
+                  <span className="whitespace-pre">, </span>
+                )}
+              </span>
+            ))}
           </span>
           <span className="block truncate text-xs text-nice">
             Sign in to {institution} in Bridge
@@ -313,9 +321,12 @@ function AccountRow({
             className={`size-2 shrink-0 rounded-full ${TONE_DOT[line.tone]}`}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold">
-              {account.name}
-              <span className="font-normal text-muted"> · {account.owner}</span>
+            <span className="flex min-w-0 items-center text-sm font-semibold">
+              <AccountName account={account} />
+              <span className="shrink-0 whitespace-pre font-normal text-muted">
+                {' · '}
+                {account.owner}
+              </span>
             </span>
             <span className={`block truncate text-xs ${TONE_TEXT[line.tone]}`}>
               {line.text}

@@ -35,7 +35,18 @@ const mocks = vi.hoisted(() => ({
   retry: vi.fn(),
   accounts: [
     { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
-  ] as Array<{ name: string; owner: string; kind: string; closed: boolean }>,
+  ] as Array<{
+    name: string
+    owner: string
+    kind: string
+    closed: boolean
+    label?: string
+    displayName?: string
+  }>,
+  labels: [
+    { name: 'Addie', color: 'pink' },
+    { name: 'Asher', color: 'blue' },
+  ],
 }))
 vi.mock('@/lib/updates/server', () => ({
   getAccountUpdates: mocks.get,
@@ -67,6 +78,7 @@ vi.mock('@/lib/ledger/book', () => ({
     ix: {
       ledger: {
         accounts: mocks.accounts,
+        labels: mocks.labels,
         balances: [],
       },
     },
@@ -570,6 +582,70 @@ describe('Unified Account Updates UI', () => {
       const done = screen.getByText(/Up to date · 1/).parentElement!
       expect(done.textContent).toContain('Home')
       expect(done.textContent).toContain('No balance yet')
+    } finally {
+      mocks.accounts.splice(1)
+    }
+  })
+
+  it('names labelled Accounts by chip and Shown as, on rows and a bank’s sign-in row', async () => {
+    mocks.accounts.push(
+      {
+        name: 'Addie 529',
+        owner: 'Joint',
+        kind: 'education',
+        closed: false,
+        label: 'Addie',
+        displayName: '529',
+      },
+      {
+        name: 'Asher 529',
+        owner: 'Joint',
+        kind: 'education',
+        closed: false,
+        label: 'Asher',
+        displayName: '529',
+      },
+      {
+        name: 'Home',
+        owner: 'Joint',
+        kind: 'property',
+        closed: false,
+        label: 'Asher',
+      },
+    )
+    try {
+      mocks.get.mockResolvedValue([empty])
+      const [connection] = feeding('attention', null)
+      const reauth = {
+        ...connection.accounts[0],
+        institution: 'Path2College',
+        problem: 'Path2College needs you to sign in again in SimpleFIN Bridge.',
+        problemKind: 'reauth',
+      }
+      mocks.connections.mockResolvedValue([
+        {
+          ...connection,
+          accounts: [
+            { ...reauth, providerId: 'p1', account: 'Addie 529' },
+            { ...reauth, providerId: 'p2', account: 'Asher 529' },
+          ],
+        },
+      ])
+      mount()
+      const sign = (
+        await screen.findByText('Sign in to Path2College in Bridge')
+      ).closest('li')!
+      // Chips and short names; each Account's full name is spoken.
+      expect(sign.textContent).toBe(
+        'Addie529Addie 529, Asher529Asher 529Sign in to Path2College in BridgeOpen Bridge',
+      )
+      expect(
+        [...sign.querySelectorAll('.sr-only')].map((s) => s.textContent),
+      ).toEqual(['Addie 529', 'Asher 529'])
+      // A label without a Shown as: the chip, then the full name.
+      const home = screen.getByRole('button', { name: /^Home \(Asher\)/ })
+      expect(home.textContent).toContain('AsherHome')
+      expect(home.textContent).toContain(' · Joint')
     } finally {
       mocks.accounts.splice(1)
     }

@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ChevronDown, ChevronRight, Plus, Receipt } from 'lucide-react'
 import { AccountSheet } from './AccountSheet'
 import { AccountUpdates } from './AccountUpdates'
+import { AccountName, AccountRef } from './AccountName'
 import { RemoveStarting } from './RemoveStarting'
 import { Baseline, WorthSheet, dayWithYear } from './WorthSheet'
 import { RulesTab } from './RulesTab'
@@ -303,7 +304,7 @@ function StartingPurchases({ onOpen }: { onOpen: (name: string) => void }) {
                   onClick={() => onOpen(name)}
                   className="rounded-full border border-border bg-sunken px-2 py-0.5 font-semibold hover:border-accent"
                 >
-                  {name}{' '}
+                  <AccountRef name={name} />{' '}
                   <span className="font-normal text-muted">
                     {n.toLocaleString()}
                   </span>
@@ -356,7 +357,7 @@ function AccountRow({
             className="size-2 shrink-0 rounded-full"
             style={{ background: ownerColor(a.owner) }}
           />
-          <span className="truncate">{a.name}</span>
+          <AccountName account={a} />
           <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden />
         </span>
         <span className="text-right font-semibold tabular-nums">

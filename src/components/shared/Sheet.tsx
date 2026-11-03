@@ -24,10 +24,13 @@ const open: Array<symbol> = []
  */
 export function Sheet({
   title,
+  heading,
   onClose,
   children,
 }: {
   title: string
+  /** Shown in place of the title (which still names the sheet). */
+  heading?: React.ReactNode
   onClose: () => void
   /** Or, to close it the way Done does: a function given that close. */
   children: React.ReactNode | ((dismiss: () => void) => React.ReactNode)
@@ -136,7 +139,9 @@ export function Sheet({
             <span className="h-1.5 w-10 rounded-full bg-muted/40" />
           </div>
           <div className="flex items-center gap-3 border-b border-border px-4 pb-3">
-            <span className="flex-1 text-base font-bold">{title}</span>
+            <span className="min-w-0 flex-1 text-base font-bold">
+              {heading ?? title}
+            </span>
             <button
               ref={close}
               type="button"

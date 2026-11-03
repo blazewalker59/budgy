@@ -20,6 +20,7 @@ import { ownerColor } from '@/lib/format'
 import { CategorySelect } from '@/components/shared/CategorySelect'
 import { Dropdown } from '@/components/shared/Dropdown'
 import { Segmented, Stat } from '@/components/shared/Layout'
+import { AccountRef } from '@/components/accounts/AccountName'
 
 type Show = 'review' | 'all'
 
@@ -155,7 +156,7 @@ function MoneyInRow({ item: m }: { item: MoneyIn }) {
             style={{ background: ownerColor(owner) }}
             title={owner}
           />
-          {m.account} · {m.description}
+          <AccountRef name={m.account} /> · {m.description}
         </p>
       </div>
       <span className="text-right font-semibold tabular-nums text-accent">

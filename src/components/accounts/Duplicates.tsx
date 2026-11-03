@@ -14,6 +14,7 @@ import { possibleDuplicates } from '@/lib/model/duplicates'
 import { categoryOf } from '@/lib/model/ledger'
 import { dayLabel } from '@/lib/model/dates'
 import { money } from '@/lib/model/money'
+import { AccountRef } from '@/components/accounts/AccountName'
 
 export function Duplicates() {
   const { ix } = useBook()
@@ -77,7 +78,8 @@ function Pair({ pair }: { pair: DuplicatePair }) {
           <span className="text-muted"> · {dayLabel(stays.date)}</span>
         </p>
         <p className="truncate text-xs text-muted">
-          {stays.account} · {categoryOf(ix, stays)} · {sourceOf(stays)}
+          <AccountRef name={stays.account} /> · {categoryOf(ix, stays)} ·{' '}
+          {sourceOf(stays)}
           {sourceOf(goes) !== sourceOf(stays) && ` + ${sourceOf(goes)}`}
         </p>
         {(merge.error || keep.error) && (

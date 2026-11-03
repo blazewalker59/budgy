@@ -12,9 +12,12 @@ Ledger. Creation and invitation details are in
 [ADR 0008](docs/adr/0008-household-creation-and-invitations.md); migration
 and the next sync slices are in [ADR 0007](docs/adr/0007-household-isolation.md).
 
-New creators name their Household after signing in, then choose **Household**
-in the account menu to create and copy a partner's invitation link. The
-partner signs in with the invited Google email and explicitly accepts. Links
+New creators name their Household after signing in, with its time zone and
+people, then land on **Setup** ([ADR 0013](docs/adr/0013-guided-setup.md)):
+inviting a partner, reviewing Categories, connecting accounts, history,
+sorting spending, pay, Targets and bills, with a "Finish setup" checklist on
+Overview until it's done. The invitation link is made on Setup or under
+**Household** in the account menu. The partner signs in with the invited Google email and explicitly accepts. Links
 expire after seven days; Budgy does not email them automatically. Owners can
 revoke links, remove Members and transfer ownership. Public signup is not on:
 add a friend's creator email to `ALLOWED_EMAILS`; partners need only an invite.

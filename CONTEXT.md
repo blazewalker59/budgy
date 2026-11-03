@@ -8,7 +8,9 @@ not a spec.
 
 **Household**:
 The people who share one Ledger. Each Household's Ledger is isolated from
-every other Household (docs/adr/0007).
+every other Household (docs/adr/0007). It has a name, a time zone (when its
+day and month start) and its people: Joint plus the names spending is filed
+to, which needn't be Members. Any Member can change these.
 
 **Member**:
 Someone in the Household, admitted through explicit membership
@@ -90,7 +92,16 @@ _Avoid_: merchant, payee
 
 **Category**:
 Where spending is counted: Groceries, Kids, Subscriptions… Each has a **Tag**
-and a **Group**.
+and a **Group**. A rename changes it everywhere it's named. A **hidden**
+Category leaves pickers and the Budget but its purchases still count; only
+one nothing is filed under can be deleted.
+
+**Bank category**:
+The category a bank or finance app gave a purchase ("Restaurants"), kept as
+it came. One with a Category's name is that Category. For the rest, a
+Member can say which Category it means: its purchases still Uncategorized,
+and every later import, are filed there as their import Category, so Moves
+and Store Rules still win. A renamed Category's old name means the new one.
 
 **Tag**:
 How much a Category (or a Store) matters: **Need**, **Nice to have**, or
@@ -112,6 +123,13 @@ purchase and choosing "Always" makes; a rule for one import Category wins
 over it. Store names match in any case. Members manage them on Filing rules,
 where Stores Moved to one Category again and again are suggested as rules;
 a dismissed suggestion stays away for the whole Household.
+
+**Setup**:
+The steps a new Household walks through: its basics, inviting a partner,
+reviewing Categories, connecting money, bringing in history, sorting
+spending, pay, Targets and bills. Each is done when the Ledger shows it
+(an Account, a Pay Schedule, a Target…); a Member can skip one, or put the
+"Finish setup" checklist away (docs/adr/0013).
 
 **Note**:
 A Member's few words on a Transaction, usually why it was Moved.

@@ -14,7 +14,9 @@ email-bound invitations are in production.
 - Registration stays closed: `ALLOWED_EMAILS` admits initial creators.
   An active invitation admits its email for Google sign-in; an accepted Member
   can continue signing in without a deployment-secret change. Neither a signup
-  nor opening a link automatically accepts the invitation.
+  nor opening a link automatically accepts the invitation. Only an allowlisted
+  creator may start a Household (`canCreateHousehold`); an invitee who signs in
+  can join, not create one of their own and stay admitted through it.
 - The original `hh_initial` additionally retains its old allowlist gate for
   migrated memberships. A historical user removed from the allowlist must not
   regain that Ledger merely by migration, or by a pending invite elsewhere.

@@ -11,7 +11,7 @@ import {
   transferOwnership,
 } from './service'
 import { requireMember, withMember } from '@/lib/auth/session'
-import { getDb } from '@/lib/db'
+import { getCloudflareEnv, getDb } from '@/lib/db'
 
 const TOKEN = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
 export const getHousehold = createServerFn({ method: 'GET' }).handler(() =>
@@ -23,7 +23,12 @@ export const startHousehold = createServerFn({ method: 'POST' })
     z.object({ name: z.string().trim().min(1).max(60) }).parse(data),
   )
   .handler(async ({ data }) =>
-    createHousehold(getDb(), await requireMember(), data.name),
+    createHousehold(
+      getDb(),
+      await requireMember(),
+      data.name,
+      getCloudflareEnv().ALLOWED_EMAILS,
+    ),
   )
 
 export const inviteToHousehold = createServerFn({ method: 'POST' })

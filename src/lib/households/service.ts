@@ -4,6 +4,7 @@ import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { DEFAULT_OWNERS } from './locale'
 import { findMemberHousehold, memberHousehold } from './membership'
 import { inHousehold } from './scope'
+import { canCreateHousehold } from './admission'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from './scope'
 import { hashToken } from '@/lib/agents/tokens'
@@ -70,8 +71,14 @@ export async function createHousehold(
   db: Database,
   actor: HouseholdActor,
   name: string,
+  allowedEmails: string | undefined,
 ): Promise<Household> {
   verified(actor)
+  // An invitation admits someone to join a Household, not to start one.
+  if (!(await canCreateHousehold(db, actor.email, allowedEmails)))
+    throw new Error(
+      'Budgy is invitation-only for now. Open the invitation link you were sent to join a Household.',
+    )
   name = name.trim()
   if (!name || name.length > 60)
     throw new Error('Name your Household (up to 60 characters)')

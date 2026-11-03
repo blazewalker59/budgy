@@ -102,7 +102,7 @@ describe('household time zone and owners', () => {
   it('gives a new Household its own zone and owners, not the original ones', async () => {
     const { db, sqlite, newClient } = testDatabase()
     open.push(sqlite)
-    const created = await createHousehold(db, actor, 'Friends')
+    const created = await createHousehold(db, actor, 'Friends', actor.email)
     expect(created.timeZone).toBe('America/New_York')
     expect(created.owners).toEqual(['Joint'])
     const scope = householdDatabase(newClient(), created.id)
@@ -149,7 +149,7 @@ describe('household time zone and owners', () => {
   it('files a synced purchase on that Household’s calendar day', async () => {
     const { db, sqlite, newClient } = testDatabase()
     open.push(sqlite)
-    const created = await createHousehold(db, actor, 'Island')
+    const created = await createHousehold(db, actor, 'Island', actor.email)
     await db
       .update(households)
       .set({ timeZone: 'Pacific/Kiritimati' })

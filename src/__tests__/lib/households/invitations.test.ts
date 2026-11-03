@@ -37,6 +37,8 @@ const stranger = {
   email: 'stranger@example.com',
   emailVerified: true,
 }
+/** Creators on ALLOWED_EMAILS; everyone else needs an invitation. */
+const CREATORS = 'owner@example.com, partner@example.com, stranger@example.com'
 const open: Array<DatabaseSync> = []
 afterEach(() => {
   for (const sqlite of open.splice(0)) sqlite.close()
@@ -51,7 +53,7 @@ async function fixture() {
       name: person.id,
     })),
   )
-  const household = await createHousehold(db, owner, 'Our budget')
+  const household = await createHousehold(db, owner, 'Our budget', CREATORS)
   const scope = await requireHousehold(newClient(), owner.id, household.id)
   return { db, sqlite, newClient, household, scope }
 }
@@ -75,21 +77,47 @@ describe('Household creation', () => {
   it('requires verified identity and rejects a second Household without orphan data', async () => {
     const { db } = await fixture()
     await expect(
-      createHousehold(db, { ...partner, emailVerified: false }, 'Nope'),
+      createHousehold(
+        db,
+        { ...partner, emailVerified: false },
+        'Nope',
+        CREATORS,
+      ),
     ).rejects.toThrow('verified')
-    await expect(createHousehold(db, owner, 'Another')).rejects.toThrow(
-      'already belong',
+    await expect(
+      createHousehold(db, owner, 'Another', CREATORS),
+    ).rejects.toThrow('already belong')
+    await expect(createHousehold(db, partner, '  ', CREATORS)).rejects.toThrow(
+      'Name',
     )
-    await expect(createHousehold(db, partner, '  ')).rejects.toThrow('Name')
     expect(await db.select().from(households)).toHaveLength(2) // initial + created
     expect(await findMemberHousehold(db, partner.id)).toBeNull()
+  })
+
+  it('lets an invitee sign in to join, but only an allowlisted creator start a Household', async () => {
+    const { db, scope } = await fixture()
+    const creatorsOnly = owner.email
+    await createInvite(scope, owner, partner.email)
+    expect(await canSignIn(db, partner.email, creatorsOnly)).toBe(true)
+    await expect(
+      createHousehold(db, partner, 'Ours instead', creatorsOnly),
+    ).rejects.toThrow('invitation-only')
+    expect(await findMemberHousehold(db, partner.id)).toBeNull()
+    expect(await db.select().from(households)).toHaveLength(2)
+    const allowed = await createHousehold(
+      db,
+      stranger,
+      'Theirs',
+      `${owner.email},${stranger.email.toUpperCase()}`,
+    )
+    expect(allowed.role).toBe('owner')
   })
 
   it('rolls back the losing simultaneous creation rather than leaving an orphan Ledger', async () => {
     const { db, newClient } = await fixture()
     const results = await Promise.allSettled([
-      createHousehold(db, partner, 'One'),
-      createHousehold(newClient(), partner, 'Two'),
+      createHousehold(db, partner, 'One', CREATORS),
+      createHousehold(newClient(), partner, 'Two', CREATORS),
     ])
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1)
     expect(
@@ -177,7 +205,7 @@ describe('Household invitations', () => {
 
   it('never merges or replaces a recipient’s existing Household', async () => {
     const { db, scope } = await fixture()
-    const other = await createHousehold(db, partner, 'Their budget')
+    const other = await createHousehold(db, partner, 'Their budget', CREATORS)
     const invite = await createInvite(scope, owner, partner.email)
     await expect(acceptInvite(db, partner, invite.token)).rejects.toThrow(
       'already belong',
@@ -304,7 +332,7 @@ describe('Household membership management', () => {
 
   it('cannot revoke or remove another Household’s data', async () => {
     const { db, scope, newClient } = await fixture()
-    const other = await createHousehold(db, stranger, 'Other')
+    const other = await createHousehold(db, stranger, 'Other', CREATORS)
     const otherScope = await requireHousehold(
       newClient(),
       stranger.id,

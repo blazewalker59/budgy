@@ -1,5 +1,6 @@
 /** During closed rollout, creators are allowlisted; invitees and existing
- * Members can sign in without editing deployment secrets. */
+ * Members can sign in without editing deployment secrets, but only a creator
+ * may start a Household (docs/adr/0008). */
 import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { LEGACY_HOUSEHOLD_ID } from './membership'
 import type { Database } from '@/lib/db'
@@ -66,4 +67,17 @@ export async function canSignIn(
     )
     .get()
   return Boolean(invite)
+}
+
+/**
+ * Whether this person may start a Household. Signing in is wider than this:
+ * an invitee is admitted to join, not to create. The one place a future
+ * creator grant (say, an operator-issued creator invitation) would be added.
+ */
+export function canCreateHousehold(
+  _db: Database,
+  email: string,
+  allowedEmails?: string,
+): Promise<boolean> {
+  return Promise.resolve(isAllowed(email, allowedEmails))
 }

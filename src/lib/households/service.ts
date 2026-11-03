@@ -2,6 +2,7 @@
  * as well as in server functions, so other entry points cannot bypass it. */
 import { and, eq, gt, isNull, sql } from 'drizzle-orm'
 import { DEFAULT_OWNERS } from './locale'
+import { cleanOwners, isTimeZone } from './basics'
 import { findMemberHousehold, memberHousehold } from './membership'
 import { inHousehold } from './scope'
 import { canCreateHousehold } from './admission'
@@ -69,11 +70,32 @@ async function requireOwner(db: HouseholdDatabase, actor: HouseholdActor) {
   if (!membership) throw new UserError('Only the Household owner can do this')
 }
 
+export interface HouseholdBasics {
+  /** IANA zone for the Household's "today"; the default if left out. */
+  timeZone?: string
+  /** The people in it, besides Joint (which is always there). */
+  people?: ReadonlyArray<string>
+}
+
+function householdName(name: string): string {
+  name = name.trim()
+  if (!name || name.length > 60)
+    throw new UserError('Name your Household (up to 60 characters)')
+  return name
+}
+
+function chosenTimeZone(timeZone: string | undefined): string {
+  if (timeZone === undefined) return DEFAULT_TIME_ZONE
+  if (!isTimeZone(timeZone)) throw new UserError('Choose a time zone from the list')
+  return timeZone
+}
+
 export async function createHousehold(
   db: Database,
   actor: HouseholdActor,
   name: string,
   allowedEmails: string | undefined,
+  basics: HouseholdBasics = {},
 ): Promise<Household> {
   verified(actor)
   // An invitation admits someone to join a Household, not to start one.
@@ -81,9 +103,9 @@ export async function createHousehold(
     throw new UserError(
       'Budgy is invitation-only for now. Open the invitation link you were sent to join a Household.',
     )
-  name = name.trim()
-  if (!name || name.length > 60)
-    throw new UserError('Name your Household (up to 60 characters)')
+  name = householdName(name)
+  const timeZone = chosenTimeZone(basics.timeZone)
+  const owners = basics.people ? cleanOwners(basics.people) : DEFAULT_OWNERS
   if (await findMemberHousehold(db, actor.id))
     throw new UserError('You already belong to a Household')
   const id = `hh_${crypto.randomUUID().replaceAll('-', '')}`
@@ -103,8 +125,8 @@ export async function createHousehold(
     db.insert(households).values({
       id,
       name,
-      timeZone: DEFAULT_TIME_ZONE,
-      owners: JSON.stringify(DEFAULT_OWNERS),
+      timeZone,
+      owners: JSON.stringify(owners),
     }),
     db
       .insert(householdMembers)
@@ -115,9 +137,38 @@ export async function createHousehold(
     id,
     name,
     role: 'owner',
-    timeZone: DEFAULT_TIME_ZONE,
-    owners: [...DEFAULT_OWNERS],
+    timeZone,
+    owners: [...owners],
   }
+}
+
+/**
+ * Change the Household's name, time zone and people. Any Member may: these
+ * shape the shared Ledger, like Categories, not who is in it (docs/adr/0013).
+ */
+export async function updateHouseholdSettings(
+  db: HouseholdDatabase,
+  actor: HouseholdActor,
+  settings: { name: string; timeZone: string; people: ReadonlyArray<string> },
+): Promise<Pick<Household, 'name' | 'timeZone' | 'owners'>> {
+  const household = await memberHousehold(db, actor.id)
+  if (household.id !== db.householdId)
+    throw new Error('Household access denied')
+  const next = {
+    name: householdName(settings.name),
+    timeZone: chosenTimeZone(settings.timeZone),
+    owners: cleanOwners(settings.people),
+  }
+  await db
+    .update(households)
+    .set({ ...next, owners: JSON.stringify(next.owners) })
+    .where(
+      and(
+        eq(households.id, db.householdId),
+        sql`exists (select 1 from ${householdMembers} where ${householdMembers.householdId} = ${db.householdId} and ${householdMembers.memberId} = ${actor.id})`,
+      ),
+    )
+  return next
 }
 
 export async function householdDetails(

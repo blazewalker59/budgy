@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   transfer: vi.fn(),
   details: vi.fn(),
+  saveSettings: vi.fn(),
   session: null as SessionState | null,
 }))
 vi.mock('@/lib/households/server', () => ({
@@ -33,9 +34,11 @@ vi.mock('@/lib/households/server', () => ({
   removeHouseholdMember: mocks.remove,
   transferHouseholdOwnership: mocks.transfer,
   getHousehold: mocks.details,
+  saveHouseholdSettings: mocks.saveSettings,
 }))
 vi.mock('@/lib/ledger/useLedger', () => ({
   SESSION_KEY: ['session'],
+  LEDGER_KEY: ['ledger'],
   useSession: () => ({ data: mocks.session }),
 }))
 vi.mock('@tanstack/react-router', () => ({
@@ -94,7 +97,11 @@ describe('Household onboarding', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create Household' }))
     await waitFor(() =>
       expect(mocks.start).toHaveBeenCalledWith({
-        data: { name: 'Alice and Bob' },
+        data: {
+          name: 'Alice and Bob',
+          timeZone: expect.any(String),
+          people: ['Alice'],
+        },
       }),
     )
   })
@@ -216,5 +223,42 @@ describe('Household management', () => {
     await waitFor(() =>
       expect(mocks.remove).toHaveBeenCalledWith({ data: { memberId: 'bob' } }),
     )
+  })
+
+  it('lets any Member change the name and people', async () => {
+    mocks.session = {
+      status: 'member',
+      member: person,
+      household: { ...household, role: 'member' },
+    }
+    mocks.details.mockResolvedValue({
+      household: { ...household, role: 'member', owners: ['Joint', 'Alice'] },
+      members: [
+        { id: person.id, name: 'Alice', email: person.email, role: 'member' },
+      ],
+      invites: [],
+    })
+    mocks.saveSettings.mockResolvedValue({})
+    mount(<HouseholdScreen />)
+    const name = await screen.findByLabelText('Name')
+    expect((screen.getByLabelText('Person 1') as HTMLInputElement).value).toBe(
+      'Alice',
+    )
+    fireEvent.change(name, { target: { value: 'Our house' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add a person' }))
+    fireEvent.change(screen.getByLabelText('Person 2'), {
+      target: { value: 'Bob' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() =>
+      expect(mocks.saveSettings).toHaveBeenCalledWith({
+        data: {
+          name: 'Our house',
+          timeZone: 'America/New_York',
+          people: ['Alice', 'Bob'],
+        },
+      }),
+    )
+    expect(await screen.findByText('Saved.')).toBeTruthy()
   })
 })

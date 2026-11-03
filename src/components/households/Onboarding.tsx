@@ -3,15 +3,35 @@ import { useState } from 'react'
 import type { Member } from '@/lib/auth/session'
 import { startHousehold } from '@/lib/households/server'
 import { signOut } from '@/lib/auth/client'
+import { deviceTimeZone, firstName } from '@/lib/households/basics'
+import { DEFAULT_TIME_ZONE } from '@/lib/model/dates'
+import {
+  PeopleEditor,
+  TimeZoneSelect,
+} from '@/components/households/HouseholdBasics'
 
 export function Onboarding({ member }: { member: Member }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
+  const [timeZone, setTimeZone] = useState(() =>
+    deviceTimeZone(DEFAULT_TIME_ZONE),
+  )
+  const [people, setPeople] = useState(() =>
+    [firstName(member.name)].filter(Boolean),
+  )
   const create = useMutation({
-    mutationFn: () => startHousehold({ data: { name } }),
+    mutationFn: () =>
+      startHousehold({
+        data: {
+          name,
+          timeZone,
+          people: people.map((p) => p.trim()).filter(Boolean),
+        },
+      }),
     onSuccess: () => {
       queryClient.clear()
-      window.location.replace('/')
+      // The rest of setup walks through accounts, categories and the plan.
+      window.location.replace('/setup')
     },
   })
   return (
@@ -44,6 +64,17 @@ export function Onboarding({ member }: { member: Member }) {
             required
             placeholder="Our household"
           />
+          <p className="block text-sm font-semibold">Time zone</p>
+          <p className="text-xs text-muted">
+            Sets when your day and month start.
+          </p>
+          <TimeZoneSelect value={timeZone} onChange={setTimeZone} />
+          <p className="block text-sm font-semibold">Who’s in it</p>
+          <p className="text-xs text-muted">
+            Spending can be filed to each person or to Joint. You can change
+            this later.
+          </p>
+          <PeopleEditor people={people} onChange={setPeople} />
           <button
             type="submit"
             disabled={!name.trim() || create.isPending}

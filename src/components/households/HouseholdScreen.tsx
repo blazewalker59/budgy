@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { HouseholdSettings } from './HouseholdSettings'
 import { HOUSEHOLD_KEY, useHousehold } from '@/lib/households/useHousehold'
 import {
   cancelHouseholdInvite,
@@ -13,10 +14,6 @@ export function HouseholdScreen() {
   const queryClient = useQueryClient()
   const session = useSession()
   const details = useHousehold()
-  const [email, setEmail] = useState('')
-  const [link, setLink] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const [copyError, setCopyError] = useState(false)
   const [confirmation, setConfirmation] = useState<{
     action: 'remove' | 'transfer'
     id: string
@@ -28,16 +25,6 @@ export function HouseholdScreen() {
       queryClient.invalidateQueries({ queryKey: SESSION_KEY }),
     ])
   }
-  const invite = useMutation({
-    mutationFn: () => inviteToHousehold({ data: { email } }),
-    onSuccess: async (created) => {
-      setLink(`${window.location.origin}/join/${created.token}`)
-      setCopied(false)
-      setCopyError(false)
-      setEmail('')
-      await refresh()
-    },
-  })
   const manage = useMutation({
     mutationFn: (action: {
       action: 'remove' | 'transfer' | 'revoke'
@@ -51,7 +38,6 @@ export function HouseholdScreen() {
     },
     onSuccess: async () => {
       setConfirmation(null)
-      setLink(null)
       await refresh()
     },
   })
@@ -71,7 +57,7 @@ export function HouseholdScreen() {
   const memberId =
     session.data?.status === 'member' ? session.data.member.id : null
   const owner = household.role === 'owner'
-  const busy = invite.isPending || manage.isPending
+  const busy = manage.isPending
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <header>
@@ -82,8 +68,9 @@ export function HouseholdScreen() {
           Everyone here can see and edit the budget. The owner manages who’s in.
         </p>
       </header>
+      <HouseholdSettings household={household} />
       <section className="space-y-3 rounded-xl border border-border bg-surface p-3">
-        <h2 className="text-sm font-bold">People</h2>
+        <h2 className="text-sm font-bold">Members</h2>
         <ul className="space-y-3">
           {members.map((member) => (
             <li
@@ -170,68 +157,7 @@ export function HouseholdScreen() {
             Enter the email of their Google account, then send them the link
             yourself. It works once and expires in 7 days.
           </p>
-          <form
-            className="flex flex-wrap gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              invite.mutate()
-            }}
-          >
-            <label className="sr-only" htmlFor="invite-email">
-              Google account email
-            </label>
-            <input
-              id="invite-email"
-              className="field min-w-48 flex-1"
-              type="email"
-              required
-              maxLength={254}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="partner@example.com"
-            />
-            <button
-              type="submit"
-              disabled={busy || !email.trim()}
-              className="min-h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50"
-            >
-              {invite.isPending ? 'Creating…' : 'Create invite link'}
-            </button>
-          </form>
-          {link && (
-            <div
-              role="status"
-              className="space-y-2 rounded-lg bg-accent-soft p-3"
-            >
-              <p className="text-sm font-semibold">
-                Copy this link now. It won’t be shown again.
-              </p>
-              <input
-                aria-label="Invitation link"
-                readOnly
-                value={link}
-                className="field w-full text-xs"
-                onFocus={(e) => e.target.select()}
-              />
-              <button
-                type="button"
-                className="min-h-11 rounded-full border border-border px-4 text-sm font-semibold"
-                onClick={() =>
-                  void navigator.clipboard
-                    .writeText(link)
-                    .then(() => setCopied(true))
-                    .catch(() => setCopyError(true))
-                }
-              >
-                {copied ? 'Copied' : 'Copy link'}
-              </button>
-              {copyError && (
-                <p className="text-xs text-muted">
-                  Couldn’t copy. Select the link and copy it yourself.
-                </p>
-              )}
-            </div>
-          )}
+          <InviteForm onInvited={refresh} />
           {invites.length > 0 && (
             <ul className="space-y-2">
               {invites.map((pending) => (
@@ -266,11 +192,100 @@ export function HouseholdScreen() {
           This Household has no owner yet, so no one can send invites.
         </p>
       )}
-      {(invite.isError || manage.isError) && (
+      {manage.isError && (
         <p role="alert" className="text-sm text-danger">
-          {invite.error?.message ?? manage.error?.message}
+          {manage.error.message}
         </p>
       )}
     </div>
+  )
+}
+
+/**
+ * An email-bound invitation link, made by an owner and shown once to copy
+ * and send yourself (docs/adr/0008).
+ */
+export function InviteForm({ onInvited }: { onInvited?: () => Promise<void> }) {
+  const [email, setEmail] = useState('')
+  const [link, setLink] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [copyError, setCopyError] = useState(false)
+  const invite = useMutation({
+    mutationFn: () => inviteToHousehold({ data: { email } }),
+    onSuccess: async (created) => {
+      setLink(`${window.location.origin}/join/${created.token}`)
+      setCopied(false)
+      setCopyError(false)
+      setEmail('')
+      await onInvited?.()
+    },
+  })
+  return (
+    <>
+      <form
+        className="flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          invite.mutate()
+        }}
+      >
+        <label className="sr-only" htmlFor="invite-email">
+          Google account email
+        </label>
+        <input
+          id="invite-email"
+          className="field min-w-48 flex-1"
+          type="email"
+          required
+          maxLength={254}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="partner@example.com"
+        />
+        <button
+          type="submit"
+          disabled={invite.isPending || !email.trim()}
+          className="min-h-11 rounded-full bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50"
+        >
+          {invite.isPending ? 'Creating…' : 'Create invite link'}
+        </button>
+      </form>
+      {link && (
+        <div role="status" className="space-y-2 rounded-lg bg-accent-soft p-3">
+          <p className="text-sm font-semibold">
+            Copy this link now. It won’t be shown again.
+          </p>
+          <input
+            aria-label="Invitation link"
+            readOnly
+            value={link}
+            className="field w-full text-xs"
+            onFocus={(e) => e.target.select()}
+          />
+          <button
+            type="button"
+            className="min-h-11 rounded-full border border-border px-4 text-sm font-semibold"
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(link)
+                .then(() => setCopied(true))
+                .catch(() => setCopyError(true))
+            }
+          >
+            {copied ? 'Copied' : 'Copy link'}
+          </button>
+          {copyError && (
+            <p className="text-xs text-muted">
+              Couldn’t copy. Select the link and copy it yourself.
+            </p>
+          )}
+        </div>
+      )}
+      {invite.isError && (
+        <p role="alert" className="text-sm text-danger">
+          {invite.error.message}
+        </p>
+      )}
+    </>
   )
 }

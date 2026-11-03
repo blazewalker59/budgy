@@ -9,18 +9,30 @@ import {
   removeMember,
   revokeInvite,
   transferOwnership,
+  updateHouseholdSettings,
 } from './service'
+import { MAX_PEOPLE, MAX_PERSON } from './basics'
 import { requireMember, withMember } from '@/lib/auth/session'
 import { getCloudflareEnv, getDb } from '@/lib/db'
 
 const TOKEN = z.string().regex(/^[A-Za-z0-9_-]{43}$/)
+const HOUSEHOLD_NAME = z.string().trim().min(1).max(60)
+const TIME_ZONE = z.string().min(1).max(64)
+const PEOPLE = z.array(z.string().max(MAX_PERSON)).max(MAX_PEOPLE + 1)
 export const getHousehold = createServerFn({ method: 'GET' }).handler(() =>
   withMember(({ db, member }) => householdDetails(db, member)),
 )
 
 export const startHousehold = createServerFn({ method: 'POST' })
-  .validator((data: { name: string }) =>
-    z.object({ name: z.string().trim().min(1).max(60) }).parse(data),
+  .validator(
+    (data: { name: string; timeZone?: string; people?: Array<string> }) =>
+      z
+        .object({
+          name: HOUSEHOLD_NAME,
+          timeZone: TIME_ZONE.optional(),
+          people: PEOPLE.optional(),
+        })
+        .parse(data),
   )
   .handler(async ({ data }) =>
     createHousehold(
@@ -28,7 +40,20 @@ export const startHousehold = createServerFn({ method: 'POST' })
       await requireMember(),
       data.name,
       getCloudflareEnv().ALLOWED_EMAILS,
+      { timeZone: data.timeZone, people: data.people },
     ),
+  )
+
+/** Any Member may rename the Household or change its time zone and people. */
+export const saveHouseholdSettings = createServerFn({ method: 'POST' })
+  .validator(
+    (data: { name: string; timeZone: string; people: Array<string> }) =>
+      z
+        .object({ name: HOUSEHOLD_NAME, timeZone: TIME_ZONE, people: PEOPLE })
+        .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db, member }) => updateHouseholdSettings(db, member, data)),
   )
 
 export const inviteToHousehold = createServerFn({ method: 'POST' })

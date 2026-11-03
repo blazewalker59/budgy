@@ -41,6 +41,7 @@ const bank = (providerId: string, name: string, over = {}) => ({
   historyComplete: false,
   problem: null,
   problemKind: null,
+  connId: null,
   ...over,
 })
 

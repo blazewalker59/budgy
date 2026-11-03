@@ -23,6 +23,7 @@ import type {
 } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { Account } from '@/lib/model/types'
+import type { ConnectionIssue } from '@/lib/db/schema'
 import { hashToken } from '@/lib/agents/tokens'
 import { accounts, bankAccounts, bankConnections } from '@/lib/db/schema'
 import { householdRow, inHousehold } from '@/lib/households/scope'
@@ -152,6 +153,7 @@ export async function reconnectSimplefin(
       accessHash,
       status: 'ready',
       lastError: null,
+      issues: null,
     })
     .where(inHousehold(db, bankConnections, eq(bankConnections.id, input.id)))
   try {
@@ -250,7 +252,7 @@ export async function readBridge(
           : ('attention' as const)
     await db
       .update(bankConnections)
-      .set({ status, lastError: message })
+      .set({ status, lastError: message, issues: null })
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     throw error instanceof SimplefinError ? error : new UserError(message)
   }
@@ -306,6 +308,7 @@ export async function readBridge(
       .update(bankConnections)
       .set({
         status: found.problems.length ? 'attention' : 'ready',
+        issues: found.issues.length ? connectionIssues(found.issues) : null,
         lastError: found.problems.length
           ? `SimpleFIN says: ${found.problems.join(' ')} Check your connections in SimpleFIN Bridge.`
           : null,
@@ -314,6 +317,26 @@ export async function readBridge(
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id))),
   ])
   return { accounts: found.accounts, issues: found.issues }
+}
+
+/** Bridge's problems as kept for the screen: each once, at most 20. */
+function connectionIssues(
+  found: ReadonlyArray<SimplefinIssue>,
+): Array<ConnectionIssue> {
+  const seen = new Set<string>()
+  const kept: Array<ConnectionIssue> = []
+  for (const { kind, message, connId, accountId } of found) {
+    const key = `${kind}|${connId ?? ''}|${accountId ?? ''}|${message}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    kept.push({
+      kind,
+      message,
+      ...(connId && { connId }),
+      ...(accountId && { accountId }),
+    })
+  }
+  return kept.slice(0, 20)
 }
 
 /**
@@ -515,6 +538,7 @@ export async function listConnections(db: HouseholdDatabase) {
         createdBy: bankConnections.createdBy,
         status: bankConnections.status,
         lastError: bankConnections.lastError,
+        issues: bankConnections.issues,
         lastFetchedAt: bankConnections.lastFetchedAt,
         createdAt: bankConnections.createdAt,
       })
@@ -535,6 +559,7 @@ export async function listConnections(db: HouseholdDatabase) {
         historyComplete: bankAccounts.historyComplete,
         problem: bankAccounts.problem,
         problemKind: bankAccounts.problemKind,
+        connId: bankAccounts.connId,
       })
       .from(bankAccounts)
       .where(inHousehold(db, bankAccounts))

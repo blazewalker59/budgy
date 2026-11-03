@@ -30,6 +30,12 @@ import {
   AddBankAccounts,
   unlinkedBankAccounts,
 } from '@/components/accounts/AddBankAccounts'
+import {
+  checkedAgo,
+  connectionHealth,
+  syncingLabel,
+  troubleLabel,
+} from '@/lib/model/bankHealth'
 
 type Connection = NonNullable<
   ReturnType<typeof useBankConnections>['data']
@@ -51,8 +57,20 @@ export function BankConnections({
   const all = connections.data ?? []
   const banks = all.flatMap((c) => c.accounts)
   const linked = banks.filter((b) => b.account).length
-  const attention =
-    all.some((c) => c.status !== 'ready') || banks.some((b) => b.problem)
+  const health = connectionHealth(
+    banks,
+    all.flatMap((c) => c.issues ?? []),
+  )
+  // A connection Bridge stopped accepting is the whole connection's problem;
+  // otherwise only the banks named have one.
+  const stopped = all.some(
+    (c) => c.status === 'revoked' || c.status === 'payment_required',
+  )
+  const note = stopped
+    ? 'needs reconnecting'
+    : (troubleLabel(health) ??
+      // Saved before problems were kept per bank: until its next read.
+      (all.some((c) => c.status === 'attention') ? 'needs attention' : null))
   const sync = useMutation({
     mutationFn: async () => {
       const results: Array<SyncedAccount> = []
@@ -87,8 +105,11 @@ export function BankConnections({
               {!all.length
                 ? 'Connect SimpleFIN Bridge to sync banks automatically'
                 : `SimpleFIN · ${linked} of ${banks.length} accounts linked`}
-              {attention && (
-                <span className="text-over"> · needs attention</span>
+              {note && (
+                <span className={stopped ? 'text-over' : 'text-nice'}>
+                  {' '}
+                  · {note}
+                </span>
               )}
             </span>
           </span>
@@ -136,17 +157,21 @@ export function BankConnections({
 
       {open && (
         <div className="space-y-3 border-t border-border p-3">
-          <ul className="list-disc space-y-0.5 pl-4 text-muted">
-            <li>SimpleFIN Bridge reads your banks. Your logins stay there.</li>
-            <li>
-              Add the accounts it finds here at once, or link each one from its
-              Budgy account below.
-            </li>
-            <li>
-              Cards and bank accounts bring in purchases and balances. Others
-              bring in just the balance.
-            </li>
-          </ul>
+          {!all.length && (
+            <ul className="list-disc space-y-0.5 pl-4 text-muted">
+              <li>
+                SimpleFIN Bridge reads your banks. Your logins stay there.
+              </li>
+              <li>
+                Add the accounts it finds here at once, or link each one from
+                its Budgy account below.
+              </li>
+              <li>
+                Cards and bank accounts bring in purchases and balances. Others
+                bring in just the balance.
+              </li>
+            </ul>
+          )}
           {connections.isError && (
             <p role="alert" className="text-over">
               {connections.error.message}
@@ -304,13 +329,17 @@ function ConnectionRow({
   const [confirming, setConfirming] = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
   const unlinked = connection.accounts.filter((a) => !a.account && a.present)
+  const health = connectionHealth(connection.accounts, connection.issues)
+  const stopped =
+    connection.status === 'revoked' || connection.status === 'payment_required'
+  // Bridge's problems are shown per bank below; this is for what happened
+  // here (a refresh or disconnect failing) or the whole connection stopping.
   const problem =
     discover.error?.message ??
     disconnect.error?.message ??
-    (connection.status !== 'ready' ? connection.lastError : null)
-  const signIn = connection.accounts.filter(
-    (a) => a.account && a.problemKind === 'reauth',
-  )
+    (stopped || (connection.status === 'attention' && !connection.issues)
+      ? connection.lastError
+      : null)
 
   return (
     <div className="space-y-1.5 rounded-lg bg-background p-2.5">
@@ -318,10 +347,13 @@ function ConnectionRow({
         <div className="min-w-0">
           <p className="truncate font-semibold">{connection.name}</p>
           <p className="truncate text-muted">
-            Connected by {connection.createdBy}
-            {connection.lastFetchedAt
-              ? ` · checked ${new Date(connection.lastFetchedAt).toLocaleString()}`
-              : ''}
+            {stopped ? 'Paused' : syncingLabel(health)}
+            {connection.lastFetchedAt && (
+              <span title={new Date(connection.lastFetchedAt).toLocaleString()}>
+                {' '}
+                · checked {checkedAgo(connection.lastFetchedAt)}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -383,36 +415,98 @@ function ConnectionRow({
             Reconnect
           </button>
         ))}
-      {(connection.status === 'payment_required' || signIn.length > 0) && (
-        <p>
-          {signIn.length > 0 && (
-            <span className="text-over">
-              Sign in again in Bridge for{' '}
-              {signIn.map((a) => `${a.name} (${a.institution})`).join(', ')}
-              .{' '}
-            </span>
-          )}
-          <a
-            href={SIMPLEFIN_BRIDGE}
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-accent"
-          >
-            {connection.status === 'payment_required'
-              ? 'Renew in SimpleFIN Bridge'
-              : 'Open SimpleFIN Bridge'}
-          </a>
-        </p>
+      {connection.status === 'payment_required' && (
+        <a
+          href={SIMPLEFIN_BRIDGE}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block font-semibold text-accent"
+        >
+          Renew in SimpleFIN Bridge
+        </a>
       )}
-      <p className="text-muted">
-        {!connection.accounts.length
-          ? 'No accounts yet. Connect banks in SimpleFIN Bridge, then refresh.'
-          : unlinked.length
-            ? `Not linked yet: ${unlinked.map((a) => `${a.name} (${a.institution})`).join(', ')}.`
-            : `All ${connection.accounts.length} accounts are linked.`}
-      </p>
+      {!stopped && health.banks.length > 0 && (
+        <BankTroubles banks={health.banks} />
+      )}
+      {!connection.accounts.length ? (
+        <p className="text-muted">
+          No accounts yet. Connect banks in SimpleFIN Bridge, then refresh.
+        </p>
+      ) : unlinked.length ? (
+        <div className="space-y-0.5">
+          <p className="text-muted">
+            {unlinked.length === 1
+              ? '1 account isn’t linked yet:'
+              : `${unlinked.length} accounts aren’t linked yet:`}
+          </p>
+          <ul className="list-disc pl-4 text-muted">
+            {unlinked.map((a) => (
+              <li key={a.providerId}>
+                {a.name} <span className="opacity-70">· {a.institution}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <p className="text-muted">Connected by {connection.createdBy}</p>
     </div>
   )
+}
+
+const TROUBLE_TEXT = {
+  'sign-in': 'Sign in to this bank again in SimpleFIN Bridge.',
+  failed: 'SimpleFIN couldn’t read it this time. Budgy will try again.',
+  other: 'SimpleFIN reported a problem.',
+} as const
+
+/** Each bank with a problem once: what to do, and which Accounts wait on it. */
+function BankTroubles({
+  banks,
+}: {
+  banks: ReturnType<typeof connectionHealth>['banks']
+}) {
+  const signIn = banks.some((b) => b.trouble === 'sign-in')
+  return (
+    <div className="space-y-1.5">
+      <ul className="space-y-1.5">
+        {banks.map((bank) => (
+          <li
+            key={bank.institution}
+            className="rounded-md border-l-2 border-nice bg-surface px-2.5 py-1.5"
+          >
+            <p className="font-semibold">{bank.institution}</p>
+            <p>{TROUBLE_TEXT[bank.trouble]}</p>
+            <p className="text-muted">
+              {bank.affects.length
+                ? `Waiting: ${bank.affects.join(', ')}`
+                : 'None of your Budgy accounts use it yet.'}
+            </p>
+            {bank.said.length > 0 && (
+              <p className="text-muted opacity-80">
+                SimpleFIN says: {bank.said.map(sentence).join(' ')}
+              </p>
+            )}
+          </li>
+        ))}
+      </ul>
+      {signIn && (
+        <a
+          href={SIMPLEFIN_BRIDGE}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block font-semibold text-accent"
+        >
+          Open SimpleFIN Bridge
+        </a>
+      )}
+    </div>
+  )
+}
+
+/** Bridge's messages often run two phrases together without a stop. */
+function sentence(text: string): string {
+  const joined = text.replace(/([a-z])\. ?([A-Z][a-z]+ required)$/, '$1. $2')
+  return /[.!?…]$/.test(joined) ? joined : `${joined}.`
 }
 
 /** A new setup token for a connection Bridge stopped accepting. */

@@ -244,9 +244,14 @@ function ConnectStep() {
   return (
     <div className="space-y-3 text-sm">
       {open.length > 0 && (
-        <p className="text-accent">
-          {open.length === 1 ? '1 account' : `${open.length} accounts`} so far:{' '}
-          {open.map((a) => a.name).join(', ')}.
+        <p>
+          <span className="font-semibold text-accent">
+            {open.length === 1 ? '1 account' : `${open.length} accounts`} so
+            far.
+          </span>{' '}
+          <Link to="/accounts" className="font-semibold text-accent underline">
+            See them on Accounts
+          </Link>
         </p>
       )}
       <Option title="Sync from your bank">

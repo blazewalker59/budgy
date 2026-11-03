@@ -326,7 +326,8 @@ describe('Unified Account Updates UI', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Bank connections/ }))
     expect(screen.getByText(/Vanguard needs attention/)).toBeTruthy()
-    expect(screen.getByText(/Not linked yet: Sapphire \(Chase\)/)).toBeTruthy()
+    expect(screen.getByText('1 account isn’t linked yet:')).toBeTruthy()
+    expect(screen.getByText('Sapphire')).toBeTruthy()
   })
   it('puts Accounts needing action above those already set up, and keeps an open card in place', async () => {
     mocks.accounts.push(
@@ -460,6 +461,69 @@ describe('Unified Account Updates UI', () => {
     ).toBe('https://bridge.simplefin.org/')
   })
 
+  it('lists each bank that needs a sign-in once, and only those as waiting', async () => {
+    mocks.get.mockResolvedValue([empty])
+    const [connection] = feeding('attention', 'SimpleFIN says: run-on text.', {
+      connId: 'CON-CHASE',
+    })
+    mocks.connections.mockResolvedValue([
+      {
+        ...connection,
+        issues: [
+          {
+            kind: 'con.auth',
+            message: 'Connection to NewRez may need attention. Auth required',
+            connId: 'CON-NEWREZ',
+          },
+          {
+            kind: 'con.auth',
+            message: 'Connection to ADP may need attention. Auth required',
+            connId: 'CON-ADP',
+          },
+        ],
+        accounts: [
+          ...connection.accounts,
+          {
+            ...connection.accounts[0],
+            providerId: 'p2',
+            name: '401k',
+            institution: 'ADP',
+            account: 'Work 401(k)',
+            connId: 'CON-ADP',
+          },
+          {
+            ...connection.accounts[0],
+            providerId: 'p3',
+            name: 'Loan#',
+            institution: 'NewRez',
+            account: null,
+            connId: 'CON-NEWREZ',
+          },
+        ],
+      },
+    ])
+    mount()
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Bank connections/ }),
+    )
+    // Amber and counted, not a blanket red "needs attention".
+    expect(screen.getByText(/2 banks need a sign-in/).className).toContain(
+      'text-nice',
+    )
+    expect(screen.getByText(/1 of 2 linked accounts syncing/)).toBeTruthy()
+    expect(screen.getByText('Waiting: Work 401(k)')).toBeTruthy()
+    expect(
+      screen.getByText('None of your Budgy accounts use it yet.'),
+    ).toBeTruthy()
+    expect(
+      screen.getByText(
+        'SimpleFIN says: Connection to NewRez may need attention. Auth required.',
+      ),
+    ).toBeTruthy()
+    // The joined string is not shown once problems are kept per bank.
+    expect(screen.queryByText(/run-on text/)).toBeNull()
+  })
+
   it('asks for a new bank sign-in in Bridge when an Account needs one', async () => {
     mocks.get.mockResolvedValue([empty])
     mocks.connections.mockResolvedValue(
@@ -476,7 +540,7 @@ describe('Unified Account Updates UI', () => {
     expect(
       screen.getByRole('link', { name: 'Open SimpleFIN Bridge' }),
     ).toBeTruthy()
-    expect(screen.getByText(/needs attention/)).toBeTruthy()
+    expect(screen.getByText(/1 bank needs a sign-in/)).toBeTruthy()
   })
 
   it('reconnects a revoked connection with a new setup token', async () => {

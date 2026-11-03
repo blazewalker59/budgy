@@ -417,6 +417,54 @@ describe('SimpleFIN connections', () => {
     })
   })
 
+  it('keeps Bridge’s problems per bank login, each once, until they clear', async () => {
+    const { a } = await fixture()
+    let errlist: Array<object> = []
+    const transport = ((url: string) =>
+      Promise.resolve(
+        url.includes('/claim/')
+          ? new Response(ACCESS)
+          : Response.json({
+              errlist,
+              connections: [],
+              accounts: [sapphire],
+            }),
+      )) as typeof fetch
+    const { id } = await connectSimplefin(
+      a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      transport,
+    )
+    const auth = {
+      code: 'con.auth',
+      msg: 'Connection to NewRez may need attention.\nAuth required',
+      conn_id: 'CON-NEWREZ',
+    }
+    errlist = [
+      auth,
+      auth,
+      { code: 'act.failed', msg: 'Later', account_id: 'ACT-1' },
+    ]
+    await discoverAccounts(a, id, KEY, transport)
+    let [connection] = await listConnections(a)
+    expect(connection.issues).toEqual([
+      {
+        kind: 'con.auth',
+        message: 'Connection to NewRez may need attention. Auth required',
+        connId: 'CON-NEWREZ',
+      },
+      { kind: 'act.failed', message: 'Later', accountId: 'ACT-1' },
+    ])
+
+    errlist = []
+    await discoverAccounts(a, id, KEY, transport)
+    ;[connection] = await listConnections(a)
+    expect(connection.status).toBe('ready')
+    expect(connection.issues).toBeNull()
+  })
+
   it('records a revoked connection, keeping its credential, and limits daily requests', async () => {
     const { a } = await fixture()
     let status = 200

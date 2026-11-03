@@ -573,6 +573,12 @@ export const bankConnections = sqliteTable(
       .notNull(),
     /** Safe operational message only; never a raw Bridge response. */
     lastError: text('last_error'),
+    /**
+     * What Bridge reported on the last read, one entry per problem, cleaned
+     * and short as shown to Members, with the institution login
+     * (`connId`) or account it is about. Null when it reported none.
+     */
+    issues: text('issues', { mode: 'json' }).$type<Array<ConnectionIssue>>(),
     createdAt: createdAt(),
     lastFetchedAt: integer('last_fetched_at', { mode: 'timestamp_ms' }),
     /** Bridge asks for at most 24 requests a day per connection. */
@@ -589,6 +595,15 @@ export const bankConnections = sqliteTable(
 
 /** Why a linked bank account's last sync didn't fully work. */
 export type BankProblem = 'reauth' | 'failed' | 'missing'
+
+/** One problem Bridge reported for a connection (docs/adr/0014). */
+export interface ConnectionIssue {
+  /** Bridge's code by prefix: `con.auth`, `act.failed`, `gen`… */
+  kind: string
+  message: string
+  connId?: string
+  accountId?: string
+}
 
 /**
  * An account SimpleFIN discovered. Discovery is metadata only; mapping it to

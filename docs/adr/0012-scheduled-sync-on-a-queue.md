@@ -17,9 +17,12 @@ Bridge response also held up everyone after it.
 ## Decision
 
 - The cron (`17 */6 * * *`, off the hour as SimpleFIN asks) only queues
-  one Cloudflare Queue message per connection with a linked account. A
-  message is the Household id and connection id. No credential, URL or
-  account detail goes on the queue; the access URL stays encrypted in D1.
+  one Cloudflare Queue message per connection with a linked account (not
+  one whose access Bridge revoked: ADR 0014). A message is the Household id
+  and connection id, and, to retry single accounts, their Bridge ids and
+  which retry it is (ADR 0014). No credential, URL or account detail goes
+  on the queue; the access URL stays encrypted in D1. Linking accounts also
+  queues their connection's first sync.
 - The same Worker consumes the queue (`queue()` in `src/server.ts`), one
   message per batch. Each message syncs one connection in its own invocation,
   inside that Household's scope (ADR 0007), with the same `syncConnection` as
@@ -31,7 +34,8 @@ Bridge response also held up everyone after it.
   failure is retried after 10, then 20 minutes, up to 3 attempts in all.
   A Member's problem (revoked access, payment, today's request limit, no
   key) is acked: the connection already shows it, and the next cron tries
-  again. Each attempt counts toward the 20-a-day request cap (4 crons × 3
+  again. Accounts that failed on their own are queued again by themselves
+  (ADR 0014). Each attempt counts toward the 20-a-day request cap (4 crons × 3
   attempts stays under it). A consumer crash leaves the batch to the queue's
   own retries (`max_retries: 3`), then the `budgy-sync-dlq` dead-letter queue.
 - **Sync now** still syncs in the request, for the Member's own Household.

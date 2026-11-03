@@ -4,7 +4,9 @@
 
 Implemented: Shortcut uploads; SimpleFIN connection, discovery, mapping and
 scheduled sync of purchases and balances. The scheduled sync moved onto a
-queue in [ADR 0012](0012-scheduled-sync-on-a-queue.md).
+queue in [ADR 0012](0012-scheduled-sync-on-a-queue.md). A first sync's
+history, connection health, reconnecting and single-account retries are
+[ADR 0014](0014-bank-history-health-and-retries.md).
 
 ## Context
 
@@ -62,8 +64,10 @@ separate update experience.
 ## Sync
 
 - One Bridge request per connection covers all its mapped accounts, from the
-  earliest account's last synced day minus a 10-day overlap (45 days the first
-  time, never more than 60), a day early for time zones.
+  earliest account's last synced day minus a 10-day overlap, a day early for
+  time zones, never more than 90 days. A newly linked account first reads
+  back up to 180 days in 90-day windows (ADR 0014; it was 45 days, never
+  more than 60).
 - Card and bank Accounts get posted purchases through `postTransactions`,
   with source IDs namespaced `simplefin:<Bridge account id>`. Re-reading the
   overlap adds nothing twice; a corrected provider purchase updates in place;

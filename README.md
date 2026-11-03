@@ -66,7 +66,10 @@ supports manual balances and historical backfills. Each card or bank Account
 can also get an iPhone share-sheet Shortcut that sends its export straight to
 `/api/updates/upload`, and SimpleFIN Bridge accounts can be linked to Budgy
 Accounts, syncing posted purchases and balances every six hours. See
-[ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md). The
+[ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md). A
+newly linked account brings in up to 6 months of history, and connection
+problems say what to fix
+([ADR 0014](docs/adr/0014-bank-history-health-and-retries.md)). The
 six-hourly cron queues one sync per connection on the `budgy-sync` Cloudflare
 Queue ([ADR 0012](docs/adr/0012-scheduled-sync-on-a-queue.md)); create it and
 its dead-letter queue once, before the first deploy that needs them:

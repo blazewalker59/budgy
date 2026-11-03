@@ -45,6 +45,9 @@ account not yet read for Money in (`bank_accounts.money_in_since` is null),
 so recent incoming money arrives without a manual upload. Purchases keep to
 their usual window, so the wider fetch adds no older purchases. Closed
 Accounts are marked as read too, so one can't make every sync reach back.
+Since [ADR 0014](0014-bank-history-health-and-retries.md), Money in comes from
+the same history windows as purchases, so a newly linked account's reaches
+back as far (up to 180 days).
 
 ## Rollout
 

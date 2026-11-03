@@ -48,6 +48,14 @@ A successful check with no new purchases still has a receipt. The latest
 attempt is separate from the last success. A recent check is not proof that
 the source supplied complete data through today (docs/adr/0009).
 
+**Bank connection**:
+A Household's SimpleFIN Bridge access, whose bank accounts each feed one
+Account once a Member links them (docs/adr/0010). A newly linked one brings
+in up to 6 months of history, where the bank allows. A connection is
+ready, needs attention, needs its Bridge subscription renewed, or needs
+reconnecting with a new setup token; a linked account may need a new
+sign-in at its bank (in Bridge) or a retry (docs/adr/0014).
+
 **Pay Schedule**:
 A paycheck the Household counts on, entered by hand: whose, how much lands in
 the bank per paycheck, how often (every week, every 2 weeks, twice a month,

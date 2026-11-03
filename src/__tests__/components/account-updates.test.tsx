@@ -288,6 +288,8 @@ describe('Unified Account Updates UI', () => {
             syncedThrough: null,
             historyFrom: null,
             historyComplete: false,
+            problem: null,
+            problemKind: null,
           },
         ],
       },
@@ -355,6 +357,8 @@ describe('Unified Account Updates UI', () => {
               syncedThrough: '2026-10-09',
               historyFrom: '2026-04-13',
               historyComplete: true,
+              problem: null,
+              problemKind: null,
             },
           ],
         },
@@ -394,5 +398,80 @@ describe('Unified Account Updates UI', () => {
     } finally {
       mocks.accounts.splice(1)
     }
+  })
+
+  /** One SimpleFIN connection feeding Card, in the given health. */
+  const feeding = (
+    status: string,
+    lastError: string | null,
+    over: Record<string, unknown> = {},
+  ) => [
+    {
+      id: 'c1',
+      name: 'SimpleFIN',
+      createdBy: 'me@example.com',
+      status,
+      lastError,
+      lastFetchedAt: null,
+      createdAt: new Date('2026-10-01'),
+      accounts: [
+        {
+          connectionId: 'c1',
+          providerId: 'p1',
+          name: 'Sapphire',
+          institution: 'Chase',
+          currency: 'USD',
+          account: 'Card',
+          present: true,
+          syncedThrough: '2026-10-09',
+          historyFrom: '2026-04-13',
+          historyComplete: true,
+          problem: null,
+          problemKind: null,
+          ...over,
+        },
+      ],
+    },
+  ]
+
+  it('says a lapsed SimpleFIN subscription paused the Account’s sync, and where to renew', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.connections.mockResolvedValue(
+      feeding(
+        'payment_required',
+        'Your SimpleFIN Bridge subscription needs renewing.',
+      ),
+    )
+    mount()
+    expect(await screen.findByText(/Needs action · 1/)).toBeTruthy()
+    expect(
+      screen.getByText(
+        'Bank sync is paused. Your SimpleFIN Bridge subscription needs renewing.',
+      ),
+    ).toBeTruthy()
+    expect(
+      screen
+        .getByRole('link', { name: 'Open SimpleFIN Bridge' })
+        .getAttribute('href'),
+    ).toBe('https://bridge.simplefin.org/')
+  })
+
+  it('asks for a new bank sign-in in Bridge when an Account needs one', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.connections.mockResolvedValue(
+      feeding('attention', 'SimpleFIN says: log in.', {
+        problem: 'Chase needs you to sign in again in SimpleFIN Bridge.',
+        problemKind: 'reauth',
+      }),
+    )
+    mount()
+    expect(await screen.findByText(/Needs action · 1/)).toBeTruthy()
+    expect(
+      screen.getByText('Chase needs you to sign in again in SimpleFIN Bridge.'),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('link', { name: 'Open SimpleFIN Bridge' }),
+    ).toBeTruthy()
+    expect(screen.getByText(/needs attention/)).toBeTruthy()
   })
 })

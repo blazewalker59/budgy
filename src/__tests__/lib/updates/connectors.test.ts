@@ -417,7 +417,7 @@ describe('SimpleFIN connections', () => {
     })
   })
 
-  it('records a revoked connection as needing attention, and limits daily requests', async () => {
+  it('records a revoked connection, keeping its credential, and limits daily requests', async () => {
     const { a } = await fixture()
     let status = 200
     const transport = ((url: string) =>
@@ -437,7 +437,13 @@ describe('SimpleFIN connections', () => {
     await expect(discoverAccounts(a, id, KEY, transport)).rejects.toThrow(
       /no longer accepts/,
     )
-    expect((await listConnections(a))[0].status).toBe('attention')
+    expect((await listConnections(a))[0]).toMatchObject({
+      status: 'revoked',
+      lastError: expect.stringContaining('Make a new setup token'),
+    })
+    expect(
+      (await a.select().from(bankConnections).get())!.encryptedAccess,
+    ).toBeTruthy()
     status = 200
     for (let i = 2; i < 20; i++) await discoverAccounts(a, id, KEY, transport)
     await expect(discoverAccounts(a, id, KEY, transport)).rejects.toThrow(

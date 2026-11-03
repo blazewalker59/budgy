@@ -6,7 +6,7 @@
  * stop the rest. A message names a Household and connection, nothing more:
  * the credential stays encrypted in D1.
  */
-import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm'
+import { and, eq, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { syncConnection } from './sync'
 import { SimplefinError } from './simplefinClient'
@@ -92,7 +92,12 @@ export async function queueFirstSync(
   return queued
 }
 
-/** The cron: one message per connection with a linked account. */
+/**
+ * The cron: one message per connection with a linked account. A revoked
+ * one is left alone: only a new setup token can fix it, and asking again
+ * with refused credentials only spends Bridge's patience. A lapsed
+ * subscription is still asked, so syncing resumes on its own once renewed.
+ */
 export async function enqueueSyncs(
   d1: D1Database,
   queue: Queue<SyncMessage>,
@@ -103,7 +108,19 @@ export async function enqueueSyncs(
       connectionId: bankAccounts.connectionId,
     })
     .from(bankAccounts)
-    .where(isNotNull(bankAccounts.account))
+    .innerJoin(
+      bankConnections,
+      and(
+        eq(bankConnections.householdId, bankAccounts.householdId),
+        eq(bankConnections.id, bankAccounts.connectionId),
+      ),
+    )
+    .where(
+      and(
+        isNotNull(bankAccounts.account),
+        ne(bankConnections.status, 'revoked'),
+      ),
+    )
   for (let i = 0; i < due.length; i += SEND_BATCH)
     await queue.sendBatch(
       due.slice(i, i + SEND_BATCH).map((body) => ({ body })),

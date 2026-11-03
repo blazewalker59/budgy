@@ -558,7 +558,13 @@ export const bankConnections = sqliteTable(
     encryptedAccess: text('encrypted_access').notNull(),
     /** The same Bridge access can't be connected twice, anywhere. */
     accessHash: text('access_hash').notNull().unique(),
-    status: text('status').$type<'ready' | 'attention'>().notNull(),
+    /**
+     * `payment_required`: Bridge answered 402 (its subscription lapsed).
+     * `revoked`: Bridge refused the access (403); a new setup token fixes it.
+     */
+    status: text('status')
+      .$type<'ready' | 'attention' | 'payment_required' | 'revoked'>()
+      .notNull(),
     /** Safe operational message only; never a raw Bridge response. */
     lastError: text('last_error'),
     createdAt: createdAt(),
@@ -574,6 +580,9 @@ export const bankConnections = sqliteTable(
   },
   (t) => [index('bank_connections_household_idx').on(t.householdId)],
 )
+
+/** Why a linked bank account's last sync didn't fully work. */
+export type BankProblem = 'reauth' | 'failed' | 'missing'
 
 /**
  * An account SimpleFIN discovered. Discovery is metadata only; mapping it to
@@ -609,6 +618,16 @@ export const bankAccounts = sqliteTable(
     historyComplete: integer('history_complete', { mode: 'boolean' })
       .notNull()
       .default(false),
+    /** Bridge's connection (institution login) it comes from, protocol 2. */
+    connId: text('conn_id'),
+    /**
+     * What went wrong for it on the last sync, as Members read it, and its
+     * kind: `reauth` (sign in at the bank again, in Bridge), `failed`
+     * (Bridge couldn't read it this time) or `missing` (not in the reply).
+     * Null when its last sync worked.
+     */
+    problem: text('problem'),
+    problemKind: text('problem_kind').$type<BankProblem>(),
   },
   (t) => [
     primaryKey({ columns: [t.householdId, t.connectionId, t.providerId] }),

@@ -10,7 +10,9 @@
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { ROUTINE_RESERVE, RequestLimitError, readBridge } from './connections'
 import { isSpending } from './exports'
-import type { SimplefinAccount, SimplefinTransaction } from './simplefinClient'
+import { recordFailedCheck } from './receipts'
+import type { SimplefinIssue, SimplefinTransaction } from './simplefinClient'
+import type { BankProblem } from '@/lib/db/schema'
 import type { BankKeys } from './crypto'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { z } from 'zod'
@@ -50,6 +52,43 @@ export interface SyncedAccount {
   moneyIn?: number
   balance?: boolean
   error?: string
+  /** Bridge's id for it, when another try might work (docs/adr/0014). */
+  retry?: string
+}
+
+/** What went wrong for one account, for the Member and for a retry. */
+interface Problem {
+  kind: BankProblem
+  message: string
+}
+
+/**
+ * What Bridge said about one account: its institution needs a new sign-in
+ * (`con.auth`, by connection), or it couldn't be read this time (`act.*`
+ * by account, or another `con` problem). Null when nothing.
+ */
+export function accountProblem(
+  account: { providerId: string; connId: string | null; institution: string },
+  issues: ReadonlyArray<SimplefinIssue>,
+): Problem | null {
+  const ofConnection = (i: SimplefinIssue) =>
+    !!i.connId && i.connId === account.connId
+  const reauth = issues.find((i) => i.kind === 'con.auth' && ofConnection(i))
+  if (reauth)
+    return {
+      kind: 'reauth',
+      message: `${account.institution} needs you to sign in again in SimpleFIN Bridge. SimpleFIN says: ${reauth.message}`,
+    }
+  const failed =
+    issues.find(
+      (i) => i.kind.startsWith('act') && i.accountId === account.providerId,
+    ) ?? issues.find((i) => i.kind === 'con' && ofConnection(i))
+  if (failed)
+    return {
+      kind: 'failed',
+      message: `SimpleFIN couldn’t get everything from ${account.institution} this time. SimpleFIN says: ${failed.message} Budgy will try again.`,
+    }
+  return null
 }
 
 /** A posted SimpleFIN transaction as a purchase row, or null if it isn't one. */
@@ -110,6 +149,8 @@ function incomingRow(
 }
 
 type Mapped = typeof bankAccounts.$inferSelect
+
+type Reply = Awaited<ReturnType<typeof readBridge>>
 
 /** One request's span: Unix seconds, `end` exclusive (now when absent). */
 interface Window {
@@ -209,27 +250,41 @@ export async function syncConnection(
    * Take one account's part of a response: its purchases and Money in from
    * the window, and its balance. An older history window brings no balance,
    * and no receipt unless it has purchases, so an empty one doesn't stand
-   * in for the account's latest update. Returns whether it was taken, and
-   * the posted times it had in the window.
+   * in for the account's latest update. Returns whether it was read in
+   * full, the posted times it had in the window, and what went wrong.
    */
   const take = async (
     m: Mapped,
-    found: Array<SimplefinAccount>,
+    reply: Reply,
     window: Window,
     older = false,
   ): Promise<{ ok: boolean; posted: Array<number> }> => {
     const accountName = m.account!
-    const source = found.find((a) => a.id === m.providerId)
-    if (!source) {
-      results.push({
-        account: accountName,
-        error: `SimpleFIN no longer shares ${m.name}.`,
-      })
-      return { ok: false, posted: [] }
-    }
     const account = accountOf(m)
     // Closed (or gone) since: nothing to read for it.
     if (!account || account.closed) return { ok: false, posted: [] }
+    const source = reply.accounts.find((a) => a.id === m.providerId)
+    if (!source) {
+      const message = `SimpleFIN didn’t send ${m.name} this time. Budgy will try it again.`
+      await recordFailedCheck(db, {
+        account: accountName,
+        source: 'simplefin',
+        updatedBy: by,
+        message,
+      })
+      await save(m, { problem: message, problemKind: 'missing' })
+      results.push({
+        account: accountName,
+        error: message,
+        retry: m.providerId,
+      })
+      return { ok: false, posted: [] }
+    }
+    // What's there is real, so it's taken; the window is read again later.
+    const problem = accountProblem(
+      { ...m, connId: source.connId ?? m.connId },
+      reply.issues,
+    )
     const inWindow = source.transactions.filter(
       (t) =>
         !t.pending &&
@@ -270,6 +325,7 @@ export async function syncConnection(
             sourceNamespace: `simplefin:${m.providerId}`,
             excluded,
             unreadable,
+            notice: problem?.message,
             coverage: {
               from: dateOn(new Date(window.start * 1000), timeZone),
               to:
@@ -310,15 +366,26 @@ export async function syncConnection(
           result.balance = true
         }
       }
+      if (problem) {
+        result.error = problem.message
+        if (problem.kind === 'failed') result.retry = m.providerId
+      }
+      await save(m, {
+        problem: problem?.message ?? null,
+        problemKind: problem?.kind ?? null,
+      })
       results.push(result)
-      return { ok: true, posted }
+      return { ok: !problem, posted }
     } catch (error) {
+      const message = clientMessage(
+        error,
+        'This sync didn’t finish. Budgy will try again.',
+      )
+      await save(m, { problem: message, problemKind: 'failed' })
       results.push({
         account: accountName,
-        error: clientMessage(
-          error,
-          'This sync didn’t finish. Budgy will try again.',
-        ),
+        error: message,
+        retry: m.providerId,
       })
       return { ok: false, posted }
     }
@@ -347,7 +414,7 @@ export async function syncConnection(
       .reduce((a, b) => (a < b ? a : b))
     // A day early, so no time zone drops the first day's purchases.
     const window = { start: Math.max(startOf(addDays(from, -1)), newest) }
-    const { accounts: found } = await readBridge(
+    const reply = await readBridge(
       db,
       id,
       secret,
@@ -355,7 +422,7 @@ export async function syncConnection(
       transport,
     )
     for (const m of routine) {
-      const { ok } = await take(m, found, window)
+      const { ok } = await take(m, reply, window)
       if (!ok) continue
       const complete = !wantsHistory(m)
       await save(m, {
@@ -388,9 +455,9 @@ export async function syncConnection(
           end: startOf(next),
         }
       : { start: newest }
-    let found: Array<SimplefinAccount>
+    let reply: Reply
     try {
-      ;({ accounts: found } = await readBridge(
+      reply = await readBridge(
         db,
         id,
         secret,
@@ -401,7 +468,7 @@ export async function syncConnection(
           reserve: next ? ROUTINE_RESERVE : 0,
         },
         transport,
-      ))
+      )
     } catch (error) {
       // Nothing synced yet this run: the caller should hear why.
       if (!routine.length && !results.length) throw error
@@ -409,7 +476,7 @@ export async function syncConnection(
       continue
     }
     for (const m of group) {
-      const { ok, posted } = await take(m, found, window, !!next)
+      const { ok, posted } = await take(m, reply, window, !!next)
       if (!ok) continue
       await save(m, {
         ...historyAfter(window, posted),

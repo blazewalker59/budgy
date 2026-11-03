@@ -95,17 +95,24 @@ export async function startReceipt(
   )
 }
 
+/**
+ * Close a receipt. A `notice` (the source said its data may be incomplete,
+ * say) makes it need attention, with that message, even with nothing to
+ * review.
+ */
 export async function finishReceipt(
   db: HouseholdDatabase,
   id: string,
   summary: PostSummary | null,
+  notice?: string,
 ) {
+  const attention = !!summary?.review.length || !!notice
   await db
     .update(accountUpdates)
     .set(
       summary
         ? {
-            status: summary.review.length ? 'attention' : 'succeeded',
+            status: attention ? 'attention' : 'succeeded',
             finishedAt: new Date(),
             added: summary.added,
             updated: summary.updated,
@@ -115,9 +122,10 @@ export async function finishReceipt(
               summary.duplicates.length +
               summary.notSpending,
             review: summary.review.length,
-            message: summary.review.length
-              ? 'Some purchases need review.'
-              : null,
+            message:
+              [notice, summary.review.length && 'Some purchases need review.']
+                .filter(Boolean)
+                .join(' ') || null,
             issues: summary.review,
           }
         : {
@@ -127,4 +135,33 @@ export async function finishReceipt(
           },
     )
     .where(inHousehold(db, accountUpdates, eq(accountUpdates.id, id)))
+}
+
+/**
+ * A check that read nothing for an Account (its source didn't send it), as
+ * a failed receipt with a message for Members. Holds no lease: it changes
+ * no purchases.
+ */
+export async function recordFailedCheck(
+  db: HouseholdDatabase,
+  input: {
+    account: string
+    source: UpdateSource
+    updatedBy: string
+    message: string
+  },
+) {
+  const now = new Date()
+  await db.insert(accountUpdates).values(
+    householdRow(db, {
+      id: crypto.randomUUID(),
+      account: input.account,
+      source: input.source,
+      updatedBy: input.updatedBy,
+      status: 'failed',
+      startedAt: now,
+      finishedAt: now,
+      message: input.message,
+    }),
+  )
 }

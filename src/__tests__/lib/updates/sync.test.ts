@@ -3,7 +3,7 @@
  * (docs/adr/0014), against a fake Bridge that honours start-date, end-date
  * and account the way the real one does.
  */
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { testDatabase } from '../../helpers/d1'
 import type { DatabaseSync } from 'node:sqlite'
@@ -19,10 +19,16 @@ import {
 } from '@/lib/db/schema'
 import { saveAccount } from '@/lib/ledger/accounts'
 import { HISTORY_DAYS, WINDOW_DAYS, syncConnection } from '@/lib/updates/sync'
-import { queueFirstSync } from '@/lib/updates/syncQueue'
+import {
+  consumeSyncBatch,
+  enqueueSyncs,
+  queueFirstSync,
+} from '@/lib/updates/syncQueue'
+import { listAccountUpdates } from '@/lib/updates/queries'
 import {
   addBankAccounts,
   connectSimplefin,
+  listConnections,
   mapBankAccount,
 } from '@/lib/updates/connections'
 import { today as householdToday } from '@/lib/model/dates'
@@ -133,7 +139,7 @@ const spending = (days: number, step = 10): FakeAccount['history'] =>
   ])
 
 async function fixture(bank: Array<FakeAccount>) {
-  const { db, sqlite, newClient } = testDatabase()
+  const { db, sqlite, newClient, d1 } = testDatabase()
   open.push(sqlite)
   await db.insert(households).values([
     { id: 'a', name: 'A' },
@@ -164,7 +170,7 @@ async function fixture(bank: Array<FakeAccount>) {
   const added = async (account = 'Card') =>
     (await db.select().from(transactions)).filter((t) => t.account === account)
       .length
-  return { db, a, b, id, ...bridge, link, sync, row, added }
+  return { db, d1, a, b, id, ...bridge, link, sync, row, added }
 }
 
 const card = (history: FakeAccount['history']): FakeAccount => ({
@@ -332,5 +338,180 @@ describe('Queueing a first sync on linking', () => {
     expect(await queueFirstSync(f.b, [f.id], q.queue)).toBe(0)
     expect(await queueFirstSync(f.a, [f.id], undefined)).toBe(0)
     expect(q.sent).toEqual([])
+  })
+})
+
+/** A queue batch of one message, recording how it was settled. */
+function batchOf(body: unknown, attempts = 1) {
+  const settled: { acked?: true; retry?: number } = {}
+  const batch = {
+    queue: 'budgy-sync',
+    messages: [
+      {
+        id: 'm1',
+        timestamp: new Date(),
+        body,
+        attempts,
+        ack: () => (settled.acked = true),
+        retry: (options?: { delaySeconds?: number }) =>
+          (settled.retry = options?.delaySeconds ?? 0),
+      },
+    ],
+  } as unknown as MessageBatch
+  return { batch, settled }
+}
+
+const checking: FakeAccount = {
+  id: 'CHK',
+  name: 'Everyday',
+  balance: '500.00',
+  history: [[2, '-5.00']],
+}
+
+describe('SimpleFIN connection health', () => {
+  it('pauses a connection whose subscription lapsed, says how to renew, and doesn’t retry it', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    f.reply.status = 402
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { batch, settled } = batchOf({ householdId: 'a', connectionId: f.id })
+    await consumeSyncBatch(f.d1, batch, KEY, f.transport)
+    expect(settled).toEqual({ acked: true })
+    const [connection] = await listConnections(f.a)
+    expect(connection.status).toBe('payment_required')
+    expect(connection.lastError).toContain('https://bridge.simplefin.org/')
+    // Still asked on schedule, so it resumes once renewed.
+    const sent: Array<unknown> = []
+    const queue = {
+      sendBatch: (m: Iterable<{ body: unknown }>) => {
+        for (const x of m) sent.push(x.body)
+        return Promise.resolve()
+      },
+    } as unknown as Queue<SyncMessage>
+    expect(await enqueueSyncs(f.d1, queue)).toBe(1)
+    f.reply.status = undefined
+    await f.sync()
+    expect((await listConnections(f.a))[0].status).toBe('ready')
+    log.mockRestore()
+  })
+
+  it('keeps a revoked connection’s credential and links, doesn’t retry it, and stops scheduling it', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    f.reply.status = 403
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { batch, settled } = batchOf({ householdId: 'a', connectionId: f.id })
+    await consumeSyncBatch(f.d1, batch, KEY, f.transport)
+    log.mockRestore()
+    expect(settled).toEqual({ acked: true })
+    const [connection] = await listConnections(f.a)
+    expect(connection.status).toBe('revoked')
+    expect(connection.lastError).toMatch(/new setup token/)
+    expect(connection.accounts[0].account).toBe('Card')
+    const stored = await f.db.select().from(bankConnections).get()
+    expect(stored!.encryptedAccess).toBeTruthy()
+    const queue = {
+      sendBatch: () => Promise.resolve(),
+    } as unknown as Queue<SyncMessage>
+    expect(await enqueueSyncs(f.d1, queue)).toBe(0)
+  })
+
+  it('marks accounts whose bank needs a new sign-in, and reads their window again once fixed', async () => {
+    const f = await fixture([card([[2, '-1.00']]), checking])
+    await f.link('ACT-1', 'Card')
+    await f.sync()
+    const before = (await f.row()).syncedThrough
+    await f.db
+      .update(bankAccounts)
+      .set({ syncedThrough: '2026-01-01' })
+      .where(eq(bankAccounts.providerId, 'ACT-1'))
+    f.reply.errlist = [
+      { code: 'con.auth', msg: 'Chase wants you to log in', conn_id: 'CON-1' },
+    ]
+    const [result] = await f.sync()
+    expect(result.error).toBe(
+      'Chase needs you to sign in again in SimpleFIN Bridge. SimpleFIN says: Chase wants you to log in',
+    )
+    expect(result.retry).toBeUndefined()
+    expect(await f.row()).toMatchObject({
+      syncedThrough: '2026-01-01',
+      problemKind: 'reauth',
+    })
+    const [update] = await listAccountUpdates(f.a)
+    expect(update.latest).toMatchObject({
+      status: 'attention',
+      message: expect.stringContaining('sign in again'),
+    })
+    f.reply.errlist = []
+    await f.sync()
+    expect(await f.row()).toMatchObject({
+      syncedThrough: before,
+      problem: null,
+      problemKind: null,
+    })
+  })
+
+  it('holds back an account Bridge couldn’t fully read, and offers to retry it alone', async () => {
+    const f = await fixture([card([[2, '-1.00']]), checking])
+    await f.link('ACT-1', 'Card')
+    await f.link('CHK', 'Checking')
+    await f.sync()
+    await f.db.update(bankAccounts).set({ syncedThrough: '2026-01-01' })
+    f.reply.errlist = [
+      { code: 'act.weird-new-code', msg: 'Try later', account_id: 'ACT-1' },
+    ]
+    const results = await f.sync()
+    expect(results.find((r) => r.account === 'Card')).toMatchObject({
+      retry: 'ACT-1',
+      error: expect.stringContaining('SimpleFIN says: Try later'),
+    })
+    expect(await f.row()).toMatchObject({
+      syncedThrough: '2026-01-01',
+      problemKind: 'failed',
+    })
+    // The other account isn't held back.
+    expect((await f.row('CHK')).syncedThrough).not.toBe('2026-01-01')
+    expect((await f.row('CHK')).problem).toBeNull()
+  })
+
+  it('records a failed check for an account missing from the reply', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    await f.sync()
+    f.reply.omit = ['ACT-1']
+    const [result] = await f.sync()
+    expect(result).toMatchObject({ account: 'Card', retry: 'ACT-1' })
+    expect(await f.row()).toMatchObject({ problemKind: 'missing' })
+    const [update] = await listAccountUpdates(f.a)
+    expect(update.latest).toMatchObject({
+      status: 'failed',
+      message:
+        'SimpleFIN didn’t send Sapphire this time. Budgy will try it again.',
+    })
+    // The last success is still the one before.
+    expect(update.success?.status).toBe('succeeded')
+  })
+
+  it('shows a plain message for Bridge’s developer errors, never their text', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    f.reply.errlist = [{ code: 'gen.api', msg: 'start-date=17 is wrong' }]
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await f.sync()
+    log.mockRestore()
+    const [connection] = await listConnections(f.a)
+    expect(connection.status).toBe('attention')
+    expect(connection.lastError).toContain('couldn’t answer Budgy’s request')
+    expect(connection.lastError).not.toContain('start-date')
+  })
+
+  it('treats gen.auth like revoked access', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    f.reply.errlist = [{ code: 'gen.auth', msg: 'nope' }]
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(f.sync()).rejects.toThrow(/no longer accepts/)
+    log.mockRestore()
+    expect((await listConnections(f.a))[0].status).toBe('revoked')
   })
 })

@@ -50,7 +50,8 @@ export function BankConnections({
   const all = connections.data ?? []
   const banks = all.flatMap((c) => c.accounts)
   const linked = banks.filter((b) => b.account).length
-  const attention = all.some((c) => c.status === 'attention')
+  const attention =
+    all.some((c) => c.status !== 'ready') || banks.some((b) => b.problem)
   const sync = useMutation({
     mutationFn: async () => {
       const results: Array<SyncedAccount> = []
@@ -182,6 +183,8 @@ export function BankConnections({
 }
 
 export const SIMPLEFIN_SIGN_UP = 'https://bridge.simplefin.org/simplefin/create'
+/** Where a Member signs in to Bridge: to renew, re-authorize a bank, or make a token. */
+export const SIMPLEFIN_BRIDGE = 'https://bridge.simplefin.org/'
 
 /** What SimpleFIN Bridge is and costs, before anyone signs up. */
 export function SimplefinNote() {
@@ -302,7 +305,10 @@ function ConnectionRow({
   const problem =
     discover.error?.message ??
     disconnect.error?.message ??
-    (connection.status === 'attention' ? connection.lastError : null)
+    (connection.status !== 'ready' ? connection.lastError : null)
+  const signIn = connection.accounts.filter(
+    (a) => a.account && a.problemKind === 'reauth',
+  )
 
   return (
     <div className="space-y-1.5 rounded-lg bg-background p-2.5">
@@ -354,6 +360,27 @@ function ConnectionRow({
       {problem && (
         <p role="alert" className="text-over">
           {problem}
+        </p>
+      )}
+      {(connection.status === 'payment_required' || signIn.length > 0) && (
+        <p>
+          {signIn.length > 0 && (
+            <span className="text-over">
+              Sign in again in Bridge for{' '}
+              {signIn.map((a) => `${a.name} (${a.institution})`).join(', ')}
+              .{' '}
+            </span>
+          )}
+          <a
+            href={SIMPLEFIN_BRIDGE}
+            target="_blank"
+            rel="noreferrer"
+            className="font-semibold text-accent"
+          >
+            {connection.status === 'payment_required'
+              ? 'Renew in SimpleFIN Bridge'
+              : 'Open SimpleFIN Bridge'}
+          </a>
         </p>
       )}
       <p className="text-muted">

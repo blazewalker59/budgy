@@ -270,6 +270,8 @@ export interface PostInput {
    * skipped, counted and listed on the receipt for review, not imported.
    */
   unreadable?: PostSummary['review']
+  /** Shown on the receipt, which then needs attention (docs/adr/0014). */
+  notice?: string
 }
 
 /** All writers use one Account lease and one receipt format. Preview is read-only. */
@@ -310,7 +312,7 @@ export async function postTransactions(
       lease,
     )
     await renewUpdate(db, account.name, lease)
-    await finishReceipt(db, id, summary)
+    await finishReceipt(db, id, summary, input.notice)
     return summary
   } catch (error) {
     if (started) await finishReceipt(db, id, null)

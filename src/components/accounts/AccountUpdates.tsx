@@ -27,6 +27,7 @@ import { dollars } from '@/lib/model/money'
 import {
   BankConnections,
   BankLink,
+  SIMPLEFIN_BRIDGE,
 } from '@/components/accounts/BankConnections'
 import { ShortcutUpload } from '@/components/accounts/ShortcutUpload'
 import { Dropdown } from '@/components/shared/Dropdown'
@@ -73,11 +74,20 @@ export function AccountUpdates() {
       </p>
     )
   const banks = connections.data?.flatMap((c) => c.accounts) ?? []
+  const health = new Map(
+    (connections.data ?? []).map((c) => [c.id, c] as const),
+  )
   const cards = ix.ledger.accounts
     .filter((a) => !a.closed)
     .map((account) => {
       const state = updates.data.find((u) => u.account === account.name)
-      const situation = situate(account, state, banks, tokens.data ?? [])
+      const situation = situate(
+        account,
+        state,
+        banks,
+        tokens.data ?? [],
+        health,
+      )
       const open = selected?.account === account.name ? selected : null
       return {
         account,
@@ -161,9 +171,19 @@ function situate(
   state: UpdateState | undefined,
   banks: Array<BankAccount>,
   tokens: Array<{ account: string }>,
+  health: ReadonlyMap<string, { status: string; lastError: string | null }>,
 ) {
   const spending = ['credit', 'checking', 'savings'].includes(account.kind)
   const bank = banks.find((b) => b.account === account.name) ?? null
+  // The whole connection stopped (a lapsed plan, revoked access): say so
+  // on every Account it feeds, with what to do.
+  const connection = bank ? health.get(bank.connectionId) : undefined
+  const paused =
+    connection &&
+    (connection.status === 'payment_required' ||
+      connection.status === 'revoked')
+      ? connection.lastError
+      : null
   const unlinkedBanks = banks.filter(
     (b) => !b.account && b.present && b.currency.toUpperCase() === 'USD',
   ).length
@@ -177,9 +197,10 @@ function situate(
     (spending && method === 'manual') ||
     (!spending && !bank && unlinkedBanks > 0) ||
     (bank !== null && !bank.present) ||
+    (bank !== null && (!!bank.problem || !!paused)) ||
     latest === 'failed' ||
     latest === 'attention'
-  return { spending, bank, unlinkedBanks, method, needsAction }
+  return { spending, bank, paused, unlinkedBanks, method, needsAction }
 }
 
 /** Which way of updating suits an Account best, given what's set up. */
@@ -205,7 +226,7 @@ function AccountCard({
 }) {
   const { ix } = useBook()
   const connections = useBankConnections()
-  const { spending, bank, unlinkedBanks, method } = situation
+  const { spending, bank, paused, unlinkedBanks, method } = situation
   const lastBalance = ix.ledger.balances
     .filter((b) => b.account === account.name)
     .at(-1)
@@ -213,8 +234,20 @@ function AccountCard({
 
   // What the card says, and the one thing it asks for (if anything).
   let summary: string
-  let primary: { label: string; panel?: Panel; record?: boolean } | null = null
-  if (bank && !bank.present) {
+  let primary: {
+    label: string
+    panel?: Panel
+    record?: boolean
+    href?: string
+  } | null = null
+  if (bank && paused) {
+    summary = `Bank sync is paused. ${paused}`
+    primary = { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
+  } else if (bank && bank.problem) {
+    summary = bank.problem
+    if (bank.problemKind === 'reauth')
+      primary = { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
+  } else if (bank && !bank.present) {
     summary = `SimpleFIN stopped sharing ${bank.name}. Check SimpleFIN Bridge or link another account.`
     primary = { label: 'Fix link', panel: 'link' }
   } else if (bank) {
@@ -252,7 +285,16 @@ function AccountCard({
           </p>
         </div>
         {primary &&
-          (primary.record ? (
+          (primary.href ? (
+            <a
+              href={primary.href}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 font-semibold text-background"
+            >
+              {primary.label}
+            </a>
+          ) : primary.record ? (
             <Link
               to="/accounts"
               search={{ kinds: [account.kind], people: [account.owner] }}
@@ -272,7 +314,13 @@ function AccountCard({
             )
           ))}
       </div>
-      <p className="text-muted">{summary}</p>
+      {bank && (paused || bank.problem) ? (
+        <p role="alert" className="text-over">
+          {summary}
+        </p>
+      ) : (
+        <p className="text-muted">{summary}</p>
+      )}
       {spending && <UpdateStatus state={state} />}
       {(!spending || bank) && (
         <p className="text-muted">

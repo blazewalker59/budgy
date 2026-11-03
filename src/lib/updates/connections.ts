@@ -188,10 +188,18 @@ export async function readBridge(
     const message =
       error instanceof SimplefinError
         ? error.message
-        : 'This connection’s credentials couldn’t be opened. Disconnect it and connect again.'
+        : 'This connection’s credentials couldn’t be opened. Make a new setup token in SimpleFIN Bridge and reconnect.'
+    // The credential is kept, so the Member sees what's wrong and can
+    // reconnect it with a new setup token.
+    const status =
+      error instanceof SimplefinError && error.kind === 'payment'
+        ? ('payment_required' as const)
+        : error instanceof SimplefinError && error.kind === 'auth'
+          ? ('revoked' as const)
+          : ('attention' as const)
     await db
       .update(bankConnections)
-      .set({ status: 'attention', lastError: message })
+      .set({ status, lastError: message })
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     throw error instanceof SimplefinError ? error : new UserError(message)
   }
@@ -206,6 +214,7 @@ export async function readBridge(
           institution: a.institution,
           currency: a.currency,
           present: true,
+          connId: a.connId,
         }),
       )
       .onConflictDoUpdate({
@@ -219,6 +228,7 @@ export async function readBridge(
           institution: a.institution,
           currency: a.currency,
           present: true,
+          connId: a.connId,
         },
       }),
   )
@@ -313,6 +323,8 @@ export async function mapBankAccount(
  * anything twice.
  */
 const FRESH_HISTORY = {
+  problem: null,
+  problemKind: null,
   syncedThrough: null,
   moneyInSince: null,
   historyFrom: null,
@@ -470,6 +482,8 @@ export async function listConnections(db: HouseholdDatabase) {
         syncedThrough: bankAccounts.syncedThrough,
         historyFrom: bankAccounts.historyFrom,
         historyComplete: bankAccounts.historyComplete,
+        problem: bankAccounts.problem,
+        problemKind: bankAccounts.problemKind,
       })
       .from(bankAccounts)
       .where(inHousehold(db, bankAccounts))

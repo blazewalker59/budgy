@@ -39,6 +39,8 @@ const bank = (providerId: string, name: string, over = {}) => ({
   syncedThrough: null,
   historyFrom: null,
   historyComplete: false,
+  problem: null,
+  problemKind: null,
   ...over,
 })
 

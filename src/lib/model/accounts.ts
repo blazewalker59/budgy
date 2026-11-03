@@ -30,11 +30,14 @@ export const accountInput = z.object({
     .transform((s) => s || null),
 })
 
+/** A Balance is at most $100,000,000 either way. */
+export const MAX_BALANCE_CENTS = 10_000_000_000
+
 export const balanceInput = z.object({
   account: z.string().trim().min(1).max(60),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   /** Cents, as the account shows it; a card's balance owed is positive. */
-  amount: z.number().int().min(-10_000_000_000).max(10_000_000_000),
+  amount: z.number().int().min(-MAX_BALANCE_CENTS).max(MAX_BALANCE_CENTS),
 })
 
 export function isDebt(account: Pick<Account, 'kind'>): boolean {

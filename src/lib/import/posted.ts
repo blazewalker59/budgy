@@ -31,6 +31,9 @@ export interface PostedRow {
   sourceId?: string
 }
 
+/** The largest purchase or refund Budgy takes: $1,000,000. */
+export const MAX_ROW_CENTS = 100_000_000
+
 export const postedRowInput = z.object({
   date: z
     .string()
@@ -46,8 +49,8 @@ export const postedRowInput = z.object({
   amount: z
     .number()
     .finite()
-    .min(-1_000_000)
-    .max(1_000_000)
+    .min(-MAX_ROW_CENTS / 100)
+    .max(MAX_ROW_CENTS / 100)
     .describe('Dollars; positive is spending, negative a refund'),
   category: z.string().max(60).nullable().optional(),
   sourceId: z.string().min(1).max(200).optional(),

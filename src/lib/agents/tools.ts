@@ -25,6 +25,7 @@ import {
 } from '@/lib/ledger/accounts'
 import { postedRowInput } from '@/lib/import/posted'
 import {
+  MAX_BALANCE_CENTS,
   equity,
   isDebt,
   latestBalances,
@@ -564,6 +565,9 @@ export function budgyTools(
               account: z.string().min(1).max(60),
               balance: z
                 .number()
+                .finite()
+                .min(-MAX_BALANCE_CENTS / 100)
+                .max(MAX_BALANCE_CENTS / 100)
                 .describe(
                   'Dollars as the account shows it; a card’s balance owed is positive',
                 ),

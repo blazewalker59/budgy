@@ -16,6 +16,7 @@ import {
 import {
   deleteAccount,
   postTransactions,
+  recordBalances,
   saveAccount,
 } from '@/lib/ledger/accounts'
 import { syncConnection } from '@/lib/updates/sync'
@@ -616,6 +617,65 @@ describe('SimpleFIN sync', () => {
     ])
     expect(await db.select().from(transactions)).toHaveLength(3)
     expect((await listAccountUpdates(b))[0].latest).toBeNull()
+  })
+
+  it('skips a purchase it can’t take and lists it, rather than failing the account every sync', async () => {
+    const { db, a, id, transport } = await linked([
+      {
+        ...sapphire,
+        transactions: [
+          txn('t1', '-12.34', 'Coffee Shop'),
+          txn('t2', '-2500000.00', 'Wire to escrow'),
+        ],
+      },
+    ])
+    expect(await syncConnection(a, id, KEY, transport)).toEqual([
+      { account: 'Card', added: 1, balance: true },
+    ])
+    expect(
+      (await db.select().from(transactions)).map((t) => t.description),
+    ).toEqual(['Coffee Shop'])
+    const [update] = await listAccountUpdates(a)
+    expect(update.latest).toMatchObject({
+      status: 'attention',
+      added: 1,
+      review: 1,
+      issues: [
+        {
+          description: 'Wire to escrow',
+          amount: 2_500_000,
+          reason: expect.stringContaining('up to $1,000,000'),
+        },
+      ],
+    })
+    const [link] = await db.select().from(bankAccounts)
+    expect(link.syncedThrough).toBeTruthy()
+  })
+
+  it('records purchases but not a balance it can’t hold', async () => {
+    const { db, a, id, transport } = await linked([
+      {
+        ...sapphire,
+        balance: '-250000000.00',
+        transactions: [txn('t1', '-12.34', 'Coffee Shop')],
+      },
+    ])
+    const [result] = await syncConnection(a, id, KEY, transport)
+    expect(result).toMatchObject({ account: 'Card', added: 1 })
+    expect(result.balance).toBeUndefined()
+    expect(result.error).toMatch(/balance .* wasn’t recorded/)
+    expect(await db.select().from(balances)).toEqual([])
+    const [link] = await db.select().from(bankAccounts)
+    expect(link.syncedThrough).toBeTruthy()
+    // However a balance arrives (an Agent, say), it's held to the same bound.
+    for (const amount of [1e13, Number.NaN, 1.5])
+      await expect(
+        recordBalances(
+          a,
+          [{ account: 'Card', date: '2026-10-01', amount }],
+          'x',
+        ),
+      ).rejects.toThrow('up to $100,000,000')
   })
 
   it('reads back to the last sync with an overlap, and 60 days the first time for Money in', async () => {

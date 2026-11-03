@@ -11,8 +11,12 @@ import { isSpending } from './exports'
 import type { SimplefinTransaction } from './simplefinClient'
 import type { BankKeys } from './crypto'
 import type { HouseholdDatabase } from '@/lib/households/scope'
+import type { z } from 'zod'
 import type { PostedRow } from '@/lib/import/posted'
+import type { PostInput } from '@/lib/ledger/accounts'
 import type { IncomingRow } from '@/lib/model/moneyIn'
+import { MAX_ROW_CENTS, postedRowInput } from '@/lib/import/posted'
+import { MAX_BALANCE_CENTS, isDebt } from '@/lib/model/accounts'
 import { recordMoneyIn } from '@/lib/moneyIn/service'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
 import { inHousehold } from '@/lib/households/scope'
@@ -24,7 +28,6 @@ import {
 import { UserError, clientMessage } from '@/lib/errors'
 import { householdTimeZone } from '@/lib/households/locale'
 import { addDays, dateOn, today } from '@/lib/model/dates'
-import { isDebt } from '@/lib/model/accounts'
 
 /** How far a first sync reaches back. */
 const FIRST_DAYS = 45
@@ -62,6 +65,26 @@ function purchaseRow(
   }
 }
 
+type SkippedRow = NonNullable<PostInput['unreadable']>[number]
+
+/** A purchase row Budgy can't take, as the receipt lists it. */
+function skippedRow(row: PostedRow, error: z.ZodError): SkippedRow {
+  const amount = Number.isFinite(row.amount) ? row.amount : 0
+  return {
+    date: row.date,
+    description: row.description.slice(0, 200),
+    amount,
+    reason: error.issues.some((i) => i.path[0] === 'amount')
+      ? 'Skipped: Budgy takes purchases up to $1,000,000.'
+      : 'Skipped: this purchase couldn’t be read.',
+  }
+}
+
+/** Cents a Balance can hold (balanceInput's bounds). */
+function plausibleBalance(cents: number) {
+  return Number.isSafeInteger(cents) && Math.abs(cents) <= MAX_BALANCE_CENTS
+}
+
 /** Posted money into a bank Account, as Money in (docs/adr/0011). */
 function incomingRow(
   t: SimplefinTransaction,
@@ -70,7 +93,8 @@ function incomingRow(
 ): IncomingRow | null {
   if (debt || t.pending || !t.posted) return null
   const cents = Math.round(Number(t.amount) * 100)
-  if (cents <= 0) return null
+  // Same bound as a purchase; anything bigger isn't money in Budgy can use.
+  if (!(cents > 0) || cents > MAX_ROW_CENTS) return null
   return {
     date: dateOn(new Date((t.transactedAt ?? t.posted) * 1000), timeZone),
     description: t.description.slice(0, 200) || 'Money in',
@@ -167,6 +191,7 @@ export async function syncConnection(
       if (SPENDING_KINDS.includes(account.kind)) {
         const rows: Array<PostedRow> = []
         const incoming: Array<IncomingRow> = []
+        const unreadable: Array<SkippedRow> = []
         let excluded = 0
         for (const t of source.transactions) {
           const row = purchaseRow(t, debt, timeZone)
@@ -175,7 +200,13 @@ export async function syncConnection(
             if (ours) excluded++
             const money = incomingRow(t, debt, timeZone)
             if (money) incoming.push(money)
-          } else if (row && ours) rows.push(row)
+          } else if (row && ours) {
+            // One row Budgy can't take (over $1M, say) mustn't stop the
+            // rest, or this account would never get past it.
+            const valid = postedRowInput.safeParse(row)
+            if (valid.success) rows.push(row)
+            else unreadable.push(skippedRow(row, valid.error))
+          }
         }
         const summary = await postTransactions(db, {
           account: account.name,
@@ -185,6 +216,7 @@ export async function syncConnection(
           via: 'simplefin',
           sourceNamespace: `simplefin:${m.providerId}`,
           excluded,
+          unreadable,
           coverage: { from: start, to: until },
         })
         result.added = summary.added
@@ -198,6 +230,12 @@ export async function syncConnection(
       }
       // SimpleFIN shows what's owed as negative; Budgy as positive.
       const cents = Math.round(Number(source.balance) * 100)
+      if (!plausibleBalance(cents)) {
+        result.error = `SimpleFIN’s balance for ${m.name} couldn’t be read, so it wasn’t recorded.`
+        await covered(m, { syncedThrough: until })
+        results.push(result)
+        continue
+      }
       await recordBalances(
         db,
         [

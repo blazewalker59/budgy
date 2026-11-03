@@ -76,7 +76,10 @@ separate update experience.
   shows what's owed as negative; Budgy stores a card's or loan's owed balance
   as positive. Investment and other balance-based Accounts get only balances.
 - Each purchase sync writes a receipt with source `simplefin` (including
-  no-op checks); one Account failing doesn't stop the others.
+  no-op checks); one Account failing doesn't stop the others. A purchase
+  Budgy can't take (over $1,000,000) is skipped and listed on the receipt
+  for review, so it can't hold its Account back every sync; a balance past
+  $100,000,000 either way isn't recorded.
 - A Cloudflare cron runs every six hours for every Household with a mapped
   account, each in its own Household scope; **Sync now** runs the same thing.
   Both count toward the 20-requests-a-day cap. The cron now queues one

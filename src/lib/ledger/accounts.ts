@@ -45,6 +45,7 @@ import {
   startReceipt,
 } from '@/lib/updates/receipts'
 import { UserError } from '@/lib/errors'
+import { MAX_BALANCE_CENTS } from '@/lib/model/accounts'
 
 /** An Account by name, any case; the error lists the real names. */
 export async function findAccount(
@@ -156,6 +157,16 @@ export async function recordBalances(
   rows: Array<Balance>,
   recordedBy: string,
 ): Promise<void> {
+  if (
+    rows.some(
+      (b) =>
+        !Number.isSafeInteger(b.amount) ||
+        Math.abs(b.amount) > MAX_BALANCE_CENTS,
+    )
+  )
+    throw new UserError(
+      'A balance must be a dollar amount up to $100,000,000 either way.',
+    )
   const statements = []
   const perInsert = rowsPerInsert(balances)
   for (const account of new Set(rows.map((b) => b.account)))
@@ -253,6 +264,11 @@ export interface PostInput {
   coverage?: { from: string; to: string }
   /** Payments/transfers excluded by the normalizer, before purchase filing. */
   excluded?: number
+  /**
+   * Rows a connector couldn't take (an amount over the limit, say). They are
+   * skipped, counted and listed on the receipt for review, not imported.
+   */
+  unreadable?: PostSummary['review']
 }
 
 /** All writers use one Account lease and one receipt format. Preview is read-only. */
@@ -422,7 +438,7 @@ async function postTransactionsUnlocked(
     replaced: replacing.length,
     updated: identified?.changes.length ?? 0,
     linked: identified?.links.length ?? 0,
-    review: identified?.conflicts ?? [],
+    review: [...(identified?.conflicts ?? []), ...(input.unreadable ?? [])],
     alreadyHad: prepared.alreadyHad,
     notSpending: prepared.notSpending + (input.excluded ?? 0),
     carried: prepared.carried,

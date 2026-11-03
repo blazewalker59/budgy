@@ -55,6 +55,7 @@ import { CADENCES, TAGS } from '@/lib/model/types'
 import { payInput } from '@/lib/model/pay'
 import { completeRules, importRulesSchema } from '@/lib/import/rules'
 import { postedRowInput } from '@/lib/import/posted'
+import { UserError } from '@/lib/errors'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 
 export type { PostSummary } from './accounts'
@@ -469,7 +470,12 @@ export const getImportRules = createServerFn({ method: 'GET' }).handler(() =>
  * already imported keep their Store and Category.
  */
 export const setImportRules = createServerFn({ method: 'POST' })
-  .validator((data: ImportRules) => importRulesSchema.parse(data))
+  .validator((data: ImportRules) => {
+    // The Member's own patterns: say which one needs fixing, and why.
+    const parsed = importRulesSchema.safeParse(data)
+    if (!parsed.success) throw new UserError(z.prettifyError(parsed.error))
+    return parsed.data
+  })
   .handler(({ data }) =>
     withMember(async ({ db }) => {
       const value = JSON.stringify(completeRules(data))

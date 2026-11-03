@@ -25,6 +25,11 @@ none of that can live in code.
   the seed script are gone: purchases come in per Account, docs/adr/0005.)
 - Rules shape future imports only; Transactions already imported keep their
   Store and Category (Moves and Store Rules change those).
+- Patterns run on the server for every imported row, so a saved pattern is
+  at most 500 characters, with no backreferences, no repeated group that
+  itself repeats or has alternatives (`(a+)+`, `(a|ab)*`) and at most six
+  repeats. A pattern saved before this that fails the check is skipped, not
+  run.
 
 ## Consequences
 

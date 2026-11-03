@@ -13,8 +13,9 @@ import {
   MAX_EXPORT_BYTES,
   detectExport,
 } from '@/lib/updates/exports'
-import { updateAccountExport } from '@/lib/updates/server'
+import { retryBankAccount, updateAccountExport } from '@/lib/updates/server'
 import {
+  BANK_CONNECTIONS_KEY,
   UPDATES_KEY,
   useAccountUpdates,
   useBankConnections,
@@ -239,14 +240,17 @@ function AccountCard({
     panel?: Panel
     record?: boolean
     href?: string
+    retry?: boolean
   } | null = null
   if (bank && paused) {
     summary = `Bank sync is paused. ${paused}`
     primary = { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
   } else if (bank && bank.problem) {
     summary = bank.problem
-    if (bank.problemKind === 'reauth')
-      primary = { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
+    primary =
+      bank.problemKind === 'reauth'
+        ? { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
+        : { label: 'Retry', retry: true }
   } else if (bank && !bank.present) {
     summary = `SimpleFIN stopped sharing ${bank.name}. Check SimpleFIN Bridge or link another account.`
     primary = { label: 'Fix link', panel: 'link' }
@@ -285,7 +289,9 @@ function AccountCard({
           </p>
         </div>
         {primary &&
-          (primary.href ? (
+          (primary.retry && bank ? (
+            <RetryBank bank={bank} />
+          ) : primary.href ? (
             <a
               href={primary.href}
               target="_blank"
@@ -382,6 +388,41 @@ function AccountCard({
             : 'Other ways to update'}
       </button>
     </section>
+  )
+}
+
+/** Try a failed bank account again now, on its own. */
+function RetryBank({ bank }: { bank: BankAccount }) {
+  const queryClient = useQueryClient()
+  const retry = useMutation({
+    mutationFn: () =>
+      retryBankAccount({
+        data: { connectionId: bank.connectionId, providerId: bank.providerId },
+      }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: BANK_CONNECTIONS_KEY }),
+        queryClient.invalidateQueries({ queryKey: UPDATES_KEY }),
+        queryClient.invalidateQueries({ queryKey: LEDGER_KEY }),
+        queryClient.invalidateQueries({ queryKey: MONEY_IN_KEY }),
+      ]),
+  })
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={retry.isPending}
+        onClick={() => retry.mutate()}
+        className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background disabled:opacity-50"
+      >
+        {retry.isPending ? 'Retrying…' : 'Retry'}
+      </button>
+      {retry.isError && (
+        <p role="alert" className="max-w-56 text-right text-over">
+          {retry.error.message}
+        </p>
+      )}
+    </div>
   )
 }
 

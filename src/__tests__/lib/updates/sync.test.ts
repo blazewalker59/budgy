@@ -22,6 +22,7 @@ import { HISTORY_DAYS, WINDOW_DAYS, syncConnection } from '@/lib/updates/sync'
 import {
   consumeSyncBatch,
   enqueueSyncs,
+  queueAccountRetry,
   queueFirstSync,
 } from '@/lib/updates/syncQueue'
 import { listAccountUpdates } from '@/lib/updates/queries'
@@ -603,5 +604,145 @@ describe('Reconnecting with a new setup token', () => {
     await expect(
       reconnectSimplefin(f.a, { id: f.id, setupToken: NEW_SETUP }, KEY, other),
     ).rejects.toThrow(/already connected/)
+  })
+})
+
+describe('Retrying single accounts', () => {
+  function sending() {
+    const sent: Array<{ body: SyncMessage; delaySeconds?: number }> = []
+    const queue = {
+      send: (body: SyncMessage, options?: { delaySeconds?: number }) => {
+        sent.push({ body, delaySeconds: options?.delaySeconds })
+        return Promise.resolve()
+      },
+    } as unknown as Queue<SyncMessage>
+    return { sent, queue }
+  }
+  const failing = [
+    { code: 'act.failed', msg: 'Try later', account_id: 'ACT-1' },
+  ]
+
+  it('queues a failed account to try alone, a bounded number of times, for just that account', async () => {
+    const f = await fixture([card([[2, '-1.00']]), checking])
+    await f.link('ACT-1', 'Card')
+    await f.link('CHK', 'Checking')
+    await f.sync()
+    f.reply.errlist = failing
+    const q = sending()
+    const full = batchOf({ householdId: 'a', connectionId: f.id })
+    await consumeSyncBatch(f.d1, full.batch, KEY, f.transport, q.queue)
+    expect(full.settled).toEqual({ acked: true })
+    expect(q.sent).toEqual([
+      {
+        body: {
+          householdId: 'a',
+          connectionId: f.id,
+          accountIds: ['ACT-1'],
+          round: 1,
+        },
+        delaySeconds: 1800,
+      },
+    ])
+
+    // Still failing: one more, later.
+    const before = f.requests.length
+    const first = batchOf(q.sent[0].body)
+    await consumeSyncBatch(f.d1, first.batch, KEY, f.transport, q.queue)
+    expect(f.requests.slice(before).map((r) => r.accounts)).toEqual([['ACT-1']])
+    expect(q.sent[1]).toMatchObject({ body: { round: 2 }, delaySeconds: 7200 })
+    // Then the cron's turn.
+    const last = batchOf(q.sent[1].body)
+    await consumeSyncBatch(f.d1, last.batch, KEY, f.transport, q.queue)
+    expect(q.sent).toHaveLength(2)
+
+    // Working again: the account catches up and its problem clears.
+    f.reply.errlist = []
+    const again = batchOf(q.sent[0].body)
+    await consumeSyncBatch(f.d1, again.batch, KEY, f.transport, q.queue)
+    expect(q.sent).toHaveLength(2)
+    expect((await f.row()).problem).toBeNull()
+  })
+
+  it('queues what failed in a Member’s Sync now, in their Household only', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    const q = sending()
+    expect(
+      await queueAccountRetry(f.a, f.id, [{ retry: 'ACT-1' }, {}], q.queue),
+    ).toBe(true)
+    expect(await queueAccountRetry(f.a, f.id, [{}], q.queue)).toBe(false)
+    expect(q.sent).toEqual([
+      {
+        body: {
+          householdId: 'a',
+          connectionId: f.id,
+          accountIds: ['ACT-1'],
+          round: 1,
+        },
+        delaySeconds: 1800,
+      },
+    ])
+  })
+
+  it('retries an account missing from the reply', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    await f.sync()
+    f.reply.omit = ['ACT-1']
+    const q = sending()
+    const { batch } = batchOf({ householdId: 'a', connectionId: f.id })
+    await consumeSyncBatch(f.d1, batch, KEY, f.transport, q.queue)
+    expect(q.sent[0].body.accountIds).toEqual(['ACT-1'])
+  })
+
+  it('leaves today’s last requests to routine syncs', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    await f.sync()
+    await f.db.update(bankConnections).set({
+      requestDay: householdToday('America/New_York'),
+      requestCount: 16,
+    })
+    const before = f.requests.length
+    const { batch, settled } = batchOf({
+      householdId: 'a',
+      connectionId: f.id,
+      accountIds: ['ACT-1'],
+      round: 1,
+    })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await consumeSyncBatch(f.d1, batch, KEY, f.transport)
+    log.mockRestore()
+    expect(settled).toEqual({ acked: true })
+    expect(f.requests).toHaveLength(before)
+    // A Member's own Retry may still use them.
+    await syncConnection(f.a, f.id, KEY, f.transport, { only: ['ACT-1'] })
+    expect(f.requests).toHaveLength(before + 1)
+  })
+
+  it('can’t retry another Household’s account, by message or directly', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    const before = f.requests.length
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const body of [
+      {
+        householdId: 'b',
+        connectionId: f.id,
+        accountIds: ['ACT-1'],
+        round: 1,
+      },
+      // Malformed: a list of accounts without its round.
+      { householdId: 'a', connectionId: f.id, accountIds: ['ACT-1'] },
+    ]) {
+      const { batch, settled } = batchOf(body)
+      await consumeSyncBatch(f.d1, batch, KEY, f.transport)
+      expect(settled).toEqual({ acked: true })
+    }
+    log.mockRestore()
+    await expect(
+      syncConnection(f.b, f.id, KEY, f.transport, { only: ['ACT-1'] }),
+    ).rejects.toThrow(/isn’t linked/)
+    expect(f.requests).toHaveLength(before)
+    expect(await f.added()).toBe(0)
   })
 })

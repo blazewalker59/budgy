@@ -90,6 +90,6 @@ export default {
 
   // The sync queue's consumer: one connection per message.
   async queue(batch: MessageBatch<unknown>, env: CloudflareEnv): Promise<void> {
-    await consumeSyncBatch(env.DB, batch, bankKeys(env))
+    await consumeSyncBatch(env.DB, batch, bankKeys(env), fetch, env.SYNC_QUEUE)
   },
 }

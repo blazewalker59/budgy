@@ -9,6 +9,7 @@
 import { and, eq, isNotNull, isNull, lt, ne, or } from 'drizzle-orm'
 import { z } from 'zod'
 import { syncConnection } from './sync'
+import { ROUTINE_RESERVE } from './connections'
 import { SimplefinError } from './simplefinClient'
 import type { BankKeys } from './crypto'
 import type { HouseholdDatabase } from '@/lib/households/scope'
@@ -20,14 +21,31 @@ import { errorCode, isUserError } from '@/lib/errors'
 export interface SyncMessage {
   householdId: string
   connectionId: string
+  /**
+   * A retry of just these accounts (Bridge ids, not secrets) after they
+   * failed, and which retry it is (docs/adr/0014).
+   */
+  accountIds?: Array<string>
+  round?: number
 }
+
+/** Retries of failed accounts, each later than the last, then the cron's. */
+export const ACCOUNT_RETRY_DELAYS_SECONDS = [30 * 60, 2 * 60 * 60]
 
 const syncMessage = z
   .object({
     householdId: z.string().min(1).max(64),
     connectionId: z.string().min(1).max(64),
+    accountIds: z.array(z.string().min(1).max(200)).min(1).max(50).optional(),
+    round: z
+      .number()
+      .int()
+      .min(1)
+      .max(ACCOUNT_RETRY_DELAYS_SECONDS.length)
+      .optional(),
   })
   .strict()
+  .refine((m) => !m.accountIds === !m.round)
 
 /** Attempts per message, counting the first. Each spends a Bridge request. */
 export const MAX_ATTEMPTS = 3
@@ -93,6 +111,35 @@ export async function queueFirstSync(
 }
 
 /**
+ * After a Member's Sync now: accounts that failed are tried again on their
+ * own later, as after a scheduled sync. Best effort; returns whether sent.
+ */
+export async function queueAccountRetry(
+  db: HouseholdDatabase,
+  connectionId: string,
+  results: ReadonlyArray<{ retry?: string }>,
+  queue: Queue<SyncMessage> | undefined,
+): Promise<boolean> {
+  const accountIds = results.flatMap((r) => (r.retry ? [r.retry] : []))
+  if (!queue || !accountIds.length) return false
+  try {
+    await queue.send(
+      {
+        householdId: db.householdId,
+        connectionId,
+        accountIds: accountIds.slice(0, 50),
+        round: 1,
+      },
+      { delaySeconds: ACCOUNT_RETRY_DELAYS_SECONDS[0] },
+    )
+    return true
+  } catch (error) {
+    console.error('SimpleFIN retry not queued:', errorCode(error))
+    return false
+  }
+}
+
+/**
  * The cron: one message per connection with a linked account. A revoked
  * one is left alone: only a new setup token can fix it, and asking again
  * with refused credentials only spends Bridge's patience. A lapsed
@@ -134,18 +181,24 @@ export async function enqueueSyncs(
  */
 export type SyncOutcome = 'synced' | 'dropped' | 'retry'
 
+/** What a message came to, and the accounts to try again on their own. */
+interface Settled {
+  outcome: SyncOutcome
+  followUp?: { body: SyncMessage; delaySeconds: number }
+}
+
 export async function syncMessageBody(
   d1: D1Database,
   body: unknown,
   keys: BankKeys,
   transport: typeof fetch = fetch,
-): Promise<SyncOutcome> {
+): Promise<Settled> {
   const parsed = syncMessage.safeParse(body)
   if (!parsed.success) {
     console.error('SimpleFIN sync: malformed queue message')
-    return 'dropped'
+    return { outcome: 'dropped' }
   }
-  const { householdId, connectionId } = parsed.data
+  const { householdId, connectionId, accountIds, round = 0 } = parsed.data
   const db = householdDatabase(dbFromD1(d1), householdId)
   // Disconnected or unlinked since it was enqueued: nothing to sync.
   const linked = await db
@@ -169,10 +222,28 @@ export async function syncMessageBody(
       ),
     )
     .get()
-  if (!linked) return 'dropped'
+  if (!linked) return { outcome: 'dropped' }
   try {
-    await syncConnection(db, connectionId, keys, transport)
-    return 'synced'
+    const results = await syncConnection(db, connectionId, keys, transport, {
+      only: accountIds,
+      // A retry is Budgy's own idea: it leaves room for routine syncs.
+      reserve: accountIds ? ROUTINE_RESERVE : 0,
+    })
+    const retry = results.flatMap((r) => (r.retry ? [r.retry] : []))
+    if (!retry.length || round >= ACCOUNT_RETRY_DELAYS_SECONDS.length)
+      return { outcome: 'synced' }
+    return {
+      outcome: 'synced',
+      followUp: {
+        body: {
+          householdId,
+          connectionId,
+          accountIds: retry.slice(0, 50),
+          round: round + 1,
+        },
+        delaySeconds: ACCOUNT_RETRY_DELAYS_SECONDS[round],
+      },
+    }
   } catch (error) {
     console.error(
       `SimpleFIN sync failed for connection ${connectionId}:`,
@@ -187,21 +258,36 @@ export async function syncMessageBody(
       error instanceof SimplefinError
         ? error.kind === 'network'
         : !isUserError(error)
-    return transient ? 'retry' : 'dropped'
+    return { outcome: transient ? 'retry' : 'dropped' }
   }
 }
 
-/** The queue consumer: each message on its own, acked or retried. */
+/**
+ * The queue consumer: each message on its own, acked or retried. Accounts
+ * that failed alone are queued again by themselves, a bounded number of
+ * times; without a queue to send to, the next cron tries them.
+ */
 export async function consumeSyncBatch(
   d1: D1Database,
   batch: MessageBatch<unknown>,
   keys: BankKeys,
   transport: typeof fetch = fetch,
+  queue?: Queue<SyncMessage>,
 ): Promise<void> {
   for (const message of batch.messages) {
     let outcome: SyncOutcome
     try {
-      outcome = await syncMessageBody(d1, message.body, keys, transport)
+      const settled = await syncMessageBody(d1, message.body, keys, transport)
+      outcome = settled.outcome
+      // Synced already: a retry that can't be queued waits for the cron.
+      if (settled.followUp && queue)
+        await queue
+          .send(settled.followUp.body, {
+            delaySeconds: settled.followUp.delaySeconds,
+          })
+          .catch((error: unknown) =>
+            console.error('SimpleFIN retry not queued:', errorCode(error)),
+          )
     } catch (error) {
       console.error('SimpleFIN sync message failed:', errorCode(error))
       outcome = 'retry'

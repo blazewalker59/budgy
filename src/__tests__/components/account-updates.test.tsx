@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   connections: vi.fn(),
   link: vi.fn(),
   reconnect: vi.fn(),
+  retry: vi.fn(),
   accounts: [
     { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
   ] as Array<{ name: string; owner: string; kind: string; closed: boolean }>,
@@ -47,6 +48,7 @@ vi.mock('@/lib/updates/server', () => ({
   refreshBankAccounts: vi.fn(),
   linkBankAccount: mocks.link,
   reconnectBank: mocks.reconnect,
+  retryBankAccount: mocks.retry,
   disconnectBank: vi.fn(),
   syncBank: vi.fn(),
 }))
@@ -498,5 +500,22 @@ describe('Unified Account Updates UI', () => {
         data: { id: 'c1', setupToken: 'token' },
       }),
     )
+  })
+
+  it('retries a bank account that failed, on its own', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.connections.mockResolvedValue(
+      feeding('ready', null, {
+        problem: 'SimpleFIN didn’t send Sapphire this time.',
+        problemKind: 'missing',
+      }),
+    )
+    mocks.retry.mockRejectedValue(new Error('Request limit reached.'))
+    mount()
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }))
+    expect(await screen.findByText('Request limit reached.')).toBeTruthy()
+    expect(mocks.retry).toHaveBeenCalledWith({
+      data: { connectionId: 'c1', providerId: 'p1' },
+    })
   })
 })

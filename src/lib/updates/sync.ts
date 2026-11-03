@@ -7,7 +7,7 @@
  * overlapping windows never add a purchase twice, and each account's balance
  * is recorded. Pending transactions wait until they post.
  */
-import { and, eq, isNotNull } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull } from 'drizzle-orm'
 import { ROUTINE_RESERVE, RequestLimitError, readBridge } from './connections'
 import { isSpending } from './exports'
 import { recordFailedCheck } from './receipts'
@@ -158,11 +158,22 @@ interface Window {
   end?: number
 }
 
+export interface SyncOptions {
+  /**
+   * Just these accounts (Bridge ids), with requests for only them: a
+   * retry of accounts that failed (docs/adr/0014).
+   */
+  only?: ReadonlyArray<string>
+  /** Requests to leave today for routine syncs: set when Budgy retries on its own. */
+  reserve?: number
+}
+
 export async function syncConnection(
   db: HouseholdDatabase,
   id: string,
   secret: BankKeys,
   transport: typeof fetch = fetch,
+  options: SyncOptions = {},
 ): Promise<Array<SyncedAccount>> {
   const mapped = await db
     .select()
@@ -171,11 +182,23 @@ export async function syncConnection(
       inHousehold(
         db,
         bankAccounts,
-        and(eq(bankAccounts.connectionId, id), isNotNull(bankAccounts.account)),
+        and(
+          eq(bankAccounts.connectionId, id),
+          isNotNull(bankAccounts.account),
+          options.only
+            ? inArray(bankAccounts.providerId, [...options.only])
+            : undefined,
+        ),
       ),
     )
   if (!mapped.length)
-    throw new UserError('Link a bank account to a Budgy account first.')
+    throw new UserError(
+      options.only
+        ? 'That bank account isn’t linked any more.'
+        : 'Link a bank account to a Budgy account first.',
+    )
+  const reserve = options.reserve ?? 0
+  const only = options.only ? mapped.map((m) => m.providerId) : undefined
   const [timeZone, connection, ledgerAccounts] = await Promise.all([
     householdTimeZone(db),
     db
@@ -418,7 +441,7 @@ export async function syncConnection(
       db,
       id,
       secret,
-      { start: window.start },
+      { start: window.start, accounts: only, reserve },
       transport,
     )
     for (const m of routine) {
@@ -465,7 +488,7 @@ export async function syncConnection(
           ...window,
           accounts: group.map((m) => m.providerId),
           // An account's first window is its sync; older ones can wait.
-          reserve: next ? ROUTINE_RESERVE : 0,
+          reserve: next ? Math.max(ROUTINE_RESERVE, reserve) : reserve,
         },
         transport,
       )

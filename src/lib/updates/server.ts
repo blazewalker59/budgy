@@ -18,7 +18,7 @@ import {
   revokeUploadToken,
 } from './uploads'
 import { syncConnection } from './sync'
-import { queueFirstSync } from './syncQueue'
+import { queueAccountRetry, queueFirstSync } from './syncQueue'
 import { bankKeys } from './crypto'
 import type { BankAccountChoice } from './connections'
 import type { AccountExportInput } from './ingest'
@@ -202,7 +202,30 @@ export const syncBank = createServerFn({ method: 'POST' })
     z.object({ id: z.string().min(1).max(64) }).parse(data),
   )
   .handler(({ data }) =>
+    withMember(async ({ db }) => {
+      const env = getCloudflareEnv()
+      const results = await syncConnection(db, data.id, bankKeys(env))
+      await queueAccountRetry(db, data.id, results, env.SYNC_QUEUE)
+      return results
+    }),
+  )
+
+/**
+ * Try one linked bank account again on its own, after it failed (a
+ * per-account request to Bridge, within the connection's daily cap).
+ */
+export const retryBankAccount = createServerFn({ method: 'POST' })
+  .validator((data: { connectionId: string; providerId: string }) =>
+    z.object(bankKey).parse(data),
+  )
+  .handler(({ data }) =>
     withMember(({ db }) =>
-      syncConnection(db, data.id, bankKeys(getCloudflareEnv())),
+      syncConnection(
+        db,
+        data.connectionId,
+        bankKeys(getCloudflareEnv()),
+        fetch,
+        { only: [data.providerId] },
+      ),
     ),
   )

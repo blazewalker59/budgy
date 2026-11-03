@@ -54,6 +54,9 @@ wrangler queues create budgy-sync
 wrangler queues create budgy-sync-dlq
 ```
 
-Then deploy as usual. Local `bun run dev` simulates both. Nothing else in
-D1 changes. After the first scheduled run, `wrangler queues list` should show
+Merges to `main` deploy automatically, and a deploy whose consumer names a
+missing queue fails, so create both before merging. Then deploy as usual;
+local `bun run dev` simulates both. Nothing in D1 changes for this (the same
+release's `0017_auth_rate_limit.sql` is additive, applied by the deploy
+workflow before the Worker). After the first scheduled run, `wrangler queues list` should show
 `budgy-sync` with no backlog, and each linked connection a fresh receipt.

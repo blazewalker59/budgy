@@ -14,6 +14,7 @@ import {
   householdMembers,
   households,
   uploadTokens,
+  user,
 } from '@/lib/db/schema'
 import { inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
@@ -126,9 +127,11 @@ export async function verifyUploadToken(
       householdId: uploadTokens.householdId,
       account: uploadTokens.account,
       format: uploadTokens.format,
-      memberEmail: uploadTokens.memberEmail,
+      // The creator's email now: admission is decided on the current one.
+      memberEmail: user.email,
     })
     .from(uploadTokens)
+    .innerJoin(user, eq(user.id, uploadTokens.memberId))
     .innerJoin(
       householdMembers,
       and(

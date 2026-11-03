@@ -23,7 +23,8 @@ it.
   (`bg_` and 32 random bytes), shown once and stored as its SHA-256, with a
   name, its first characters and when it was last used. A Member holds at
   most ten; revoking stops one at once. A token also stops working when its
-  Member leaves `ALLOWED_EMAILS`. A malformed token is refused before any
+  Member leaves `ALLOWED_EMAILS`, judged by the Member's current email, not
+  the one copied onto the token. A malformed token is refused before any
   database query, and a Workers Rate Limiting binding caps requests per IP
   and per token (429 over the limit; absent locally, so it fails open).
 - Scopes: `read` (every read tool) and `write` (also

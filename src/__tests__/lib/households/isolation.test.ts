@@ -38,6 +38,7 @@ import {
   settings,
   storeRules,
   transactions,
+  user,
 } from '@/lib/db/schema'
 
 vi.mock('@/lib/auth/server', () => ({
@@ -78,6 +79,14 @@ async function fixture() {
     { householdId: 'a', memberId: 'alice', role: 'owner' },
     { householdId: 'b', memberId: 'bob', role: 'owner' },
   ])
+  await db.insert(user).values(
+    ['alice', 'bob'].map((id) => ({
+      id,
+      name: id,
+      email: `${id}@example.com`,
+      emailVerified: true,
+    })),
+  )
   const a = householdDatabase(db, 'a')
   // Each scope owns a distinct Drizzle instance, as production requests do.
   const b = householdDatabase(newClient(), 'b')

@@ -10,7 +10,7 @@ import {
   verifyToken,
 } from '@/lib/agents/tokens'
 import { householdDatabase } from '@/lib/households/scope'
-import { apiTokens, householdMembers, households } from '@/lib/db/schema'
+import { apiTokens, householdMembers, households, user } from '@/lib/db/schema'
 
 const open: Array<DatabaseSync> = []
 afterEach(() => {
@@ -52,6 +52,14 @@ describe('API tokens', () => {
       { householdId: 'a', memberId: 'alice', role: 'owner' },
       { householdId: 'a', memberId: 'bob', role: 'member' },
     ])
+    await db.insert(user).values(
+      ['alice', 'bob'].map((id) => ({
+        id,
+        name: id,
+        email: `${id}@example.com`,
+        emailVerified: true,
+      })),
+    )
     const alice = { id: 'alice', email: 'alice@example.com' }
     const results = await Promise.allSettled(
       Array.from({ length: MAX_ACTIVE_TOKENS + 3 }, (_, i) =>

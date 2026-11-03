@@ -17,7 +17,7 @@ import {
   findMemberHousehold,
   requireHousehold,
 } from '@/lib/households/membership'
-import { householdMembers } from '@/lib/db/schema'
+import { householdMembers, user } from '@/lib/db/schema'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { UserError } from '@/lib/errors'
 
@@ -41,6 +41,16 @@ export async function sessionState(): Promise<SessionState> {
   if (import.meta.env.DEV && env.DEV_MEMBER_EMAIL) {
     const email = env.DEV_MEMBER_EMAIL
     const db = getDb()
+    // A user row, as Google sign-in would make: tokens are admitted by it.
+    await db
+      .insert(user)
+      .values({
+        id: 'dev',
+        name: email.split('@')[0],
+        email,
+        emailVerified: true,
+      })
+      .onConflictDoNothing()
     await db
       .insert(householdMembers)
       .values({

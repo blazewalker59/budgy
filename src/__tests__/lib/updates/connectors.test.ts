@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { testDatabase } from '../../helpers/d1'
 import type { DatabaseSync } from 'node:sqlite'
 import type { CloudflareEnv } from '@/lib/db'
 import type { SyncMessage } from '@/lib/updates/syncQueue'
 import { householdDatabase } from '@/lib/households/scope'
+import { LEGACY_HOUSEHOLD_ID } from '@/lib/households/membership'
 import {
   balances,
   bankAccounts,
@@ -13,6 +15,7 @@ import {
   moneyIn,
   transactions,
   uploadTokens,
+  user,
 } from '@/lib/db/schema'
 import {
   deleteAccount,
@@ -73,6 +76,10 @@ async function fixture() {
   await db.insert(householdMembers).values([
     { householdId: 'a', memberId: 'm-a', role: 'owner' },
     { householdId: 'b', memberId: 'm-b', role: 'owner' },
+  ])
+  await db.insert(user).values([
+    { id: 'm-a', name: 'A', email: 'a@example.com', emailVerified: true },
+    { id: 'm-b', name: 'B', email: 'b@example.com', emailVerified: true },
   ])
   const a = householdDatabase(newClient(), 'a')
   const b = householdDatabase(newClient(), 'b')
@@ -158,6 +165,35 @@ describe('Shortcut upload tokens', () => {
     await createUploadToken(a, me, 'Empty', 'spending-positive')
     await deleteAccount(a, 'Empty')
     expect((await listUploadTokens(a)).map((t) => t.account)).toEqual(['Card'])
+  })
+
+  it('admits by its creator’s current email, not the one it was made with', async () => {
+    // Only the original Household still gates Members by ALLOWED_EMAILS
+    // (docs/adr/0008), so that's where a stale address would matter.
+    const { db, env } = await fixture()
+    const creator = { id: 'm-c', email: 'c@example.com' }
+    await db.insert(user).values({ ...creator, name: 'C', emailVerified: true })
+    await db.insert(householdMembers).values({
+      householdId: LEGACY_HOUSEHOLD_ID,
+      memberId: creator.id,
+      role: 'owner',
+    })
+    const initial = householdDatabase(db, LEGACY_HOUSEHOLD_ID)
+    await saveAccount(initial, { name: 'Card', ...card }, true)
+    const { token } = await createUploadToken(
+      initial,
+      creator,
+      'Card',
+      'spending-positive',
+    )
+    const allowed = { ...env, ALLOWED_EMAILS: creator.email }
+    expect((await upload(allowed, token, csv)).status).toBe(200)
+    // c@example.com stays allowlisted, but it's no longer this Member's.
+    await db
+      .update(user)
+      .set({ email: 'c@elsewhere.example' })
+      .where(eq(user.id, creator.id))
+    expect((await upload(allowed, token, csv)).status).toBe(401)
   })
 
   it('records a malformed upload as a failed check without echoing the file', async () => {

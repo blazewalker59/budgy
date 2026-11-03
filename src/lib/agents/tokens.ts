@@ -8,7 +8,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from '@/lib/households/scope'
-import { apiTokens, householdMembers, households } from '@/lib/db/schema'
+import { apiTokens, householdMembers, households, user } from '@/lib/db/schema'
 import { UserError } from '@/lib/errors'
 import { authorizationBearer, digestHex, prefixedToken } from '@/lib/secret'
 
@@ -108,9 +108,12 @@ export async function verifyToken(
   now = new Date(),
 ): Promise<Caller | null> {
   if (!TOKEN_PATTERN.test(token)) return null
-  const row = await db
-    .select()
+  // The Member's email now, not the one copied when the token was made:
+  // admission (ALLOWED_EMAILS, invitations) is decided on the current one.
+  const found = await db
+    .select({ token: apiTokens, email: user.email })
     .from(apiTokens)
+    .innerJoin(user, eq(user.id, apiTokens.memberId))
     .where(
       and(
         eq(apiTokens.tokenHash, await hashToken(token)),
@@ -118,7 +121,8 @@ export async function verifyToken(
       ),
     )
     .get()
-  if (!row) return null
+  if (!found) return null
+  const row = found.token
   const membership = await db
     .select({ memberId: householdMembers.memberId })
     .from(householdMembers)
@@ -142,7 +146,7 @@ export async function verifyToken(
     tokenId: row.id,
     agentName: row.name,
     memberId: row.memberId,
-    memberEmail: row.memberEmail,
+    memberEmail: found.email,
     scopes: row.scopes,
   }
 }

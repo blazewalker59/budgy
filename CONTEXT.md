@@ -92,6 +92,19 @@ has. Each has a **kind**, an **Owner** (Joint, a person in this Household,
 or anyone else, such as a child for a 529), and optionally an institution. Purchases come
 from the card and bank Accounts.
 
+**Account label**:
+A coloured chip the Household puts on Accounts to group and name them
+briefly on the Accounts screen ("Addie"), apart from the Owner: Addie's
+529 is labelled Addie but owned by Joint. Each label has a name, unique in
+any case, and one of ten colours. A rename follows to every Account with
+it; deleting one takes it off them (docs/adr/0016).
+_Avoid_: tag (that's a Category's), owner
+
+**Shown as**:
+An Account's short name beside its label on the Accounts screen: "529"
+for Addie 529. It needn't be unique, since the label tells them apart; the
+Account's name stays what it's known by everywhere else.
+
 **Balance**:
 What an Account held (or, for a card or loan, owed) on a day, recorded by a
 Member or an Agent, or uploaded as a history when the Account is added.

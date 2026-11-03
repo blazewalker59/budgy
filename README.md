@@ -31,10 +31,35 @@ bun run dev                     # http://localhost:3000
 ```
 
 `.dev.vars` (git-ignored) holds `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
-`ALLOWED_EMAILS`, and optionally `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
+`ALLOWED_EMAILS`, and optionally `ADMIN_EMAILS`, `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`.
 Set `DEV_MEMBER_EMAIL` to skip Google locally (development builds only).
 
+Add your own email to `ADMIN_EMAILS` in `.dev.vars` to use the demo
+sandbox locally (it works with `DEV_MEMBER_EMAIL` too).
+
 `bun run ci` runs format, lint, typecheck, tests and the build.
+
+## Demo sandbox
+
+Admins (`ADMIN_EMAILS`) can replay a new family's first steps at
+**/admin** (account menu → Demo sandbox), without touching any real
+Household ([ADR 0015](docs/adr/0015-demo-sandbox.md)):
+
+1. **New persona** makes a made-up person ("Sam (demo)",
+   `sam-…@demo.invalid`). No one can sign in as them.
+2. **Act as** makes you that persona everywhere, with a yellow banner on
+   every screen. A new persona starts at "Start your Household"; then setup.
+3. **Replay invite** (on an owner persona) makes a partner persona and an
+   invitation from that Household, and shows the link. **Act as … and open
+   the link** takes you to the join page as the partner, to accept.
+4. **Reset to start** deletes an owner's Demo Household and everything in it
+   (or takes a partner out of one). **Delete persona** also removes them.
+5. **Exit demo** (banner) returns to your own Household; so does signing out.
+
+The page and the banner offer sample exports (Apple Card, a checking CSV,
+a savings balance history) dated up to today, and SimpleFIN's public demo
+setup token. Only one Demo Household can hold that SimpleFIN connection at
+a time; reset it to free it.
 
 ## Install
 
@@ -79,7 +104,9 @@ Worker secrets (`wrangler secret put <NAME> --env production`; sign-in
 refuses to run without `BETTER_AUTH_URL` and `BETTER_AUTH_SECRET`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,
 `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` (comma-separated; a secret so the
-Household's addresses stay out of the repository), and `BANK_CONNECTION_KEY`
+Household's addresses stay out of the repository), `ADMIN_EMAILS` (optional,
+comma-separated: who may use the demo sandbox; each must also be admitted;
+unset means no one), and `BANK_CONNECTION_KEY`
 (32 random bytes, base64: `openssl rand -base64 32`; encrypts SimpleFIN access.
 Losing it means reconnecting every bank connection). To rotate it, put the old
 value in `BANK_CONNECTION_KEY_PREVIOUS` and a new one in `BANK_CONNECTION_KEY`;

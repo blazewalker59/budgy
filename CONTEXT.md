@@ -22,6 +22,17 @@ A person belongs to one Household. An invitation is email-bound, expires
 after seven days, and is accepted explicitly; it never merges Ledgers.
 _Avoid_: user, viewer
 
+**Demo persona**:
+A made-up person at `demo.invalid` an admin acts as, to go through what a
+new family sees (docs/adr/0015). Nobody can sign in as one; only an admin
+acting as one makes it a Member, and only of a Demo Household.
+_Avoid_: test user, fake account
+
+**Demo Household**:
+A Household a Demo persona made. Only Demo personas are in it, it is
+marked demo for good, and it can be reset to the start (deleted with
+everything in it). Never a real family's Household.
+
 **Ledger**:
 Everything Budgy knows: Transactions, Accounts and their Balances,
 Categories, Store Rules, Targets, Planned Expenses and Pay Schedules.

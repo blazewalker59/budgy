@@ -15,6 +15,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { NotAllowed, SignIn } from '@/components/layout/SignIn'
 import { useServiceWorker } from '@/lib/pwa'
 import { Onboarding } from '@/components/households/Onboarding'
+import { DemoBanner } from '@/components/demo/DemoBanner'
 
 interface MyRouterContext {
   queryClient: QueryClient
@@ -51,10 +52,12 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
   component: Gate,
   errorComponent: Crashed,
-  notFoundComponent: () => (
-    <p className="p-8 text-center text-muted">Page not found.</p>
-  ),
+  notFoundComponent: NotFound,
 })
+
+function NotFound() {
+  return <p className="p-8 text-center text-muted">Page not found.</p>
+}
 
 /**
  * Budgy is for the Household's Members only (docs/adr/0001): a visitor
@@ -66,23 +69,38 @@ function Gate() {
   const state = session.data
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const invitation = /^\/join\/[^/]+$/.test(pathname)
-  const ledger = useLedgerQuery(state?.status === 'member' && !invitation)
+  // The demo sandbox stands apart from the Ledger (docs/adr/0015).
+  const sandbox = pathname === '/admin'
+  const ledger = useLedgerQuery(
+    state?.status === 'member' && !invitation && !sandbox,
+  )
   if (session.isPending) return <Splash />
   if (session.isError) return <Crashed error={session.error} />
   if (state?.status === 'not-allowed') return <NotAllowed email={state.email} />
   if (state?.status !== 'member' && state?.status !== 'no-household')
     return <SignIn callbackURL={invitation ? pathname : '/'} />
-  if (invitation) return <Outlet />
+  // While an admin acts as a Demo persona, every screen says so.
+  const demo = (page: React.ReactNode) =>
+    state.demo ? (
+      <div style={{ '--demo-banner': '2.5rem' } as React.CSSProperties}>
+        <DemoBanner demo={state.demo} />
+        {page}
+      </div>
+    ) : (
+      page
+    )
+  if (sandbox) return demo(state.admin ? <Outlet /> : <NotFound />)
+  if (invitation) return demo(<Outlet />)
   if (state.status === 'no-household')
-    return <Onboarding member={state.member} />
+    return demo(<Onboarding member={state.member} />)
   if (ledger.isError) return <Crashed error={ledger.error} />
   if (!ledger.data) return <Splash />
-  return (
+  return demo(
     <BookProvider ledger={ledger.data} timeZone={state.household.timeZone}>
-      <AppShell member={state.member}>
+      <AppShell member={state.member} admin={state.admin === true}>
         <Outlet />
       </AppShell>
-    </BookProvider>
+    </BookProvider>,
   )
 }
 

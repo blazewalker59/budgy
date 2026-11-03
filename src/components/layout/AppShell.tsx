@@ -2,6 +2,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import {
   Bot,
   Download,
+  FlaskConical,
   LayoutList,
   ListChecks,
   LogOut,
@@ -34,14 +35,17 @@ const NAV = [
 
 export function AppShell({
   member,
+  admin = false,
   children,
 }: {
   member: Member
+  /** May open the demo sandbox (docs/adr/0015); the server checks again. */
+  admin?: boolean
   children: React.ReactNode
 }) {
   return (
     <div className="min-h-dvh bg-background pb-[calc(6rem+env(safe-area-inset-bottom))] sm:pb-6">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur">
+      <header className="sticky top-[var(--demo-banner,0px)] z-20 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-3">
           <Link
             to="/"
@@ -69,7 +73,7 @@ export function AppShell({
           <div className="ml-auto flex items-center gap-1">
             <CommandPalette />
             <ThemeButton />
-            <MemberMenu member={member} />
+            <MemberMenu member={member} admin={admin} />
           </div>
         </div>
       </header>
@@ -156,7 +160,7 @@ function ThemeButton() {
   )
 }
 
-function MemberMenu({ member }: { member: Member }) {
+function MemberMenu({ member, admin }: { member: Member; admin: boolean }) {
   const [open, setOpen] = useState(false)
   const install = useInstall()
   return (
@@ -222,6 +226,15 @@ function MemberMenu({ member }: { member: Member }) {
           >
             <ListChecks size={15} aria-hidden /> Setup
           </Link>
+          {admin && (
+            <a
+              href="/admin"
+              onClick={() => setOpen(false)}
+              className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-sunken"
+            >
+              <FlaskConical size={15} aria-hidden /> Demo sandbox
+            </a>
+          )}
           <button
             type="button"
             onClick={() => void signOut().then(() => window.location.reload())}

@@ -52,6 +52,13 @@ export function getAuth(env: CloudflareEnv) {
     account: {
       accountLinking: { enabled: false },
     },
+    // On by default only when NODE_ENV is production, which Workers don't
+    // set; in memory it would be per isolate. D1 keeps one count.
+    rateLimit: { enabled: true, storage: 'database' },
+    advanced: {
+      // Cloudflare sets this from the connection; a client can't forge it.
+      ipAddress: { ipAddressHeaders: ['cf-connecting-ip'] },
+    },
     databaseHooks: {
       user: {
         create: {

@@ -117,6 +117,14 @@ export const verification = sqliteTable(
   (table) => [index('verification_identifier_idx').on(table.identifier)],
 )
 
+/** Better Auth's rate limit counts (`rateLimit.storage: 'database'`). */
+export const rateLimit = sqliteTable('rate_limit', {
+  id: text('id').primaryKey(),
+  key: text('key').notNull().unique(),
+  count: integer('count').notNull(),
+  lastRequest: integer('last_request').notNull(),
+})
+
 // ─── Ledger ─────────────────────────────────────────────────────────────────
 
 const createdAt = () =>

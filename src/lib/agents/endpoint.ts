@@ -6,10 +6,11 @@
 
 import { INSTRUCTIONS, WRITE_INSTRUCTIONS, budgyTools } from './tools'
 import { handleMcp, parseError } from './mcp'
-import { bearerToken, verifyToken } from './tokens'
+import { TOKEN_PATTERN, bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
 import { BodyTooLarge, readLimited } from '@/lib/updates/http'
 import { dbFromD1 } from '@/lib/db'
+import { overRateLimit, tooManyRequests } from '@/lib/rateLimit'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { today } from '@/lib/model/dates'
 import { householdTimeZone } from '@/lib/households/locale'
@@ -36,8 +37,12 @@ export async function serveMcp(
     return new Response('Forbidden', { status: 403 })
   }
 
+  const bearer = bearerToken(request.headers.get('authorization'))
+  // A malformed token is refused without touching the database.
+  const token = bearer && TOKEN_PATTERN.test(bearer) ? bearer : null
+  if (await overRateLimit(env.MCP_RATE_LIMITER, request, token))
+    return tooManyRequests()
   const db = dbFromD1(env.DB)
-  const token = bearerToken(request.headers.get('authorization'))
   const caller = token ? await verifyToken(db, token) : null
   // Membership is checked by verifyToken; admission also preserves the
   // original Household's rollout allowlist without blocking invited partners.

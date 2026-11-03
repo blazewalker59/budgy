@@ -18,6 +18,9 @@ const SHOWN_CHARS = 10
 /** Don't rewrite last_used_at more often than this. */
 const TOUCH_EVERY_MS = 60_000
 
+/** A well-formed token; anything else is refused before the database. */
+export const TOKEN_PATTERN = /^bg_[A-Za-z0-9_-]{43}$/
+
 /** `read` sees the Ledger; `write` may also import and edit Transactions. */
 export type TokenScope = 'read' | 'write'
 
@@ -75,6 +78,7 @@ export async function verifyToken(
   token: string,
   now = new Date(),
 ): Promise<Caller | null> {
+  if (!TOKEN_PATTERN.test(token)) return null
   const row = await db
     .select()
     .from(apiTokens)

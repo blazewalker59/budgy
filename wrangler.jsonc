@@ -29,6 +29,20 @@
       "migrations_dir": "drizzle",
     },
   ],
+  // Workers Rate Limiting for the token endpoints (src/lib/rateLimit.ts).
+  // namespace_id is ours to choose, unique in the Cloudflare account.
+  "ratelimits": [
+    {
+      "name": "MCP_RATE_LIMITER",
+      "namespace_id": "4101",
+      "simple": { "limit": 120, "period": 60 },
+    },
+    {
+      "name": "UPLOAD_RATE_LIMITER",
+      "namespace_id": "4102",
+      "simple": { "limit": 10, "period": 60 },
+    },
+  ],
   "env": {
     "production": {
       "name": "budgy",
@@ -65,6 +79,19 @@
           "database_name": "budgy-db",
           "database_id": "b2206e5f-72a5-4e6b-a349-21485511cae7",
           "migrations_dir": "drizzle",
+        },
+      ],
+      // As at the top level (src/lib/rateLimit.ts).
+      "ratelimits": [
+        {
+          "name": "MCP_RATE_LIMITER",
+          "namespace_id": "4101",
+          "simple": { "limit": 120, "period": 60 },
+        },
+        {
+          "name": "UPLOAD_RATE_LIMITER",
+          "namespace_id": "4102",
+          "simple": { "limit": 10, "period": 60 },
         },
       ],
     },

@@ -72,5 +72,17 @@ Household's addresses stay out of the repository), and `BANK_CONNECTION_KEY`
 (32 random bytes, base64: `openssl rand -base64 32`; encrypts SimpleFIN access.
 Losing or changing it means reconnecting every bank connection).
 
+Rate limits: Better Auth counts sign-in attempts per client IP in D1 (the
+`rate_limit` table), and the `MCP_RATE_LIMITER` / `UPLOAD_RATE_LIMITER`
+Workers Rate Limiting bindings in `wrangler.jsonc` cap `/mcp` and
+`/api/updates/upload` per IP and per token (no Cloudflare resource to create).
+Also add these WAF rate limiting rules in the dashboard (Security → WAF →
+Rate limiting rules), counting by IP:
+
+- `starts_with(http.request.uri.path, "/api/auth/")`: 30 requests per minute,
+  block for 10 minutes.
+- `starts_with(http.request.uri.path, "/_serverFn/")`: 300 requests per
+  minute, block for 1 minute (the app's own reads and writes).
+
 The Google OAuth client needs `<origin>/api/auth/callback/google` as an
 authorized redirect URI, for production and for `http://localhost:3000`.

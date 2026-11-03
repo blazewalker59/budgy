@@ -29,6 +29,9 @@ export interface CloudflareEnv {
   DEV_MEMBER_EMAIL?: string
   /** 32 random bytes, base64-encoded. Never reuse the authentication secret. */
   BANK_CONNECTION_KEY?: string
+  /** Workers Rate Limiting for `/mcp` and the Shortcut upload. Absent locally. */
+  MCP_RATE_LIMITER?: RateLimit
+  UPLOAD_RATE_LIMITER?: RateLimit
 }
 
 export type Database = DrizzleD1Database<typeof schema>

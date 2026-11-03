@@ -13,6 +13,7 @@ import type { CloudflareEnv } from '@/lib/db'
 import { clientMessage } from '@/lib/errors'
 import { authorizationBearer } from '@/lib/secret'
 import { dbFromD1 } from '@/lib/db'
+import { overRateLimit, tooManyRequests } from '@/lib/rateLimit'
 import { uploadTokens } from '@/lib/db/schema'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { householdDatabase } from '@/lib/households/scope'
@@ -49,12 +50,12 @@ export async function serveUpload(
   if (origin && origin !== new URL(request.url).origin)
     return reply('Forbidden', 403)
 
-  const token = authorizationBearer(request.headers.get('authorization'))
+  const bearer = authorizationBearer(request.headers.get('authorization'))
+  const token = bearer && UPLOAD_TOKEN_PATTERN.test(bearer) ? bearer : null
+  if (await overRateLimit(env.UPLOAD_RATE_LIMITER, request, token))
+    return tooManyRequests()
   const db = dbFromD1(env.DB)
-  const uploader =
-    token && UPLOAD_TOKEN_PATTERN.test(token)
-      ? await verifyUploadToken(db, token)
-      : null
+  const uploader = token ? await verifyUploadToken(db, token) : null
   if (
     !uploader ||
     !(await canSignIn(db, uploader.memberEmail, env.ALLOWED_EMAILS)) ||

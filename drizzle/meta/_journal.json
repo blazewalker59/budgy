@@ -120,6 +120,13 @@
       "when": 1793544597448,
       "tag": "0016_money_in",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1793670111862,
+      "tag": "0017_auth_rate_limit",
+      "breakpoints": true
     }
   ]
 }

@@ -9,6 +9,7 @@
 import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { ImportRules } from './ImportRules'
+import { BankCategories } from './BankCategories'
 import type { StoreRule } from '@/lib/model/types'
 import { useBook } from '@/lib/ledger/book'
 import {
@@ -35,6 +36,7 @@ export function RulesTab() {
       {suggestions.length > 0 && <Suggestions list={suggestions} />}
       <RuleList uses={uses} />
       <AddRule />
+      <BankCategories />
       <Transfers />
       <ImportRules />
     </div>

@@ -14,7 +14,7 @@
 import { z } from 'zod'
 import { sha1Hex, twoDecimals } from './rows'
 import { EMPTY_RULES } from './rules'
-import { bankKey, resolveBankCategory } from './bankCategories'
+import { bankKey, bankName, resolveBankCategory } from './bankCategories'
 import { bucketCategory, isSpending, storeName } from './stores'
 import type { ParsedTxn } from './rows'
 import type { ImportRules } from './rules'
@@ -82,6 +82,8 @@ export interface Prepared {
       /** Carried from the starting purchase this one replaces. */
       category: string | null
       note: string | null
+      /** The category the bank gave it, as it came. */
+      bankCategory: string | null
     }
   >
   /** Already in the Ledger by id. */
@@ -264,6 +266,7 @@ export async function preparePosted(input: {
             : 'uncategorized',
       category: old?.category ?? null,
       note: old?.note ?? null,
+      bankCategory: r.category ? bankName(r.category) : null,
     })
   }
   return out

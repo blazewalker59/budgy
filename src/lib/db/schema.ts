@@ -267,6 +267,11 @@ export const transactions = sqliteTable(
     store: text('store').notNull(),
     /** The Category the import gave it, before any Moves. */
     sourceCategory: text('source_category').notNull(),
+    /**
+     * The bank's or finance app's own category name, as it came; what a
+     * Member says it means files it (src/lib/import/bankCategories.ts).
+     */
+    bankCategory: text('bank_category'),
     amount: integer('amount').notNull(),
     /** A Move of this one Transaction (wins over a Store Rule). */
     category: text('category'),

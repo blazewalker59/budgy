@@ -134,6 +134,20 @@
       "when": 1793671991973,
       "tag": "0018_category_hidden",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1793670886554,
+      "tag": "0018_bank_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1793672010590,
+      "tag": "0019_bank_category",
+      "breakpoints": true
     }
   ]
 }

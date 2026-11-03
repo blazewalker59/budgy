@@ -8,9 +8,14 @@
 /** Where the Household keeps what each Bank category means. */
 export const BANK_CATEGORIES_KEY = 'bank-categories'
 
-/** Bank categories match in any case, with spaces trimmed. */
+/** A Bank category as kept on a purchase: spaces tidied, at most 60. */
+export function bankName(name: string): string | null {
+  return name.trim().replace(/\s+/g, ' ').slice(0, 60) || null
+}
+
+/** Bank categories match in any case, with spaces tidied. */
 export function bankKey(name: string): string {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase()
+  return (bankName(name) ?? '').toLowerCase()
 }
 
 /** Stored meanings (bank key → Category); anything broken is ignored. */

@@ -18,6 +18,7 @@ import {
 import { RULES_KEY, loadImportRules } from './importer'
 import { keepBoth, mergeDuplicate } from './duplicates'
 import { deleteCategory, hideCategory, renameCategory } from './categories'
+import { fileBankCategory, listBankCategories } from './bankCategories'
 import {
   clearBalances as clearBalanceRows,
   deleteAccount as deleteAccountRow,
@@ -255,6 +256,25 @@ export const setCategoryHidden = createServerFn({ method: 'POST' })
 export const removeCategory = createServerFn({ method: 'POST' })
   .validator((data: { name: string }) => z.object({ name: NAME }).parse(data))
   .handler(({ data }) => withMember(({ db }) => deleteCategory(db, data.name)))
+
+/** The bank's own categories purchases came with, and what each means. */
+export const getBankCategories = createServerFn({ method: 'GET' }).handler(() =>
+  withMember(({ db }) => listBankCategories(db)),
+)
+
+/** Say which Category a bank's category means (null: none). */
+export const setBankCategory = createServerFn({ method: 'POST' })
+  .validator((data: { name: string; category: string | null }) =>
+    z
+      .object({
+        name: z.string().trim().min(1).max(60),
+        category: NAME.nullable(),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => fileBankCategory(db, data.name, data.category)),
+  )
 
 export type AccountEdit = Omit<Account, 'sourceName'> & { isNew: boolean }
 

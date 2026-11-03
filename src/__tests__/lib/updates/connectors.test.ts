@@ -12,6 +12,7 @@ import {
   households,
   moneyIn,
   transactions,
+  uploadTokens,
 } from '@/lib/db/schema'
 import {
   deleteAccount,
@@ -177,6 +178,27 @@ describe('Shortcut upload tokens', () => {
     await expect(
       createUploadToken(a, me, 'Checking', 'apple-card'),
     ).rejects.toThrow(/credit card account/)
+  })
+
+  it('stop at five per Account, even when requested all at once', async () => {
+    const { a, b, db } = await fixture()
+    const results = await Promise.allSettled(
+      Array.from({ length: 8 }, () =>
+        createUploadToken(a, me, 'Card', 'spending-positive'),
+      ),
+    )
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(5)
+    expect(
+      results.find((r) => r.status === 'rejected')?.reason.message,
+    ).toContain('already has 5 Shortcut tokens')
+    const listed = await listUploadTokens(a)
+    expect(listed).toHaveLength(5)
+    expect(listed[0].createdAt).toBeInstanceOf(Date)
+    // Revoking one makes room; another Household's Account is its own.
+    await revokeUploadToken(a, listed[0].id)
+    await createUploadToken(a, me, 'Card', 'spending-positive')
+    await createUploadToken(b, me, 'Card', 'spending-positive')
+    expect(await db.select().from(uploadTokens)).toHaveLength(7)
   })
 })
 

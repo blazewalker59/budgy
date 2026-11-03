@@ -5,10 +5,11 @@
  * Member; the MCP endpoint also enforces rollout admission rules.
  */
 
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, sql } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from '@/lib/households/scope'
-import { apiTokens, householdMembers } from '@/lib/db/schema'
+import { apiTokens, householdMembers, households } from '@/lib/db/schema'
+import { UserError } from '@/lib/errors'
 import { authorizationBearer, digestHex, prefixedToken } from '@/lib/secret'
 
 /** Marks a Budgy token, so a leaked one is easy to spot and scan for. */
@@ -38,7 +39,14 @@ export function bearerToken(header: string | null): string | null {
   return authorizationBearer(header, TOKEN_PREFIX)
 }
 
-/** Store a new token for a Member; returns it, the only time it's seen. */
+/** Enough for a few Agents; more is likely tokens nobody revoked. */
+export const MAX_ACTIVE_TOKENS = 10
+
+/**
+ * Store a new token for a Member; returns it, the only time it's seen. The
+ * limit is checked in the insert itself, so simultaneous requests can't
+ * pass it together.
+ */
 export async function createToken(
   db: HouseholdDatabase,
   member: { id: string; email: string },
@@ -48,17 +56,38 @@ export async function createToken(
 ): Promise<{ id: string; token: string }> {
   const token = newToken()
   const id = crypto.randomUUID()
-  await db.insert(apiTokens).values({
-    householdId: db.householdId,
-    id,
-    memberId: member.id,
-    memberEmail: member.email,
-    name,
-    tokenHash: await hashToken(token),
-    prefix: token.slice(0, SHOWN_CHARS),
-    scopes,
-    createdAt: now.toISOString(),
-  })
+  const inserted = await db
+    .insert(apiTokens)
+    .select(
+      db
+        .select({
+          householdId: households.id,
+          id: sql<string>`${id}`.as('id'),
+          memberId: sql<string>`${member.id}`.as('member_id'),
+          memberEmail: sql<string>`${member.email}`.as('member_email'),
+          name: sql<string>`${name}`.as('name'),
+          tokenHash: sql<string>`${await hashToken(token)}`.as('token_hash'),
+          prefix: sql<string>`${token.slice(0, SHOWN_CHARS)}`.as('prefix'),
+          scopes: sql<Array<TokenScope>>`${JSON.stringify(scopes)}`.as(
+            'scopes',
+          ),
+          createdAt: sql<string>`${now.toISOString()}`.as('created_at'),
+          lastUsedAt: sql<string | null>`null`.as('last_used_at'),
+          revokedAt: sql<string | null>`null`.as('revoked_at'),
+        })
+        .from(households)
+        .where(
+          and(
+            eq(households.id, db.householdId),
+            sql`(select count(*) from ${apiTokens} where ${apiTokens.householdId} = ${db.householdId} and ${apiTokens.memberId} = ${member.id} and ${apiTokens.revokedAt} is null) < ${MAX_ACTIVE_TOKENS}`,
+          ),
+        ),
+    )
+    .returning({ id: apiTokens.id })
+  if (!inserted.length)
+    throw new UserError(
+      `You have ${MAX_ACTIVE_TOKENS} tokens: revoke one to make another`,
+    )
   return { id, token }
 }
 

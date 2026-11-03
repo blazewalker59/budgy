@@ -3,14 +3,19 @@
  * one may only send CSV exports to one Account, in one format. It can't read
  * anything, and the request body never chooses the Household or Account.
  */
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import type { Database } from '@/lib/db'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { ExportFormat } from './exports'
 import { hashToken } from '@/lib/agents/tokens'
 import { prefixedToken } from '@/lib/secret'
-import { accounts, householdMembers, uploadTokens } from '@/lib/db/schema'
-import { householdRow, inHousehold } from '@/lib/households/scope'
+import {
+  accounts,
+  householdMembers,
+  households,
+  uploadTokens,
+} from '@/lib/db/schema'
+import { inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
 import { UserError } from '@/lib/errors'
 
@@ -35,36 +40,43 @@ export async function createUploadToken(
     throw new UserError(
       'Apple Card exports only work with a credit card account.',
     )
-  const active = await db
-    .select({ id: uploadTokens.id })
-    .from(uploadTokens)
-    .where(
-      inHousehold(
-        db,
-        uploadTokens,
-        and(
-          eq(uploadTokens.account, account.name),
-          isNull(uploadTokens.revokedAt),
+  const token = prefixedToken(UPLOAD_PREFIX)
+  const id = crypto.randomUUID()
+  // The limit is checked in the insert itself, so simultaneous requests
+  // can't pass it together.
+  const inserted = await db
+    .insert(uploadTokens)
+    .select(
+      db
+        .select({
+          householdId: households.id,
+          id: sql<string>`${id}`.as('id'),
+          account: sql<string>`${account.name}`.as('account'),
+          format: sql<ExportFormat>`${format}`.as('format'),
+          memberId: sql<string>`${member.id}`.as('member_id'),
+          memberEmail: sql<string>`${member.email}`.as('member_email'),
+          tokenHash: sql<string>`${await hashToken(token)}`.as('token_hash'),
+          prefix: sql<string>`${token.slice(0, SHOWN_CHARS)}`.as('prefix'),
+          createdAt:
+            sql<Date>`cast(unixepoch('subsecond') * 1000 as integer)`.as(
+              'created_at',
+            ),
+          lastUsedAt: sql<Date | null>`null`.as('last_used_at'),
+          revokedAt: sql<Date | null>`null`.as('revoked_at'),
+        })
+        .from(households)
+        .where(
+          and(
+            eq(households.id, db.householdId),
+            sql`(select count(*) from ${uploadTokens} where ${uploadTokens.householdId} = ${db.householdId} and ${uploadTokens.account} = ${account.name} and ${uploadTokens.revokedAt} is null) < ${MAX_ACTIVE_PER_ACCOUNT}`,
+          ),
         ),
-      ),
     )
-  if (active.length >= MAX_ACTIVE_PER_ACCOUNT)
+    .returning({ id: uploadTokens.id })
+  if (!inserted.length)
     throw new UserError(
       `${account.name} already has ${MAX_ACTIVE_PER_ACCOUNT} Shortcut tokens. Revoke one you no longer use.`,
     )
-  const token = prefixedToken(UPLOAD_PREFIX)
-  const id = crypto.randomUUID()
-  await db.insert(uploadTokens).values(
-    householdRow(db, {
-      id,
-      account: account.name,
-      format,
-      memberId: member.id,
-      memberEmail: member.email,
-      tokenHash: await hashToken(token),
-      prefix: token.slice(0, SHOWN_CHARS),
-    }),
-  )
   return { id, token, account: account.name }
 }
 

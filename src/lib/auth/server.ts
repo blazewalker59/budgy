@@ -46,11 +46,11 @@ export function getAuth(env: CloudflareEnv) {
         clientSecret: google.clientSecret,
       },
     },
+    // Google is the only provider, so there is nothing to link. Linking would
+    // let a Google identity whose email isn't verified take over an existing
+    // user with that email.
     account: {
-      accountLinking: {
-        enabled: true,
-        trustedProviders: ['google'],
-      },
+      accountLinking: { enabled: false },
     },
     databaseHooks: {
       user: {

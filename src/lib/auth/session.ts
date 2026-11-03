@@ -66,6 +66,9 @@ export async function sessionState(): Promise<SessionState> {
   if (!headers) return { status: 'signed-out' }
   const session = await getAuth(env).api.getSession({ headers })
   if (!session?.user) return { status: 'signed-out' }
+  // Admission is by email, so an email Google hasn't verified admits nobody.
+  if (!session.user.emailVerified)
+    return { status: 'not-allowed', email: session.user.email }
   const db = getDb()
   if (!(await canSignIn(db, session.user.email, env.ALLOWED_EMAILS)))
     return { status: 'not-allowed', email: session.user.email }

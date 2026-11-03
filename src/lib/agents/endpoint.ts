@@ -10,6 +10,7 @@ import { TOKEN_PATTERN, bearerToken, verifyToken } from './tokens'
 import type { CloudflareEnv } from '@/lib/db'
 import { BodyTooLarge, readLimited } from '@/lib/updates/http'
 import { dbFromD1 } from '@/lib/db'
+import { errorCode } from '@/lib/errors'
 import { overRateLimit, tooManyRequests } from '@/lib/rateLimit'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
 import { today } from '@/lib/model/dates'
@@ -90,7 +91,8 @@ export async function serveMcp(
       ? new Response(null, { status: 202 })
       : Response.json(reply)
   } catch (error) {
-    console.error('mcp', error)
+    // The kind only: a query failure's message repeats its bound values.
+    console.error('mcp failed:', errorCode(error))
     return new Response('Internal error', { status: 500 })
   }
 }

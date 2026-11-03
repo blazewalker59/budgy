@@ -15,6 +15,7 @@ import {
   householdInvites,
   householdMembers,
   households,
+  uploadTokens,
   user,
 } from '@/lib/db/schema'
 import { DEFAULT_TIME_ZONE } from '@/lib/model/dates'
@@ -371,6 +372,22 @@ export async function removeMember(
           apiTokens,
           and(
             eq(apiTokens.memberId, memberId),
+            ownerGuard(db, actor.id),
+            targetGuard,
+          ),
+        ),
+      ),
+    // Their Shortcut upload tokens too: they write into the shared Ledger.
+    db
+      .update(uploadTokens)
+      .set({ revokedAt: new Date() })
+      .where(
+        inHousehold(
+          db,
+          uploadTokens,
+          and(
+            eq(uploadTokens.memberId, memberId),
+            isNull(uploadTokens.revokedAt),
             ownerGuard(db, actor.id),
             targetGuard,
           ),

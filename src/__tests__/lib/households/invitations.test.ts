@@ -19,6 +19,8 @@ import {
 } from '@/lib/households/membership'
 import { createToken, hashToken, verifyToken } from '@/lib/agents/tokens'
 import { loadLedger } from '@/lib/ledger/queries'
+import { saveAccount } from '@/lib/ledger/accounts'
+import { createUploadToken, verifyUploadToken } from '@/lib/updates/uploads'
 import {
   householdInvites,
   householdMembers,
@@ -283,6 +285,55 @@ describe('Household membership management', () => {
     expect((await householdDetails(memberScope, partner)).members).toHaveLength(
       2,
     )
+  })
+
+  it('never resurrects a removed Member’s Shortcut upload tokens on rejoin', async () => {
+    const { db, scope, newClient, household } = await fixture()
+    await saveAccount(
+      scope,
+      {
+        name: 'Card',
+        owner: 'Joint',
+        kind: 'credit',
+        institution: null,
+        closed: false,
+        securedBy: null,
+      },
+      true,
+    )
+    await acceptInvite(
+      db,
+      partner,
+      (await createInvite(scope, owner, partner.email)).token,
+    )
+    const memberScope = await requireHousehold(
+      newClient(),
+      partner.id,
+      household.id,
+    )
+    const theirs = await createUploadToken(
+      memberScope,
+      partner,
+      'Card',
+      'spending-positive',
+    )
+    const ours = await createUploadToken(
+      scope,
+      owner,
+      'Card',
+      'spending-positive',
+    )
+    expect(await verifyUploadToken(db, theirs.token)).toBeTruthy()
+
+    await removeMember(scope, owner, partner.id)
+    expect(await verifyUploadToken(db, theirs.token)).toBeNull()
+    await acceptInvite(
+      db,
+      partner,
+      (await createInvite(scope, owner, partner.email)).token,
+    )
+    expect(await verifyUploadToken(db, theirs.token)).toBeNull()
+    expect(await verifyUploadToken(db, ours.token)).toBeTruthy()
   })
 
   it('removes access immediately and never resurrects old MCP tokens on rejoin', async () => {

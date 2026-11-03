@@ -44,8 +44,9 @@ email-bound invitations are in production.
   just an earlier UI or authorization check. Ownership transfer atomically
   promotes a current Member and demotes the owner; the owner cannot remove
   themselves and accidentally leave no owner.
-- Removing a Member also permanently revokes their Household's MCP tokens.
-  Re-inviting them cannot resurrect old tokens or old invitation links. Moves,
+- Removing a Member also permanently revokes their Household's MCP tokens
+  and Shortcut upload tokens. Re-inviting them cannot resurrect old tokens or
+  old invitation links. Moves,
   notes, purchases and balances are retained in the shared Ledger.
 - Browser query keys include Member and Household identity. Creation/joining
   clears caches and replaces the invitation URL with `/`. Sign-in preserves

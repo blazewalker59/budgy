@@ -38,7 +38,9 @@ separate update experience.
   access URL is encrypted with AES-GCM under that Worker secret, with the
   Household and connection id as additional data, so ciphertext can't be
   moved between them. Its SHA-256 prevents connecting the same access twice.
-  It is never returned to the browser or written to errors.
+  It is never returned to the browser or written to errors. To rotate the
+  key, the old one moves to `BANK_CONNECTION_KEY_PREVIOUS`: it still opens
+  existing ciphertext, which is resealed under the new key on its next use.
 - The client calls only Bridge hosts over HTTPS, without redirects, with a
   timeout and response size limit, and validates responses before use. It
   reads protocol 1 and 2 responses (institutions on each account, or in a

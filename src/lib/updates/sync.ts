@@ -9,6 +9,7 @@ import { and, eq, isNotNull } from 'drizzle-orm'
 import { readBridge } from './connections'
 import { isSpending } from './exports'
 import type { SimplefinTransaction } from './simplefinClient'
+import type { BankKeys } from './crypto'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { PostedRow } from '@/lib/import/posted'
 import type { IncomingRow } from '@/lib/model/moneyIn'
@@ -82,7 +83,7 @@ function incomingRow(
 export async function syncConnection(
   db: HouseholdDatabase,
   id: string,
-  secret: string | undefined,
+  secret: BankKeys,
   transport: typeof fetch = fetch,
 ): Promise<Array<SyncedAccount>> {
   const mapped = await db
@@ -234,7 +235,7 @@ export async function syncConnection(
  */
 export async function syncAll(
   d1: D1Database,
-  secret: string | undefined,
+  secret: BankKeys,
   transport: typeof fetch = fetch,
 ): Promise<void> {
   const due = await dbFromD1(d1)

@@ -19,6 +19,7 @@ import { serverRequestContext } from '@/lib/db'
 import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 import { serveUpload } from '@/lib/updates/uploadEndpoint'
 import { syncAll } from '@/lib/updates/sync'
+import { bankKeys } from '@/lib/updates/crypto'
 import { UPLOAD_PATH } from '@/lib/updates/exports'
 
 const startFetch = createStartHandler(defaultStreamHandler) as (
@@ -71,6 +72,6 @@ export default {
     env: CloudflareEnv,
     ctx: ExecutionContext,
   ): void {
-    ctx.waitUntil(syncAll(env.DB, env.BANK_CONNECTION_KEY))
+    ctx.waitUntil(syncAll(env.DB, bankKeys(env)))
   },
 }

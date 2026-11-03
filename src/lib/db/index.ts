@@ -29,6 +29,8 @@ export interface CloudflareEnv {
   DEV_MEMBER_EMAIL?: string
   /** 32 random bytes, base64-encoded. Never reuse the authentication secret. */
   BANK_CONNECTION_KEY?: string
+  /** The key being rotated out: still opens credentials sealed under it. */
+  BANK_CONNECTION_KEY_PREVIOUS?: string
   /** Workers Rate Limiting for `/mcp` and the Shortcut upload. Absent locally. */
   MCP_RATE_LIMITER?: RateLimit
   UPLOAD_RATE_LIMITER?: RateLimit

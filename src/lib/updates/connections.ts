@@ -4,12 +4,18 @@
  * Account. Discovery imports nothing; syncing mapped accounts is sync.ts.
  */
 import { and, eq, sql } from 'drizzle-orm'
-import { connectionKeyReady, decryptAccess, encryptAccess } from './crypto'
+import {
+  connectionKeyReady,
+  currentKey,
+  encryptAccess,
+  openAccess,
+} from './crypto'
 import {
   SimplefinError,
   claimSimplefin,
   fetchSimplefin,
 } from './simplefinClient'
+import type { BankKeys } from './crypto'
 import type { SimplefinAccount } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
 import { hashToken } from '@/lib/agents/tokens'
@@ -33,11 +39,12 @@ export async function connectSimplefin(
   db: HouseholdDatabase,
   member: { email: string },
   input: { name: string; setupToken: string },
-  secret: string | undefined,
+  secret: BankKeys,
   transport: typeof fetch = fetch,
 ): Promise<{ id: string }> {
   // A setup token works once: don't spend it unless it can be stored.
-  if (!connectionKeyReady(secret)) throw new UserError(NOT_CONFIGURED)
+  if (!connectionKeyReady(currentKey(secret)))
+    throw new UserError(NOT_CONFIGURED)
   const access = await claimSimplefin(input.setupToken, transport)
   const accessHash = await hashToken(access)
   const taken = await db
@@ -52,7 +59,11 @@ export async function connectSimplefin(
       id,
       name: input.name,
       createdBy: member.email,
-      encryptedAccess: await encryptAccess(access, secret, context(db, id)),
+      encryptedAccess: await encryptAccess(
+        access,
+        currentKey(secret),
+        context(db, id),
+      ),
       accessHash,
       status: 'ready' as const,
     }),
@@ -95,7 +106,7 @@ async function spendRequest(db: HouseholdDatabase, id: string) {
 export async function discoverAccounts(
   db: HouseholdDatabase,
   id: string,
-  secret: string | undefined,
+  secret: BankKeys,
   transport: typeof fetch = fetch,
 ): Promise<void> {
   await readBridge(db, id, secret, { balancesOnly: true }, transport)
@@ -109,7 +120,7 @@ export async function discoverAccounts(
 export async function readBridge(
   db: HouseholdDatabase,
   id: string,
-  secret: string | undefined,
+  secret: BankKeys,
   options: Parameters<typeof fetchSimplefin>[1],
   transport: typeof fetch = fetch,
 ): Promise<Array<SimplefinAccount>> {
@@ -119,15 +130,23 @@ export async function readBridge(
     .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     .get()
   if (!connection) throw new UserError('That bank connection no longer exists.')
-  if (!connectionKeyReady(secret)) throw new UserError(NOT_CONFIGURED)
+  if (!connectionKeyReady(currentKey(secret)))
+    throw new UserError(NOT_CONFIGURED)
   await spendRequest(db, id)
   let found: Awaited<ReturnType<typeof fetchSimplefin>>
   try {
-    const access = await decryptAccess(
+    const { access, resealed } = await openAccess(
       connection.encryptedAccess,
       secret,
       context(db, id),
     )
+    // Opened with the previous key during a rotation: store it under the
+    // current one, so the previous key can be retired.
+    if (resealed)
+      await db
+        .update(bankConnections)
+        .set({ encryptedAccess: resealed })
+        .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     found = await fetchSimplefin(access, options, transport)
   } catch (error) {
     const message =

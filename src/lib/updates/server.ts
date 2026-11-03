@@ -16,6 +16,7 @@ import {
   revokeUploadToken,
 } from './uploads'
 import { syncConnection } from './sync'
+import { bankKeys } from './crypto'
 import type { AccountExportInput } from './ingest'
 import type { ExportFormat } from './exports'
 import { withMember } from '@/lib/auth/session'
@@ -84,12 +85,7 @@ export const connectBank = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(({ db, member }) =>
-      connectSimplefin(
-        db,
-        member,
-        data,
-        getCloudflareEnv().BANK_CONNECTION_KEY,
-      ),
+      connectSimplefin(db, member, data, bankKeys(getCloudflareEnv())),
     ),
   )
 
@@ -99,7 +95,7 @@ export const refreshBankAccounts = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(({ db }) =>
-      discoverAccounts(db, data.id, getCloudflareEnv().BANK_CONNECTION_KEY),
+      discoverAccounts(db, data.id, bankKeys(getCloudflareEnv())),
     ),
   )
 
@@ -134,6 +130,6 @@ export const syncBank = createServerFn({ method: 'POST' })
   )
   .handler(({ data }) =>
     withMember(({ db }) =>
-      syncConnection(db, data.id, getCloudflareEnv().BANK_CONNECTION_KEY),
+      syncConnection(db, data.id, bankKeys(getCloudflareEnv())),
     ),
   )

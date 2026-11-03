@@ -70,7 +70,10 @@ Worker secrets (`wrangler secret put <NAME> --env production`):
 `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` (comma-separated; a secret so the
 Household's addresses stay out of the repository), and `BANK_CONNECTION_KEY`
 (32 random bytes, base64: `openssl rand -base64 32`; encrypts SimpleFIN access.
-Losing or changing it means reconnecting every bank connection).
+Losing it means reconnecting every bank connection). To rotate it, put the old
+value in `BANK_CONNECTION_KEY_PREVIOUS` and a new one in `BANK_CONNECTION_KEY`;
+each connection is resealed under the new key the next time it syncs. Once
+every connection has synced (a day of crons), delete the previous key.
 
 Rate limits: Better Auth counts sign-in attempts per client IP in D1 (the
 `rate_limit` table), and the `MCP_RATE_LIMITER` / `UPLOAD_RATE_LIMITER`

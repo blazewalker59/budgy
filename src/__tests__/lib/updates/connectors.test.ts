@@ -6,6 +6,7 @@ import { householdDatabase } from '@/lib/households/scope'
 import {
   balances,
   bankAccounts,
+  bankConnections,
   householdMembers,
   households,
   moneyIn,
@@ -500,6 +501,38 @@ describe('SimpleFIN client', () => {
     expect(sealed).not.toContain('secret')
     expect(await decryptAccess(sealed, KEY, 'simplefin:a:1')).toBe(ACCESS)
     await expect(decryptAccess(sealed, KEY, 'simplefin:b:1')).rejects.toThrow()
+  })
+
+  it('opens a credential under the previous key during rotation, and reseals it', async () => {
+    const { a, db } = await fixture()
+    const { transport, calls } = bridge([sapphire])
+    const { id } = await connectSimplefin(
+      a,
+      me,
+      { name: 'Bridge', setupToken: SETUP },
+      KEY,
+      transport,
+    )
+    const sealedBefore = (await db.select().from(bankConnections).get())!
+      .encryptedAccess
+    const NEW = btoa(String.fromCharCode(...new Uint8Array(32).fill(9)))
+    // The new key alone can't open what the old one sealed.
+    await expect(discoverAccounts(a, id, NEW, transport)).rejects.toThrow(
+      'credentials couldn’t be opened',
+    )
+    await discoverAccounts(a, id, { current: NEW, previous: KEY }, transport)
+    expect(calls.at(-1)?.authorization).toBe(`Basic ${btoa('user:secret')}`)
+    const sealedAfter = (await db.select().from(bankConnections).get())!
+      .encryptedAccess
+    expect(sealedAfter).not.toBe(sealedBefore)
+    expect(await decryptAccess(sealedAfter, NEW, `simplefin:a:${id}`)).toBe(
+      ACCESS,
+    )
+    // Resealed: the previous key can now be retired.
+    await discoverAccounts(a, id, { current: NEW }, transport)
+    expect(
+      (await db.select().from(bankConnections).get())!.encryptedAccess,
+    ).toBe(sealedAfter)
   })
 })
 

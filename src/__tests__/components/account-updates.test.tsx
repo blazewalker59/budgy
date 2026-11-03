@@ -121,13 +121,22 @@ const summary = {
 const csv =
   'Transaction Date,Clearing Date,Description,Merchant,Category,Type,Amount (USD)\n10/01/2026,10/02/2026,Shop,Shop,Shopping,Purchase,5'
 
+/** Open an Account's row on Updates to see its details. */
+const openRow = (name: string) =>
+  fireEvent.click(
+    screen.getByRole('button', { name: new RegExp(`^${name}\\b`) }),
+  )
+
 describe('Unified Account Updates UI', () => {
   it('shows the actual manual method and does not claim a bank connection or use a purchase date as update status', async () => {
     mocks.get.mockResolvedValue([empty])
     mount()
-    expect(await screen.findByText('Card')).toBeTruthy()
+    // One line on the row; the rest once it's opened.
+    expect(await screen.findByText('Not set up yet')).toBeTruthy()
+    expect(screen.queryByText(/No updates yet/)).toBeNull()
+    openRow('Card')
     expect(screen.getByText(/No updates yet/)).toBeTruthy()
-    expect(screen.getByText(/Not set up yet/)).toBeTruthy()
+    expect(screen.getByText(/Not set up yet\. Choose/)).toBeTruthy()
     await waitFor(() => expect(mocks.connections).toHaveBeenCalled())
     expect(screen.queryByText(/Connected by/)).toBeNull()
     expect(mocks.update).not.toHaveBeenCalled()
@@ -143,9 +152,7 @@ describe('Unified Account Updates UI', () => {
       total: 1,
     })
     mount()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Set up updates' }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up' }))
     fireEvent.click(screen.getByRole('button', { name: /Upload a file now/ }))
     const file = new File([csv], 'apple.csv', { type: 'text/csv' })
     Object.defineProperty(file, 'text', { value: () => Promise.resolve(csv) })
@@ -180,9 +187,7 @@ describe('Unified Account Updates UI', () => {
   it('does not silently choose an amount sign for a generic bank export', async () => {
     mocks.get.mockResolvedValue([empty])
     mount()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Set up updates' }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up' }))
     fireEvent.click(screen.getByRole('button', { name: /Upload a file now/ }))
     const generic = 'Date,Description,Amount\n2026-10-01,Shop,-5'
     const file = new File([generic], 'bank.csv')
@@ -228,7 +233,9 @@ describe('Unified Account Updates UI', () => {
       },
     ])
     mount()
-    expect(await screen.findByText(/^Last updated /)).toBeTruthy()
+    expect(await screen.findByText('Last update failed')).toBeTruthy()
+    openRow('Card')
+    expect(screen.getByText(/^Last updated /)).toBeTruthy()
     expect(screen.getByRole('alert').textContent).toContain(
       'last successful update is above',
     )
@@ -241,9 +248,7 @@ describe('Unified Account Updates UI', () => {
       account: 'Card',
     })
     mount()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Set up updates' }),
-    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Set up' }))
     // No bank to link: for a card, the share sheet is the recommended way.
     const shortcut = screen.getByRole('button', {
       name: /From your iPhone’s share sheet/,
@@ -307,7 +312,7 @@ describe('Unified Account Updates UI', () => {
     // Collapsed: the connection's details aren't shown until opened.
     expect(screen.queryByText(/Vanguard needs attention/)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Set up updates' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Set up' }))
     const fromBank = screen.getByRole('button', {
       name: /Automatically from your bank/,
     })
@@ -370,13 +375,12 @@ describe('Unified Account Updates UI', () => {
       ])
       mount()
       const needs = (await screen.findByText(/Needs action · 1/)).parentElement!
-      const done = screen.getByText(/Set up · 2/).parentElement!
+      const done = screen.getByText(/Up to date · 2/).parentElement!
       expect(needs.textContent).toContain('Card')
       expect(done.textContent).toContain('Checking')
       expect(done.textContent).toContain('Apple')
-      expect(done.textContent).toContain(
-        'Updates automatically from Joint Checking',
-      )
+      expect(done.textContent).toContain('Bank sync · through Oct 9')
+      expect(done.textContent).toContain('Shortcut · not used yet')
 
       // Setting up a Shortcut for Card: it stays put until closed.
       mocks.createToken.mockResolvedValue({
@@ -384,7 +388,7 @@ describe('Unified Account Updates UI', () => {
         token: 'bu_new',
         account: 'Card',
       })
-      fireEvent.click(screen.getByRole('button', { name: 'Set up updates' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Set up' }))
       fireEvent.click(
         screen.getByRole('button', { name: /From your iPhone’s share sheet/ }),
       )
@@ -398,7 +402,10 @@ describe('Unified Account Updates UI', () => {
       expect(await screen.findByText('Bearer bu_new')).toBeTruthy()
       expect(screen.getByText(/Needs action · 1/)).toBeTruthy()
       fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-      expect(await screen.findByText('All set up')).toBeTruthy()
+      // Still open, so still where it was; folding it away moves it.
+      expect(screen.getByText(/Needs action · 1/)).toBeTruthy()
+      openRow('Card')
+      expect(await screen.findByText('All up to date')).toBeTruthy()
       expect(screen.queryByText(/Needs action/)).toBeNull()
     } finally {
       mocks.accounts.splice(1)
@@ -449,15 +456,15 @@ describe('Unified Account Updates UI', () => {
     )
     mount()
     expect(await screen.findByText(/Needs action · 1/)).toBeTruthy()
+    expect(screen.getByText('Bank sync paused')).toBeTruthy()
+    openRow('Card')
     expect(
       screen.getByText(
         'Bank sync is paused. Your SimpleFIN Bridge subscription needs renewing.',
       ),
     ).toBeTruthy()
     expect(
-      screen
-        .getByRole('link', { name: 'Open SimpleFIN Bridge' })
-        .getAttribute('href'),
+      screen.getByRole('link', { name: 'Open Bridge' }).getAttribute('href'),
     ).toBe('https://bridge.simplefin.org/')
   })
 
@@ -524,6 +531,52 @@ describe('Unified Account Updates UI', () => {
     expect(screen.queryByText(/run-on text/)).toBeNull()
   })
 
+  it('puts Accounts waiting on one bank sign-in on one row, and keeps balance-only Accounts out of Needs action', async () => {
+    mocks.accounts.push(
+      { name: 'Kid A 529', owner: 'Kid A', kind: 'education', closed: false },
+      { name: 'Kid B 529', owner: 'Kid B', kind: 'education', closed: false },
+      { name: 'Home', owner: 'Joint', kind: 'property', closed: false },
+    )
+    try {
+      mocks.get.mockResolvedValue([empty])
+      const [connection] = feeding('attention', null)
+      const reauth = {
+        ...connection.accounts[0],
+        institution: 'Path2College',
+        problem: 'Path2College needs you to sign in again in SimpleFIN Bridge.',
+        problemKind: 'reauth',
+      }
+      mocks.connections.mockResolvedValue([
+        {
+          ...connection,
+          accounts: [
+            { ...reauth, providerId: 'p1', account: 'Kid A 529' },
+            { ...reauth, providerId: 'p2', account: 'Kid B 529' },
+            // Unlinked: once, this made every balance Account "need action".
+            {
+              ...connection.accounts[0],
+              providerId: 'p3',
+              account: null,
+            },
+          ],
+        },
+      ])
+      mount()
+      const needs = (await screen.findByText(/Needs action · 3/)).parentElement!
+      expect(needs.textContent).toContain('Kid A 529, Kid B 529')
+      expect(needs.textContent).toContain('Sign in to Path2College in Bridge')
+      expect(
+        screen.getAllByText('Sign in to Path2College in Bridge'),
+      ).toHaveLength(1)
+      expect(needs.textContent).not.toContain('Home')
+      const done = screen.getByText(/Up to date · 1/).parentElement!
+      expect(done.textContent).toContain('Home')
+      expect(done.textContent).toContain('No balance yet')
+    } finally {
+      mocks.accounts.splice(1)
+    }
+  })
+
   it('asks for a new bank sign-in in Bridge when an Account needs one', async () => {
     mocks.get.mockResolvedValue([empty])
     mocks.connections.mockResolvedValue(
@@ -534,12 +587,12 @@ describe('Unified Account Updates UI', () => {
     )
     mount()
     expect(await screen.findByText(/Needs action · 1/)).toBeTruthy()
+    expect(screen.getByText('Sign in to Chase in Bridge')).toBeTruthy()
+    openRow('Card')
     expect(
       screen.getByText('Chase needs you to sign in again in SimpleFIN Bridge.'),
     ).toBeTruthy()
-    expect(
-      screen.getByRole('link', { name: 'Open SimpleFIN Bridge' }),
-    ).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Open Bridge' })).toBeTruthy()
     expect(screen.getByText(/1 bank needs a sign-in/)).toBeTruthy()
   })
 

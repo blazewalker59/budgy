@@ -1,7 +1,7 @@
 /** One update surface, independent of where an Account's data comes from. */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Check, FileUp, Landmark, Share } from 'lucide-react'
+import { Check, ChevronDown, FileUp, Landmark, Share } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { Account } from '@/lib/model/types'
 import type { ExportFormat } from '@/lib/updates/exports'
@@ -25,6 +25,8 @@ import { useBook } from '@/lib/ledger/book'
 import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 import { MONEY_IN_KEY } from '@/lib/moneyIn/useMoneyIn'
 import { dollars } from '@/lib/model/money'
+import { dayLabel } from '@/lib/model/dates'
+import { checkedAgo } from '@/lib/model/bankHealth'
 import {
   BankConnections,
   BankLink,
@@ -57,7 +59,8 @@ export function AccountUpdates() {
   const tokens = useUploadTokens()
   const [selected, setSelected] = useState<{
     account: string
-    panel: Panel
+    /** Null: open, showing its details. */
+    panel: Panel | null
     /** The group it was in when opened, so it doesn't move while open. */
     needsAction: boolean
   } | null>(null)
@@ -90,31 +93,45 @@ export function AccountUpdates() {
         health,
       )
       const open = selected?.account === account.name ? selected : null
+      const lastBalance = ix.ledger.balances
+        .filter((b) => b.account === account.name)
+        .at(-1)
       return {
         account,
         state,
         situation,
+        line: brief(situation, state, lastBalance),
         panel: open?.panel ?? null,
         needsAction: open ? open.needsAction : situation.needsAction,
       }
     })
-  const card = (c: (typeof cards)[number]) => (
-    <AccountCard
+  const row = (c: (typeof cards)[number]) => (
+    <AccountRow
       key={c.account.name}
       account={c.account}
       state={c.state}
       situation={c.situation}
+      line={c.line}
+      expanded={selected?.account === c.account.name}
+      needsAction={c.needsAction}
       panel={c.panel}
-      onPanel={(panel) =>
+      onToggle={() =>
         setSelected(
-          panel
-            ? {
+          selected?.account === c.account.name
+            ? null
+            : {
                 account: c.account.name,
-                panel,
+                panel: null,
                 needsAction: c.needsAction,
-              }
-            : null,
+              },
         )
+      }
+      onPanel={(panel) =>
+        setSelected({
+          account: c.account.name,
+          panel,
+          needsAction: c.needsAction,
+        })
       }
       onConnectBank={() => {
         setBanksOpen(true)
@@ -122,18 +139,18 @@ export function AccountUpdates() {
       }}
     />
   )
-  const needing = cards.filter((c) => c.needsAction)
+  const RANK = { over: 0, nice: 1, muted: 2 } as const
+  const needing = cards
+    .filter((c) => c.needsAction)
+    .sort(
+      (a, b) =>
+        RANK[a.line.tone] - RANK[b.line.tone] ||
+        a.line.text.localeCompare(b.line.text) ||
+        a.account.name.localeCompare(b.account.name),
+    )
   const settled = cards.filter((c) => !c.needsAction)
   return (
-    <div className="space-y-3">
-      <ul className="list-disc space-y-0.5 pl-4 text-sm text-muted">
-        <li>Linked banks sync on their own.</li>
-        <li>Other cards update from an export, here or from your iPhone.</li>
-        <li>
-          “Last updated” means the last check worked. Some recent transactions
-          may not be in yet.
-        </li>
-      </ul>
+    <div className="space-y-4">
       <BankConnections open={banksOpen} onOpenChange={setBanksOpen} />
       {!cards.length && (
         <p className="rounded-xl border border-border bg-surface p-4 text-sm text-muted">
@@ -141,22 +158,199 @@ export function AccountUpdates() {
         </p>
       )}
       {!!needing.length && (
-        <section className="space-y-2">
-          <h2 className="pt-1 text-sm font-bold uppercase tracking-wide text-muted">
+        <section className="space-y-1.5">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-nice">
             Needs action · {needing.length}
           </h2>
-          {needing.map(card)}
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+            {byBank(needing).map((item) =>
+              'institution' in item ? (
+                <SignInRow
+                  key={`bank:${item.institution}`}
+                  institution={item.institution}
+                  accounts={item.cards.map((c) => c.account)}
+                />
+              ) : (
+                row(item)
+              ),
+            )}
+          </ul>
         </section>
       )}
       {!!settled.length && (
-        <section className="space-y-2">
-          <h2 className="pt-1 text-sm font-bold uppercase tracking-wide text-muted">
-            {needing.length ? `Set up · ${settled.length}` : 'All set up'}
+        <section className="space-y-1.5">
+          <h2 className="text-xs font-bold uppercase tracking-wide text-muted">
+            {needing.length
+              ? `Up to date · ${settled.length}`
+              : 'All up to date'}
           </h2>
-          {settled.map(card)}
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface">
+            {settled.map(row)}
+          </ul>
+          <p className="px-1 text-xs text-muted">
+            “Through” is the last day a sync covered; the newest purchases can
+            take a day or two to post.
+          </p>
         </section>
       )}
     </div>
+  )
+}
+
+/**
+ * Accounts needing the same bank sign-in, together: one login at the bank
+ * fixes them all. An Account that's open stays on its own row.
+ */
+function byBank<
+  TCard extends { situation: Situation; panel: Panel | null; account: Account },
+>(
+  cards: Array<TCard>,
+): Array<TCard | { institution: string; cards: Array<TCard> }> {
+  const signIn = (c: TCard) =>
+    c.situation.bank?.problemKind === 'reauth' &&
+    !c.situation.paused &&
+    c.panel === null
+      ? c.situation.bank.institution
+      : null
+  const counts = new Map<string, number>()
+  for (const c of cards) {
+    const bank = signIn(c)
+    if (bank) counts.set(bank, (counts.get(bank) ?? 0) + 1)
+  }
+  const out: Array<TCard | { institution: string; cards: Array<TCard> }> = []
+  const groups = new Map<string, { institution: string; cards: Array<TCard> }>()
+  for (const c of cards) {
+    const bank = signIn(c)
+    if (!bank || (counts.get(bank) ?? 0) < 2) {
+      out.push(c)
+      continue
+    }
+    let group = groups.get(bank)
+    if (!group) {
+      group = { institution: bank, cards: [] }
+      groups.set(bank, group)
+      out.push(group)
+    }
+    group.cards.push(c)
+  }
+  return out
+}
+
+/** Several Accounts waiting on one bank sign-in, in Bridge. */
+function SignInRow({
+  institution,
+  accounts,
+}: {
+  institution: string
+  accounts: Array<Account>
+}) {
+  return (
+    <li className="flex items-center gap-2 px-3 py-1">
+      <div className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5">
+        <span
+          aria-hidden
+          className={`size-2 shrink-0 rounded-full ${TONE_DOT.nice}`}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">
+            {accounts.map((a) => a.name).join(', ')}
+          </span>
+          <span className="block truncate text-xs text-nice">
+            Sign in to {institution} in Bridge
+          </span>
+        </span>
+      </div>
+      <a
+        href={SIMPLEFIN_BRIDGE}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex min-h-9 shrink-0 items-center rounded-full bg-foreground px-3 text-xs font-semibold text-background"
+      >
+        Open Bridge
+      </a>
+    </li>
+  )
+}
+
+/** One Account in a line; tap for its details and every way to update. */
+function AccountRow({
+  account,
+  state,
+  situation,
+  line,
+  expanded,
+  needsAction,
+  panel,
+  onToggle,
+  onPanel,
+  onConnectBank,
+}: {
+  account: Account
+  state?: UpdateState
+  situation: Situation
+  line: { tone: Tone; text: string }
+  expanded: boolean
+  needsAction: boolean
+  panel: Panel | null
+  onToggle: () => void
+  onPanel: (panel: Panel | null) => void
+  onConnectBank: () => void
+}) {
+  const { primary } = describe(situation, state)
+  // Needing action, the fix sits on the row itself; otherwise it's inside.
+  const inline = needsAction && primary !== null && panel !== primary.panel
+  return (
+    <li>
+      <div className="flex items-center gap-2 px-3 py-1">
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={onToggle}
+          className="flex min-h-12 min-w-0 flex-1 items-center gap-2.5 text-left"
+        >
+          <span
+            aria-hidden
+            className={`size-2 shrink-0 rounded-full ${TONE_DOT[line.tone]}`}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold">
+              {account.name}
+              <span className="font-normal text-muted"> · {account.owner}</span>
+            </span>
+            <span className={`block truncate text-xs ${TONE_TEXT[line.tone]}`}>
+              {line.text}
+            </span>
+          </span>
+          <ChevronDown
+            size={16}
+            aria-hidden
+            className={`shrink-0 text-muted transition-transform ${expanded ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {inline && (
+          <PrimaryAction
+            account={account}
+            bank={situation.bank}
+            primary={primary}
+            onPanel={onPanel}
+            compact
+          />
+        )}
+      </div>
+      {expanded && (
+        <div className="border-t border-border bg-background/40 px-3 py-3">
+          <AccountCard
+            account={account}
+            state={state}
+            situation={situation}
+            panel={panel}
+            onPanel={onPanel}
+            onConnectBank={onConnectBank}
+            showsAction={inline}
+          />
+        </div>
+      )}
+    </li>
   )
 }
 
@@ -195,13 +389,135 @@ function situate(
       : 'manual'
   const latest = state?.latest?.status
   const needsAction =
+    // Linking a balance-only Account to its bank is a suggestion, shown
+    // inside it, not something broken.
     (spending && method === 'manual') ||
-    (!spending && !bank && unlinkedBanks > 0) ||
     (bank !== null && !bank.present) ||
     (bank !== null && (!!bank.problem || !!paused)) ||
     latest === 'failed' ||
     latest === 'attention'
   return { spending, bank, paused, unlinkedBanks, method, needsAction }
+}
+
+type Primary = {
+  label: string
+  /** On a row, where space is short. */
+  short?: string
+  panel?: Panel
+  record?: boolean
+  href?: string
+  retry?: boolean
+}
+
+/** What an Account's details say, and the one thing it asks for (if any). */
+function describe(
+  situation: Situation,
+  state: UpdateState | undefined,
+): { summary: string; primary: Primary | null } {
+  const { spending, bank, paused, unlinkedBanks, method } = situation
+  if (bank && paused)
+    return {
+      summary: `Bank sync is paused. ${paused}`,
+      primary: {
+        label: 'Open SimpleFIN Bridge',
+        short: 'Open Bridge',
+        href: SIMPLEFIN_BRIDGE,
+      },
+    }
+  if (bank && bank.problem)
+    return {
+      summary: bank.problem,
+      primary:
+        bank.problemKind === 'reauth'
+          ? {
+              label: 'Open SimpleFIN Bridge',
+              short: 'Open Bridge',
+              href: SIMPLEFIN_BRIDGE,
+            }
+          : { label: 'Retry', retry: true },
+    }
+  if (bank && !bank.present)
+    return {
+      summary: `SimpleFIN stopped sharing ${bank.name}. Check SimpleFIN Bridge or link another account.`,
+      primary: { label: 'Fix link', short: 'Fix', panel: 'link' },
+    }
+  if (bank)
+    return {
+      summary: `Updates automatically from ${bank.name} (${bank.institution}).`,
+      primary: null,
+    }
+  if (method === 'shortcut')
+    return { summary: 'Updates from its iPhone Shortcut.', primary: null }
+  if (spending)
+    return {
+      summary: state?.success
+        ? 'Updated by uploading exports. Set up an easier way.'
+        : 'Not set up yet. Choose how purchases come in.',
+      primary: { label: 'Set up updates', short: 'Set up', panel: 'choose' },
+    }
+  if (unlinkedBanks)
+    return {
+      summary:
+        'Its balance is entered by hand. Link its bank to update it automatically.',
+      primary: { label: 'Link bank', panel: 'link' },
+    }
+  return {
+    summary: 'Its balance is entered by hand.',
+    primary: { label: 'Record balance', record: true },
+  }
+}
+
+type Tone = 'over' | 'nice' | 'muted'
+const TONE_TEXT: Record<Tone, string> = {
+  over: 'text-over',
+  nice: 'text-nice',
+  muted: 'text-muted',
+}
+const TONE_DOT: Record<Tone, string> = {
+  over: 'bg-over',
+  nice: 'bg-nice',
+  muted: 'bg-border',
+}
+
+/**
+ * One short line for an Account's row: why it needs action, or how and when
+ * it last updated. Same-bank problems read alike, so they sort together.
+ */
+function brief(
+  situation: Situation,
+  state: UpdateState | undefined,
+  lastBalance: { amount: number; date: string } | undefined,
+): { tone: Tone; text: string } {
+  const { spending, bank, paused, method } = situation
+  const latest = state?.latest?.status
+  if (bank && paused) return { tone: 'over', text: 'Bank sync paused' }
+  if (bank?.problemKind === 'reauth')
+    return { tone: 'nice', text: `Sign in to ${bank.institution} in Bridge` }
+  if (bank?.problem) return { tone: 'nice', text: 'Couldn’t sync this time' }
+  if (bank && !bank.present)
+    return { tone: 'over', text: 'The bank stopped sharing it' }
+  if (latest === 'failed') return { tone: 'over', text: 'Last update failed' }
+  if (latest === 'attention')
+    return { tone: 'nice', text: 'Purchases to review' }
+  if (spending && method === 'manual')
+    return {
+      tone: 'nice',
+      text: state?.success?.finishedAt
+        ? `Uploaded by hand · ${checkedAgo(state.success.finishedAt)}`
+        : 'Not set up yet',
+    }
+  const via = bank
+    ? `Bank sync · ${bank.syncedThrough ? `through ${dayLabel(bank.syncedThrough)}` : 'first sync soon'}`
+    : method === 'shortcut'
+      ? `Shortcut · ${state?.success?.finishedAt ? checkedAgo(state.success.finishedAt) : 'not used yet'}`
+      : null
+  const balance = lastBalance
+    ? `${dollars(lastBalance.amount)} on ${dayLabel(lastBalance.date)}`
+    : 'No balance yet'
+  return {
+    tone: 'muted',
+    text: via ? (spending ? via : `${via} · ${balance}`) : balance,
+  }
 }
 
 /** Which way of updating suits an Account best, given what's set up. */
@@ -217,6 +533,7 @@ function AccountCard({
   panel,
   onPanel,
   onConnectBank,
+  showsAction,
 }: {
   account: Account
   state?: UpdateState
@@ -224,6 +541,8 @@ function AccountCard({
   panel: Panel | null
   onPanel: (panel: Panel | null) => void
   onConnectBank: () => void
+  /** The row above already shows the action. */
+  showsAction: boolean
 }) {
   const { ix } = useBook()
   const connections = useBankConnections()
@@ -233,93 +552,20 @@ function AccountCard({
     .at(-1)
   const best = recommend(account, unlinkedBanks > 0)
 
-  // What the card says, and the one thing it asks for (if anything).
-  let summary: string
-  let primary: {
-    label: string
-    panel?: Panel
-    record?: boolean
-    href?: string
-    retry?: boolean
-  } | null = null
-  if (bank && paused) {
-    summary = `Bank sync is paused. ${paused}`
-    primary = { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
-  } else if (bank && bank.problem) {
-    summary = bank.problem
-    primary =
-      bank.problemKind === 'reauth'
-        ? { label: 'Open SimpleFIN Bridge', href: SIMPLEFIN_BRIDGE }
-        : { label: 'Retry', retry: true }
-  } else if (bank && !bank.present) {
-    summary = `SimpleFIN stopped sharing ${bank.name}. Check SimpleFIN Bridge or link another account.`
-    primary = { label: 'Fix link', panel: 'link' }
-  } else if (bank) {
-    summary = `Updates automatically from ${bank.name} (${bank.institution}).`
-  } else if (method === 'shortcut') {
-    summary = 'Updates from its iPhone Shortcut.'
-  } else if (spending) {
-    summary = state?.success
-      ? 'Updated by uploading exports. Set up an easier way.'
-      : 'Not set up yet. Choose how purchases come in.'
-    primary = { label: 'Set up updates', panel: 'choose' }
-  } else if (unlinkedBanks) {
-    summary =
-      'Its balance is entered by hand. Link its bank to update it automatically.'
-    primary = { label: 'Link bank', panel: 'link' }
-  } else {
-    summary = 'Its balance is entered by hand.'
-    primary = { label: 'Record balance', record: true }
-  }
+  const { summary, primary } = describe(situation, state)
 
   return (
-    <section className="space-y-2.5 rounded-xl border border-border bg-surface p-3 text-xs">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-bold">{account.name}</h2>
-          <p className="text-muted">
-            {account.owner} ·{' '}
-            {bank
-              ? 'Bank sync'
-              : method === 'shortcut'
-                ? 'iPhone Shortcut'
-                : spending
-                  ? 'Manual'
-                  : 'Recorded balances'}
-          </p>
-        </div>
-        {primary &&
-          (primary.retry && bank ? (
-            <RetryBank bank={bank} />
-          ) : primary.href ? (
-            <a
-              href={primary.href}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 font-semibold text-background"
-            >
-              {primary.label}
-            </a>
-          ) : primary.record ? (
-            <Link
-              to="/accounts"
-              search={{ kinds: [account.kind], people: [account.owner] }}
-              className="inline-flex min-h-11 items-center rounded-full bg-foreground px-4 font-semibold text-background"
-            >
-              {primary.label}
-            </Link>
-          ) : (
-            panel !== primary.panel && (
-              <button
-                type="button"
-                onClick={() => onPanel(primary.panel!)}
-                className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background"
-              >
-                {primary.label}
-              </button>
-            )
-          ))}
-      </div>
+    <div className="space-y-2.5 text-xs">
+      <p className="text-muted">
+        {account.owner} ·{' '}
+        {bank
+          ? 'Bank sync'
+          : method === 'shortcut'
+            ? 'iPhone Shortcut'
+            : spending
+              ? 'Manual'
+              : 'Recorded balances'}
+      </p>
       {bank && (paused || bank.problem) ? (
         <p role="alert" className="text-over">
           {summary}
@@ -387,7 +633,60 @@ function AccountCard({
             ? 'What are my options?'
             : 'Other ways to update'}
       </button>
-    </section>
+      {primary && !showsAction && panel !== primary.panel && (
+        <PrimaryAction
+          account={account}
+          bank={bank}
+          primary={primary}
+          onPanel={onPanel}
+        />
+      )}
+    </div>
+  )
+}
+
+/** The one thing an Account asks for, as a button or link. */
+function PrimaryAction({
+  account,
+  bank,
+  primary,
+  onPanel,
+  compact = false,
+}: {
+  account: Account
+  bank: BankAccount | null
+  primary: Primary
+  onPanel: (panel: Panel | null) => void
+  /** On a row: the short label, a smaller button. */
+  compact?: boolean
+}) {
+  const style = `inline-flex shrink-0 items-center rounded-full bg-foreground font-semibold text-background ${compact ? 'min-h-9 px-3 text-xs' : 'min-h-11 px-4 text-xs'}`
+  const label = compact ? (primary.short ?? primary.label) : primary.label
+  if (primary.retry && bank) return <RetryBank bank={bank} />
+  if (primary.href)
+    return (
+      <a href={primary.href} target="_blank" rel="noreferrer" className={style}>
+        {label}
+      </a>
+    )
+  if (primary.record)
+    return (
+      <Link
+        to="/accounts"
+        search={{ kinds: [account.kind], people: [account.owner] }}
+        className={style}
+      >
+        {label}
+      </Link>
+    )
+  return (
+    <button
+      type="button"
+      onClick={() => onPanel(primary.panel!)}
+      className={style}
+    >
+      {label}
+    </button>
   )
 }
 

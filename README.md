@@ -63,7 +63,11 @@ supports manual balances and historical backfills. Each card or bank Account
 can also get an iPhone share-sheet Shortcut that sends its export straight to
 `/api/updates/upload`, and SimpleFIN Bridge accounts can be linked to Budgy
 Accounts, syncing posted purchases and balances every six hours. See
-[ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md).
+[ADR 0010](docs/adr/0010-shortcut-uploads-and-simplefin-connections.md). The
+six-hourly cron queues one sync per connection on the `budgy-sync` Cloudflare
+Queue ([ADR 0012](docs/adr/0012-scheduled-sync-on-a-queue.md)); create it and
+its dead-letter queue once, before the first deploy that needs them:
+`wrangler queues create budgy-sync && wrangler queues create budgy-sync-dlq`.
 
 Worker secrets (`wrangler secret put <NAME> --env production`):
 `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `GOOGLE_CLIENT_ID`,

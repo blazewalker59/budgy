@@ -12,6 +12,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { drizzle } from 'drizzle-orm/d1'
 import * as schema from './schema'
 import type { DrizzleD1Database } from 'drizzle-orm/d1'
+import type { SyncMessage } from '@/lib/updates/syncQueue'
 
 export interface CloudflareEnv {
   DB: D1Database
@@ -32,6 +33,8 @@ export interface CloudflareEnv {
   /** The key being rotated out: still opens credentials sealed under it. */
   BANK_CONNECTION_KEY_PREVIOUS?: string
   /** Workers Rate Limiting for `/mcp` and the Shortcut upload. Absent locally. */
+  /** SimpleFIN sync, one message per connection (docs/adr/0012). */
+  SYNC_QUEUE?: Queue<SyncMessage>
   MCP_RATE_LIMITER?: RateLimit
   UPLOAD_RATE_LIMITER?: RateLimit
 }

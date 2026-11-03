@@ -14,9 +14,8 @@ import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { PostedRow } from '@/lib/import/posted'
 import type { IncomingRow } from '@/lib/model/moneyIn'
 import { recordMoneyIn } from '@/lib/moneyIn/service'
-import { dbFromD1 } from '@/lib/db'
 import { bankAccounts, bankConnections } from '@/lib/db/schema'
-import { householdDatabase, inHousehold } from '@/lib/households/scope'
+import { inHousehold } from '@/lib/households/scope'
 import {
   findAccount,
   postTransactions,
@@ -226,39 +225,4 @@ export async function syncConnection(
     }
   }
   return results
-}
-
-/**
- * The scheduled sync: every connection with a mapped account, in every
- * Household. A trusted background job, so each runs in its own Household's
- * scope; one failing doesn't stop the rest.
- */
-export async function syncAll(
-  d1: D1Database,
-  secret: BankKeys,
-  transport: typeof fetch = fetch,
-): Promise<void> {
-  const due = await dbFromD1(d1)
-    .selectDistinct({
-      id: bankAccounts.connectionId,
-      householdId: bankAccounts.householdId,
-    })
-    .from(bankAccounts)
-    .where(isNotNull(bankAccounts.account))
-  for (const connection of due) {
-    try {
-      await syncConnection(
-        // A client is bound to one Household, so each gets its own.
-        householdDatabase(dbFromD1(d1), connection.householdId),
-        connection.id,
-        secret,
-        transport,
-      )
-    } catch (error) {
-      console.error(
-        `SimpleFIN sync failed for connection ${connection.id}:`,
-        error instanceof Error ? error.message : 'unknown error',
-      )
-    }
-  }
 }

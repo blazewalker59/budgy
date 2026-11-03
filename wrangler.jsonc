@@ -43,6 +43,22 @@
       "simple": { "limit": 10, "period": 60 },
     },
   ],
+  // SimpleFIN sync (docs/adr/0012): the cron queues one message per bank
+  // connection; this Worker consumes them one at a time. A message that keeps
+  // failing (or crashes the consumer) lands in the dead-letter queue.
+  "queues": {
+    "producers": [{ "binding": "SYNC_QUEUE", "queue": "budgy-sync" }],
+    "consumers": [
+      {
+        "queue": "budgy-sync",
+        "max_batch_size": 1,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+        "max_concurrency": 2,
+        "dead_letter_queue": "budgy-sync-dlq",
+      },
+    ],
+  },
   "env": {
     "production": {
       "name": "budgy",
@@ -64,9 +80,24 @@
       "vars": {
         "CANONICAL_HOST": "budgy.bid",
       },
-      // Sync linked SimpleFIN accounts four times a day (docs/adr/0010).
+      // Queue a sync of each linked SimpleFIN connection four times a day
+      // (docs/adr/0012), off the hour as SimpleFIN asks.
       "triggers": {
-        "crons": ["0 */6 * * *"],
+        "crons": ["17 */6 * * *"],
+      },
+      // As at the top level (docs/adr/0012).
+      "queues": {
+        "producers": [{ "binding": "SYNC_QUEUE", "queue": "budgy-sync" }],
+        "consumers": [
+          {
+            "queue": "budgy-sync",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 3,
+            "max_concurrency": 2,
+            "dead_letter_queue": "budgy-sync-dlq",
+          },
+        ],
       },
       "observability": {
         "logs": {

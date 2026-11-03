@@ -3,7 +3,8 @@
 ## Status
 
 Implemented: Shortcut uploads; SimpleFIN connection, discovery, mapping and
-scheduled sync of purchases and balances.
+scheduled sync of purchases and balances. The scheduled sync moved onto a
+queue in [ADR 0012](0012-scheduled-sync-on-a-queue.md).
 
 ## Context
 
@@ -78,11 +79,14 @@ separate update experience.
   no-op checks); one Account failing doesn't stop the others.
 - A Cloudflare cron runs every six hours for every Household with a mapped
   account, each in its own Household scope; **Sync now** runs the same thing.
-  Both count toward the 20-requests-a-day cap.
+  Both count toward the 20-requests-a-day cap. The cron now queues one
+  message per connection, each synced in its own invocation
+  ([ADR 0012](0012-scheduled-sync-on-a-queue.md)).
 
 ## Rollout
 
 Apply `0013_uploads_and_bank_connections.sql` and `0014_bank_account_sync.sql`
 before the new Worker, and set the `BANK_CONNECTION_KEY` secret before
-connecting a bank. The cron trigger is in `wrangler.jsonc` (production). Without it, the
+connecting a bank. The cron trigger and sync queue are in `wrangler.jsonc`
+(production); create the queues first (ADR 0012). Without the key, the
 Shortcut flow works and bank connection setup explains what's missing.

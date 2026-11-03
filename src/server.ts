@@ -3,7 +3,8 @@
  * Custom Cloudflare Worker entry (same shape as sportsline).
  *
  * Serves Better Auth (`/api/auth/*`), the health check and the MCP server
- * for Agents (`/mcp`, docs/adr/0004) directly;
+ * for Agents (`/mcp`, docs/adr/0004) directly, and consumes the SimpleFIN
+ * sync queue (docs/adr/0012);
  * everything else falls through to TanStack Start inside a per-request
  * context carrying the env.
  */
@@ -18,7 +19,7 @@ import { canonicalRedirect } from '@/lib/canonical'
 import { serverRequestContext } from '@/lib/db'
 import { MCP_PATH, serveMcp } from '@/lib/agents/endpoint'
 import { serveUpload } from '@/lib/updates/uploadEndpoint'
-import { syncAll } from '@/lib/updates/sync'
+import { consumeSyncBatch, enqueueSyncs } from '@/lib/updates/syncQueue'
 import { bankKeys } from '@/lib/updates/crypto'
 import { UPLOAD_PATH } from '@/lib/updates/exports'
 
@@ -66,12 +67,22 @@ export default {
     )
   },
 
-  // Cron (wrangler.jsonc): sync linked SimpleFIN accounts (docs/adr/0010).
+  // Cron (wrangler.jsonc): queue a sync of each linked SimpleFIN connection
+  // (docs/adr/0012), so each runs in its own invocation.
   scheduled(
     _controller: ScheduledController,
     env: CloudflareEnv,
     ctx: ExecutionContext,
   ): void {
-    ctx.waitUntil(syncAll(env.DB, bankKeys(env)))
+    if (!env.SYNC_QUEUE) {
+      console.error('SimpleFIN sync: no SYNC_QUEUE binding')
+      return
+    }
+    ctx.waitUntil(enqueueSyncs(env.DB, env.SYNC_QUEUE))
+  },
+
+  // The sync queue's consumer: one connection per message.
+  async queue(batch: MessageBatch<unknown>, env: CloudflareEnv): Promise<void> {
+    await consumeSyncBatch(env.DB, batch, bankKeys(env))
   },
 }

@@ -1,7 +1,8 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { testDatabase } from '../../helpers/d1'
 import type { DatabaseSync } from 'node:sqlite'
 import type { CloudflareEnv } from '@/lib/db'
+import type { SyncMessage } from '@/lib/updates/syncQueue'
 import { householdDatabase } from '@/lib/households/scope'
 import {
   balances,
@@ -17,7 +18,9 @@ import {
   postTransactions,
   saveAccount,
 } from '@/lib/ledger/accounts'
-import { syncAll, syncConnection } from '@/lib/updates/sync'
+import { syncConnection } from '@/lib/updates/sync'
+import { consumeSyncBatch, enqueueSyncs } from '@/lib/updates/syncQueue'
+import { today as householdToday } from '@/lib/model/dates'
 import {
   createUploadToken,
   listUploadTokens,
@@ -777,50 +780,177 @@ describe('SimpleFIN sync', () => {
     expect(link.moneyInSince).not.toBeNull()
   })
 
-  it('syncs every Household’s linked connections on schedule, each in its own scope', async () => {
+  /** Household A and B each with a linked connection, Bridge per access. */
+  async function twoHouseholds() {
     const f = await fixture()
-    const bridgeA = liveBridge([
-      { ...sapphire, transactions: [txn('t1', '-1', 'A shop')] },
-    ])
-    const { id: idA } = await connectSimplefin(
-      f.a,
-      me,
-      { name: 'A', setupToken: SETUP },
-      KEY,
-      bridgeA.transport,
-    )
-    await mapBankAccount(f.a, {
-      connectionId: idA,
-      providerId: 'ACT-1',
-      account: 'Card',
-    })
-    const otherAccess = 'https://user:other@beta-bridge.simplefin.org/simplefin'
-    const transport = ((url: string) =>
-      Promise.resolve(
-        url.includes('/claim/')
-          ? new Response(otherAccess)
-          : Response.json({
-              accounts: [
-                { ...sapphire, transactions: [txn('t1', '-2', 'B shop')] },
-              ],
-            }),
-      )) as typeof fetch
-    const { id: idB } = await connectSimplefin(
-      f.b,
-      me,
-      { name: 'B', setupToken: SETUP },
-      KEY,
-      transport,
-    )
-    await mapBankAccount(f.b, {
-      connectionId: idB,
-      providerId: 'ACT-1',
-      account: 'Card',
-    })
+    const failing = new Set<string>()
+    const requests: Array<string> = []
+    const transport = ((url: string, init?: RequestInit) => {
+      if (url.includes('/claim/'))
+        return Promise.resolve(
+          new Response(
+            `https://user:${url.split('/').at(-1)}@beta-bridge.simplefin.org/simplefin`,
+          ),
+        )
+      const who = atob(
+        new Headers(init?.headers).get('authorization')!.slice(6),
+      ).split(':')[1]
+      requests.push(who)
+      if (failing.has(who))
+        return Promise.resolve(new Response('down', { status: 503 }))
+      return Promise.resolve(
+        Response.json({
+          accounts: [
+            { ...sapphire, transactions: [txn('t1', '-1', `${who} shop`)] },
+          ],
+        }),
+      )
+    }) as typeof fetch
+    const connect = async (
+      scope: typeof f.a,
+      name: string,
+      link: boolean,
+    ): Promise<string> => {
+      const { id } = await connectSimplefin(
+        scope,
+        me,
+        {
+          name,
+          setupToken: btoa(
+            `https://beta-bridge.simplefin.org/simplefin/claim/${name}`,
+          ),
+        },
+        KEY,
+        transport,
+      )
+      if (link)
+        await mapBankAccount(scope, {
+          connectionId: id,
+          providerId: 'ACT-1',
+          account: 'Card',
+        })
+      return id
+    }
+    const idA = await connect(f.a, 'a', true)
+    const idB = await connect(f.b, 'b', true)
+    await connect(f.a, 'unlinked', false)
+    requests.length = 0
+    return { ...f, transport, failing, requests, idA, idB }
+  }
 
-    await syncAll(f.env.DB, KEY, transport)
-    const rows = await f.db.select().from(transactions)
-    expect(rows.map((r) => r.householdId).sort()).toEqual(['a', 'b'])
+  /** A queue batch whose messages record how they were settled. */
+  function batchOf(bodies: Array<unknown>, attempts = 1) {
+    const settled: Array<{ acked?: true; retry?: number }> = []
+    const messages = bodies.map((body, i) => {
+      settled.push({})
+      return {
+        id: `m${i}`,
+        timestamp: new Date(),
+        body,
+        attempts,
+        ack: () => (settled[i].acked = true),
+        retry: (options?: { delaySeconds?: number }) =>
+          (settled[i].retry = options?.delaySeconds ?? 0),
+      }
+    })
+    return {
+      batch: { messages, queue: 'budgy-sync' } as unknown as MessageBatch,
+      settled,
+    }
+  }
+
+  const shops = async (db: Awaited<ReturnType<typeof fixture>>['db']) =>
+    (await db.select().from(transactions))
+      .map((t) => `${t.householdId}:${t.description}`)
+      .sort()
+
+  it('queues one message per linked connection, across Households, without secrets', async () => {
+    const f = await twoHouseholds()
+    const sent: Array<unknown> = []
+    const queue = {
+      sendBatch: (messages: Iterable<{ body: unknown }>) => {
+        for (const m of messages) sent.push(m.body)
+        return Promise.resolve()
+      },
+    } as unknown as Queue<SyncMessage>
+    expect(await enqueueSyncs(f.env.DB, queue)).toBe(2)
+    expect(sent).toEqual(
+      expect.arrayContaining([
+        { householdId: 'a', connectionId: f.idA },
+        { householdId: 'b', connectionId: f.idB },
+      ]),
+    )
+    expect(sent).toHaveLength(2)
+    expect(JSON.stringify(sent)).not.toMatch(/secret|simplefin\.org|v1\./)
+    // Enqueueing calls no bank.
+    expect(f.requests).toEqual([])
+  })
+
+  it('syncs only the message’s connection, in its own Household', async () => {
+    const f = await twoHouseholds()
+    const { batch, settled } = batchOf([
+      { householdId: 'b', connectionId: f.idB },
+    ])
+    await consumeSyncBatch(f.env.DB, batch, KEY, f.transport)
+    expect(settled).toEqual([{ acked: true }])
+    expect(f.requests).toEqual(['b'])
+    expect(await shops(f.db)).toEqual(['b:b shop'])
+  })
+
+  it('drops a message naming another Household’s connection, or one that’s gone', async () => {
+    const f = await twoHouseholds()
+    await disconnectSimplefin(f.b, f.idB)
+    const { batch, settled } = batchOf([
+      { householdId: 'a', connectionId: f.idB },
+      { householdId: 'b', connectionId: f.idB },
+      { householdId: 'a', connectionId: f.idA, extra: 'x' },
+      'nonsense',
+    ])
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await consumeSyncBatch(f.env.DB, batch, KEY, f.transport)
+    log.mockRestore()
+    expect(settled).toEqual([
+      { acked: true },
+      { acked: true },
+      { acked: true },
+      { acked: true },
+    ])
+    expect(f.requests).toEqual([])
+    expect(await shops(f.db)).toEqual([])
+  })
+
+  it('retries a connection Bridge can’t reach, a few times, without holding up the others', async () => {
+    const f = await twoHouseholds()
+    f.failing.add('a')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const first = batchOf([
+      { householdId: 'a', connectionId: f.idA },
+      { householdId: 'b', connectionId: f.idB },
+    ])
+    await consumeSyncBatch(f.env.DB, first.batch, KEY, f.transport)
+    expect(first.settled).toEqual([{ retry: 600 }, { acked: true }])
+    expect(await shops(f.db)).toEqual(['b:b shop'])
+
+    const last = batchOf([{ householdId: 'a', connectionId: f.idA }], 3)
+    await consumeSyncBatch(f.env.DB, last.batch, KEY, f.transport)
+    expect(last.settled).toEqual([{ acked: true }])
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret')
+    log.mockRestore()
+  })
+
+  it('doesn’t retry what another try can’t fix, such as today’s request limit', async () => {
+    const f = await twoHouseholds()
+    await f.db
+      .update(bankConnections)
+      .set({ requestDay: householdToday('America/New_York'), requestCount: 20 })
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { batch, settled } = batchOf([
+      { householdId: 'a', connectionId: f.idA },
+    ])
+    await consumeSyncBatch(f.env.DB, batch, KEY, f.transport)
+    log.mockRestore()
+    expect(settled).toEqual([{ acked: true }])
+    expect(f.requests).toEqual([])
   })
 
   it('needs a linked account before syncing', async () => {

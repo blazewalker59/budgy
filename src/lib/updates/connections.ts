@@ -3,7 +3,7 @@
  * a one-time setup token, discover its accounts, and map each one to a Budgy
  * Account. Discovery imports nothing; syncing mapped accounts is sync.ts.
  */
-import { and, count, eq, sql } from 'drizzle-orm'
+import { and, count, eq, isNull, sql } from 'drizzle-orm'
 import {
   connectionKeyReady,
   currentKey,
@@ -18,8 +18,9 @@ import {
 import type { BankKeys } from './crypto'
 import type { SimplefinAccount } from './simplefinClient'
 import type { HouseholdDatabase } from '@/lib/households/scope'
+import type { Account } from '@/lib/model/types'
 import { hashToken } from '@/lib/agents/tokens'
-import { bankAccounts, bankConnections } from '@/lib/db/schema'
+import { accounts, bankAccounts, bankConnections } from '@/lib/db/schema'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
 import { householdTimeZone } from '@/lib/households/locale'
@@ -240,8 +241,7 @@ export async function mapBankAccount(
   if (input.account !== null) {
     const account = await findAccount(db, input.account)
     if (account.closed) throw new UserError('Reopen this account to link it.')
-    if (found.currency.toUpperCase() !== 'USD')
-      throw new UserError('Budgy only supports USD accounts.')
+    linkable(found)
     const linked = await db
       .select({
         name: bankAccounts.name,
@@ -264,6 +264,113 @@ export async function mapBankAccount(
     name = account.name
   }
   await db.update(bankAccounts).set({ account: name }).where(where)
+}
+
+/** A discovered account Budgy can feed from. */
+function linkable(found: { currency: string }) {
+  if (found.currency.toUpperCase() !== 'USD')
+    throw new Error('Budgy only supports USD accounts.')
+}
+
+/** For a discovered account: a new Budgy Account for it, or an existing one. */
+export type BankAccountChoice = {
+  connectionId: string
+  providerId: string
+} & (
+  | { create: Pick<Account, 'name' | 'owner' | 'kind' | 'institution'> }
+  | { link: string }
+)
+
+/**
+ * Add discovered accounts in one go: for each, make a Budgy Account and
+ * link it, or link an existing one (the same checks as mapBankAccount). One
+ * D1 batch, so a failure adds and links nothing.
+ */
+export async function addBankAccounts(
+  db: HouseholdDatabase,
+  choices: ReadonlyArray<BankAccountChoice>,
+): Promise<{ added: number; linked: number }> {
+  const [discovered, existing] = await Promise.all([
+    db.select().from(bankAccounts).where(inHousehold(db, bankAccounts)),
+    db.select().from(accounts).where(inHousehold(db, accounts)),
+  ])
+  const byName = new Map(existing.map((a) => [a.name.toLowerCase(), a]))
+  const fed = new Map(
+    discovered.flatMap((b) =>
+      b.account ? [[b.account.toLowerCase(), b.name] as const] : [],
+    ),
+  )
+  const chosen = new Set<string>()
+  const names = new Set<string>()
+  const statements = []
+  let added = 0
+  for (const choice of choices) {
+    const key = JSON.stringify([choice.connectionId, choice.providerId])
+    const found = discovered.find(
+      (b) =>
+        b.connectionId === choice.connectionId &&
+        b.providerId === choice.providerId,
+    )
+    if (!found || !found.present)
+      throw new Error('That bank account no longer exists.')
+    if (chosen.has(key)) throw new Error(`${found.name} is chosen twice.`)
+    chosen.add(key)
+    if (found.account)
+      throw new Error(`${found.name} already feeds ${found.account}.`)
+    linkable(found)
+    let name: string
+    if ('create' in choice) {
+      name = choice.create.name.trim()
+      if (byName.has(name.toLowerCase()))
+        throw new Error(`There's already an account named ${name}.`)
+      statements.push(
+        db.insert(accounts).values(
+          householdRow(db, {
+            name,
+            sourceName: name,
+            owner: choice.create.owner.trim() || 'Joint',
+            kind: choice.create.kind,
+            institution: choice.create.institution?.trim() || null,
+            closed: false,
+            securedBy: null,
+          }),
+        ),
+      )
+      added++
+    } else {
+      const account = byName.get(choice.link.trim().toLowerCase())
+      if (!account) throw new Error(`No account named "${choice.link}".`)
+      if (account.closed) throw new Error(`Reopen ${account.name} to link it.`)
+      const feeding = fed.get(account.name.toLowerCase())
+      if (feeding)
+        throw new Error(`${account.name} is already linked to ${feeding}.`)
+      name = account.name
+    }
+    if (names.has(name.toLowerCase()))
+      throw new Error(`${name} is chosen for two bank accounts.`)
+    names.add(name.toLowerCase())
+    statements.push(
+      db
+        .update(bankAccounts)
+        .set({ account: name })
+        .where(
+          inHousehold(
+            db,
+            bankAccounts,
+            and(
+              eq(bankAccounts.connectionId, found.connectionId),
+              eq(bankAccounts.providerId, found.providerId),
+              isNull(bankAccounts.account),
+            ),
+          ),
+        ),
+    )
+  }
+  if (!statements.length) return { added: 0, linked: 0 }
+  // The unique (household, account) index also refuses a link made
+  // meanwhile, failing the whole batch.
+  await db.batch(statements as [(typeof statements)[number]])
+  return { added, linked: choices.length }
 }
 
 /** Forget a connection and its credential. Revoking it in Bridge is separate. */

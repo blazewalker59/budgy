@@ -321,3 +321,27 @@ export function equity(ledger: Ledger): Array<Equity> {
       }
     })
 }
+
+/**
+ * A kind to start from for an account a bank shared, by its name ("Sapphire
+ * Visa", "Roth IRA"). Only a guess: the Member confirms it.
+ */
+export function guessAccountKind(name: string): AccountKind {
+  const n = name.toLowerCase()
+  const has = (pattern: RegExp) => pattern.test(n)
+  if (has(/\b529\b|education|college/)) return 'education'
+  if (has(/401\s*\(?k\)?|403\s*\(?b\)?|\bira\b|roth|retire|pension|\btsp\b/))
+    return 'retirement'
+  if (has(/mortgage|\bloan\b|\bheloc\b|auto ?loan|student/)) return 'loan'
+  if (
+    has(
+      /credit|\bcard\b|visa|mastercard|amex|american express|discover it|sapphire|freedom|venture|quicksilver/,
+    )
+  )
+    return 'credit'
+  if (has(/saving|money market|\bcd\b|certificate/)) return 'savings'
+  if (has(/checking|\bchk\b|debit|spend/)) return 'checking'
+  if (has(/brokerage|invest|individual|\bhsa\b|trading|stock/))
+    return 'brokerage'
+  return 'other'
+}

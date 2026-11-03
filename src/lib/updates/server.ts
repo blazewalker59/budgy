@@ -4,6 +4,7 @@ import { EXPORT_FORMATS, EXPORT_TOO_LARGE, withinExportLimit } from './exports'
 import { listAccountUpdates } from './queries'
 import { ingestAccountExport } from './ingest'
 import {
+  addBankAccounts,
   connectSimplefin,
   disconnectSimplefin,
   discoverAccounts,
@@ -17,9 +18,11 @@ import {
 } from './uploads'
 import { syncConnection } from './sync'
 import { bankKeys } from './crypto'
+import type { BankAccountChoice } from './connections'
 import type { AccountExportInput } from './ingest'
 import type { ExportFormat } from './exports'
 import { withMember } from '@/lib/auth/session'
+import { accountInput } from '@/lib/model/accounts'
 import { getCloudflareEnv } from '@/lib/db'
 
 export const getAccountUpdates = createServerFn({ method: 'GET' }).handler(() =>
@@ -115,6 +118,40 @@ export const linkBankAccount = createServerFn({ method: 'POST' })
         .parse(data),
   )
   .handler(({ data }) => withMember(({ db }) => mapBankAccount(db, data)))
+
+const bankKey = {
+  connectionId: z.string().min(1).max(64),
+  providerId: z.string().min(1).max(200),
+}
+
+/** Add discovered bank accounts at once: each made a Budgy Account, or linked. */
+export const addFromBank = createServerFn({ method: 'POST' })
+  .validator((data: { choices: Array<BankAccountChoice> }) =>
+    z
+      .object({
+        choices: z
+          .array(
+            z.union([
+              z.object({
+                ...bankKey,
+                create: accountInput.pick({
+                  name: true,
+                  owner: true,
+                  kind: true,
+                  institution: true,
+                }),
+              }),
+              z.object({ ...bankKey, link: z.string().trim().min(1).max(60) }),
+            ]),
+          )
+          .min(1)
+          .max(50),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) => addBankAccounts(db, data.choices)),
+  )
 
 export const disconnectBank = createServerFn({ method: 'POST' })
   .validator((data: { id: string }) =>

@@ -25,6 +25,10 @@ import { LEDGER_KEY } from '@/lib/ledger/useLedger'
 import { MONEY_IN_KEY } from '@/lib/moneyIn/useMoneyIn'
 import { ConfirmPanel } from '@/components/shared/Confirm'
 import { Dropdown } from '@/components/shared/Dropdown'
+import {
+  AddBankAccounts,
+  unlinkedBankAccounts,
+} from '@/components/accounts/AddBankAccounts'
 
 type Connection = NonNullable<
   ReturnType<typeof useBankConnections>['data']
@@ -132,7 +136,10 @@ export function BankConnections({
         <div className="space-y-3 border-t border-border p-3">
           <ul className="list-disc space-y-0.5 pl-4 text-muted">
             <li>SimpleFIN Bridge reads your banks. Your logins stay there.</li>
-            <li>Link each bank account from its Budgy account below.</li>
+            <li>
+              Add the accounts it finds here at once, or link each one from its
+              Budgy account below.
+            </li>
             <li>
               Cards and bank accounts bring in purchases and balances. Others
               bring in just the balance.
@@ -150,6 +157,7 @@ export function BankConnections({
               onChange={refresh}
             />
           ))}
+          <AddFound banks={banks} />
           {adding ? (
             <ConnectForm
               onDone={async () => {
@@ -170,6 +178,19 @@ export function BankConnections({
         </div>
       )}
     </section>
+  )
+}
+
+export const SIMPLEFIN_SIGN_UP = 'https://bridge.simplefin.org/simplefin/create'
+
+/** What SimpleFIN Bridge is and costs, before anyone signs up. */
+export function SimplefinNote() {
+  return (
+    <p className="text-muted">
+      SimpleFIN Bridge is a separate service, about $1.50 a month or $15 a year,
+      for up to 25 banks. It can’t reach every card (Apple Card, for one). For
+      those, upload an export instead.
+    </p>
   )
 }
 
@@ -194,18 +215,18 @@ function ConnectForm({
         connect.mutate()
       }}
     >
+      <SimplefinNote />
       <ol className="list-decimal space-y-1 pl-4 text-muted">
         <li>
-          At{' '}
           <a
-            href="https://bridge.simplefin.org"
+            href={SIMPLEFIN_SIGN_UP}
             target="_blank"
             rel="noreferrer"
             className="font-semibold text-accent"
           >
-            bridge.simplefin.org
-          </a>
-          , connect your banks.
+            Sign up for SimpleFIN Bridge
+          </a>{' '}
+          and connect your banks there.
         </li>
         <li>
           Create a <strong>setup token</strong> there and paste it below.
@@ -340,6 +361,36 @@ function ConnectionRow({
             ? `Not linked yet: ${unlinked.map((a) => `${a.name} (${a.institution})`).join(', ')}.`
             : `All ${connection.accounts.length} accounts are linked.`}
       </p>
+    </div>
+  )
+}
+
+/** Bank accounts found and not linked: offer to add them all at once. */
+export function AddFound({ banks }: { banks: Array<BankAccount> }) {
+  const [open, setOpen] = useState(false)
+  const unlinked = unlinkedBankAccounts(banks)
+  const feeding = banks.flatMap((b) => (b.account ? [b.account] : []))
+  if (!unlinked.length) return null
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background"
+      >
+        Add these accounts ({unlinked.length})
+      </button>
+    )
+  return (
+    <div className="space-y-2 rounded-lg bg-background p-2.5">
+      <p className="font-semibold">Add these accounts</p>
+      <AddBankAccounts
+        // A fresh list each time it opens, from what's unlinked now.
+        key={unlinked.map((b) => b.providerId).join()}
+        banks={unlinked}
+        feeding={feeding}
+        onDone={() => setOpen(false)}
+      />
     </div>
   )
 }

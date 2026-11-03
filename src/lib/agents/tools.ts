@@ -171,7 +171,7 @@ export function budgyTools(
       name: 'get_spending_breakdown',
       title: 'Spending breakdown',
       description:
-        'How part of the household’s spending (a person, some accounts, a search) sits inside each everyday category and against its Target, which accounts it comes from, and month by month. Per-month averages when the period spans several months. E.g. how much of Dining comes from Blaze Apple Card.',
+        'How part of the household’s spending (a person, some accounts, a search) sits inside each everyday category and against its Target, which accounts it comes from, and month by month. Per-month averages when the period spans several months. E.g. how much of Dining comes from one credit card.',
       input: z.object({
         months: z
           .union([z.literal(1), z.literal(3), z.literal(6), z.literal(12)])

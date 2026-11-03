@@ -30,7 +30,7 @@ result couldn't be wiped. A real family's data must never be involved.
     create hook, the MCP endpoint and the Shortcut upload all call
     `canSignIn` without that, so all of them refuse personas, even ones on
     `ALLOWED_EMAILS` or with a membership.
-  - Triggers (`0021_demo_guards.sql`): `demo_personas` accepts only a
+  - Triggers (`0023_demo_guards.sql`): `demo_personas` accepts only a
     `demo.invalid` user with no `account`; an `account` row can never be
     added for a persona; an email can't move into or out of `demo.invalid`.
 - **Acting as a persona** is a `demo_sessions` row keyed by the admin's own
@@ -95,9 +95,9 @@ result couldn't be wiped. A real family's data must never be involved.
 
 - `sessionState()` does one more read per request (the demo session
   lookup) and, while acting, a check of the Household's demo flag.
-- Two migrations: `0020_demo_sandbox.sql` (`households.demo`,
+- Two migrations: `0022_demo_sandbox.sql` (`households.demo`,
   `demo_personas`, `demo_sessions`, `admin_audit`) and
-  `0021_demo_guards.sql` (triggers). Both are additive and safe before or
+  `0023_demo_guards.sql` (triggers). Both are additive and safe before or
   after the code deploys. The trigger on `household_members` runs on every
   insert, a small cost on a rare write.
 - Demo Households sit beside real ones in D1. Anything operator-facing

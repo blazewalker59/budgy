@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   createToken: vi.fn(),
   connections: vi.fn(),
   link: vi.fn(),
+  reconnect: vi.fn(),
   accounts: [
     { name: 'Card', owner: 'Joint', kind: 'credit', closed: false },
   ] as Array<{ name: string; owner: string; kind: string; closed: boolean }>,
@@ -45,6 +46,7 @@ vi.mock('@/lib/updates/server', () => ({
   connectBank: vi.fn(),
   refreshBankAccounts: vi.fn(),
   linkBankAccount: mocks.link,
+  reconnectBank: mocks.reconnect,
   disconnectBank: vi.fn(),
   syncBank: vi.fn(),
 }))
@@ -473,5 +475,28 @@ describe('Unified Account Updates UI', () => {
       screen.getByRole('link', { name: 'Open SimpleFIN Bridge' }),
     ).toBeTruthy()
     expect(screen.getByText(/needs attention/)).toBeTruthy()
+  })
+
+  it('reconnects a revoked connection with a new setup token', async () => {
+    mocks.get.mockResolvedValue([empty])
+    mocks.connections.mockResolvedValue(
+      feeding('revoked', 'SimpleFIN no longer accepts this connection.'),
+    )
+    mocks.reconnect.mockResolvedValue(undefined)
+    mount()
+    fireEvent.click(
+      await screen.findByRole('button', { name: /Bank connections/ }),
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    expect(screen.getByText(/Linked accounts stay linked/)).toBeTruthy()
+    fireEvent.change(screen.getByLabelText('New setup token'), {
+      target: { value: 'token' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    await waitFor(() =>
+      expect(mocks.reconnect).toHaveBeenCalledWith({
+        data: { id: 'c1', setupToken: 'token' },
+      }),
+    )
   })
 })

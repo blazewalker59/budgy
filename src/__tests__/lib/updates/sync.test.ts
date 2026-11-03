@@ -30,6 +30,7 @@ import {
   connectSimplefin,
   listConnections,
   mapBankAccount,
+  reconnectSimplefin,
 } from '@/lib/updates/connections'
 import { today as householdToday } from '@/lib/model/dates'
 
@@ -513,5 +514,94 @@ describe('SimpleFIN connection health', () => {
     await expect(f.sync()).rejects.toThrow(/no longer accepts/)
     log.mockRestore()
     expect((await listConnections(f.a))[0].status).toBe('revoked')
+  })
+})
+
+describe('Reconnecting with a new setup token', () => {
+  const NEW_SETUP = btoa(
+    'https://beta-bridge.simplefin.org/simplefin/claim/new',
+  )
+
+  it('replaces a revoked connection’s credential and keeps its links and history', async () => {
+    const f = await fixture([card([[2, '-1.00']])])
+    await f.link('ACT-1', 'Card')
+    await f.sync()
+    const synced = await f.row()
+    f.reply.status = 403
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(f.sync()).rejects.toThrow(/no longer accepts/)
+    log.mockRestore()
+    const sealed = (await f.db.select().from(bankConnections).get())!
+    f.reply.status = undefined
+    await reconnectSimplefin(
+      f.a,
+      { id: f.id, setupToken: NEW_SETUP },
+      KEY,
+      f.transport,
+    )
+    const [connection] = await listConnections(f.a)
+    expect(connection).toMatchObject({
+      id: f.id,
+      status: 'ready',
+      lastError: null,
+    })
+    expect(connection.accounts[0]).toMatchObject({
+      account: 'Card',
+      present: true,
+      syncedThrough: synced.syncedThrough,
+      historyComplete: true,
+    })
+    const resealed = (await f.db.select().from(bankConnections).get())!
+    expect(resealed.encryptedAccess).not.toBe(sealed.encryptedAccess)
+    await f.sync()
+    expect(await f.added()).toBe(1)
+  })
+
+  it('won’t spend a token on another Household’s connection, or without a key', async () => {
+    const f = await fixture([card([])])
+    const claims: Array<string> = []
+    const counting = ((url: string, init?: RequestInit) => {
+      if (url.includes('/claim/')) claims.push(url)
+      return f.transport(url, init)
+    }) as typeof fetch
+    await expect(
+      reconnectSimplefin(
+        f.b,
+        { id: f.id, setupToken: NEW_SETUP },
+        KEY,
+        counting,
+      ),
+    ).rejects.toThrow(/no longer exists/)
+    await expect(
+      reconnectSimplefin(
+        f.a,
+        { id: f.id, setupToken: NEW_SETUP },
+        undefined,
+        counting,
+      ),
+    ).rejects.toThrow(/BANK_CONNECTION_KEY/)
+    expect(claims).toEqual([])
+  })
+
+  it('refuses access that another connection already has', async () => {
+    const f = await fixture([card([])])
+    const other = ((url: string, init?: RequestInit) =>
+      url.includes('/claim/')
+        ? Promise.resolve(
+            new Response(
+              'https://user:other@beta-bridge.simplefin.org/simplefin',
+            ),
+          )
+        : f.transport(url, init)) as typeof fetch
+    await connectSimplefin(
+      f.b,
+      me,
+      { name: 'B', setupToken: NEW_SETUP },
+      KEY,
+      other,
+    )
+    await expect(
+      reconnectSimplefin(f.a, { id: f.id, setupToken: NEW_SETUP }, KEY, other),
+    ).rejects.toThrow(/already connected/)
   })
 })

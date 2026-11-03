@@ -10,6 +10,7 @@ import {
   discoverAccounts,
   listConnections,
   mapBankAccount,
+  reconnectSimplefin,
 } from './connections'
 import {
   createUploadToken,
@@ -90,6 +91,22 @@ export const connectBank = createServerFn({ method: 'POST' })
   .handler(({ data }) =>
     withMember(({ db, member }) =>
       connectSimplefin(db, member, data, bankKeys(getCloudflareEnv())),
+    ),
+  )
+
+/** A new setup token for a connection Bridge stopped accepting; links stay. */
+export const reconnectBank = createServerFn({ method: 'POST' })
+  .validator((data: { id: string; setupToken: string }) =>
+    z
+      .object({
+        id: z.string().min(1).max(64),
+        setupToken: z.string().trim().min(1).max(4096),
+      })
+      .parse(data),
+  )
+  .handler(({ data }) =>
+    withMember(({ db }) =>
+      reconnectSimplefin(db, data, bankKeys(getCloudflareEnv())),
     ),
   )
 

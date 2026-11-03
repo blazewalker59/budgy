@@ -13,6 +13,7 @@ import {
   connectBank,
   disconnectBank,
   linkBankAccount,
+  reconnectBank,
   refreshBankAccounts,
   syncBank,
 } from '@/lib/updates/server'
@@ -301,6 +302,7 @@ function ConnectionRow({
     onSettled: onChange,
   })
   const [confirming, setConfirming] = useState(false)
+  const [reconnecting, setReconnecting] = useState(false)
   const unlinked = connection.accounts.filter((a) => !a.account && a.present)
   const problem =
     discover.error?.message ??
@@ -362,6 +364,25 @@ function ConnectionRow({
           {problem}
         </p>
       )}
+      {connection.status === 'revoked' &&
+        (reconnecting ? (
+          <ReconnectForm
+            id={connection.id}
+            onDone={async () => {
+              setReconnecting(false)
+              await onChange()
+            }}
+            onCancel={() => setReconnecting(false)}
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setReconnecting(true)}
+            className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background"
+          >
+            Reconnect
+          </button>
+        ))}
       {(connection.status === 'payment_required' || signIn.length > 0) && (
         <p>
           {signIn.length > 0 && (
@@ -391,6 +412,78 @@ function ConnectionRow({
             : `All ${connection.accounts.length} accounts are linked.`}
       </p>
     </div>
+  )
+}
+
+/** A new setup token for a connection Bridge stopped accepting. */
+function ReconnectForm({
+  id,
+  onDone,
+  onCancel,
+}: {
+  id: string
+  onDone: () => Promise<void>
+  onCancel: () => void
+}) {
+  const [setupToken, setSetupToken] = useState('')
+  const reconnect = useMutation({
+    mutationFn: () => reconnectBank({ data: { id, setupToken } }),
+    onSuccess: onDone,
+  })
+  return (
+    <form
+      className="space-y-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        reconnect.mutate()
+      }}
+    >
+      <p className="text-muted">
+        In{' '}
+        <a
+          href={SIMPLEFIN_BRIDGE}
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-accent"
+        >
+          SimpleFIN Bridge
+        </a>
+        , create a new setup token and paste it here. Linked accounts stay
+        linked.
+      </p>
+      <label className="block space-y-1 font-semibold">
+        New setup token
+        <textarea
+          value={setupToken}
+          onChange={(event) => setSetupToken(event.target.value)}
+          rows={3}
+          autoComplete="off"
+          spellCheck={false}
+          className="field w-full font-mono"
+        />
+      </label>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={!setupToken.trim() || reconnect.isPending}
+          className="min-h-11 rounded-full bg-foreground px-4 font-semibold text-background disabled:opacity-50"
+        >
+          {reconnect.isPending ? 'Reconnecting…' : 'Reconnect'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="min-h-11 rounded-full border border-border px-4 font-semibold"
+        >
+          Cancel
+        </button>
+      </div>
+      {reconnect.isError && (
+        <p role="alert" className="text-over">
+          {reconnect.error.message}
+        </p>
+      )}
+    </form>
   )
 }
 

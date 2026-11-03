@@ -110,6 +110,57 @@ export async function connectSimplefin(
   return { id }
 }
 
+/**
+ * Give an existing connection a new setup token, when Bridge stopped
+ * accepting its access (revoked, or its credentials changed). Its links,
+ * history and sync state stay: Bridge account ids belong to the Member's
+ * Bridge account, not the token, so they match again. An account that
+ * doesn't come back shows as no longer shared, still linked.
+ */
+export async function reconnectSimplefin(
+  db: HouseholdDatabase,
+  input: { id: string; setupToken: string },
+  secret: BankKeys,
+  transport: typeof fetch = fetch,
+): Promise<void> {
+  if (!connectionKeyReady(currentKey(secret)))
+    throw new UserError(NOT_CONFIGURED)
+  // Before the token is spent: it must be this Household's connection.
+  const connection = await db
+    .select({ id: bankConnections.id })
+    .from(bankConnections)
+    .where(inHousehold(db, bankConnections, eq(bankConnections.id, input.id)))
+    .get()
+  if (!connection) throw new UserError('That bank connection no longer exists.')
+  const access = await claimSimplefin(input.setupToken, transport)
+  const accessHash = await hashToken(access)
+  const taken = await db
+    .select({ id: bankConnections.id })
+    .from(bankConnections)
+    .where(eq(bankConnections.accessHash, accessHash))
+    .get()
+  if (taken && taken.id !== input.id)
+    throw new UserError('This SimpleFIN access is already connected.')
+  await db
+    .update(bankConnections)
+    .set({
+      encryptedAccess: await encryptAccess(
+        access,
+        currentKey(secret),
+        context(db, input.id),
+      ),
+      accessHash,
+      status: 'ready',
+      lastError: null,
+    })
+    .where(inHousehold(db, bankConnections, eq(bankConnections.id, input.id)))
+  try {
+    await discoverAccounts(db, input.id, secret, transport)
+  } catch {
+    // Saved as needing attention; the Member can refresh it.
+  }
+}
+
 /** Count a Bridge request against today's allowance, or refuse it. */
 async function spendRequest(db: HouseholdDatabase, id: string, reserve = 0) {
   const day = today(await householdTimeZone(db))

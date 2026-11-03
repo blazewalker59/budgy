@@ -3,6 +3,7 @@ import {
   Outlet,
   Scripts,
   createRootRouteWithContext,
+  useRouter,
   useRouterState,
 } from '@tanstack/react-router'
 import appCss from '../styles.css?url'
@@ -118,14 +119,25 @@ function Splash() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  // The Content-Security-Policy nonce (src/lib/securityHeaders.ts). Only the
+  // server has it; browsers hide it from the DOM, so it never matches.
+  const nonce = useRouter().options.ssr?.nonce
   return (
     // The boot script sets the theme class before hydration, so the
     // server-rendered class differs by design.
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT }}
+        />
         <HeadContent />
-        <script dangerouslySetInnerHTML={{ __html: THEME_COLOR_BOOT }} />
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_COLOR_BOOT }}
+        />
       </head>
       <body>
         {children}

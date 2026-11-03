@@ -79,6 +79,11 @@ value in `BANK_CONNECTION_KEY_PREVIOUS` and a new one in `BANK_CONNECTION_KEY`;
 each connection is resealed under the new key the next time it syncs. Once
 every connection has synced (a day of crons), delete the previous key.
 
+Every Worker response carries HSTS, a nonce-based Content-Security-Policy,
+`X-Frame-Options`, `nosniff`, a Referrer-Policy and a Permissions-Policy
+(`src/lib/securityHeaders.ts`). Loading a new third-party script, font or
+image host means adding it there.
+
 Rate limits: Better Auth counts sign-in attempts per client IP in D1 (the
 `rate_limit` table), and the `MCP_RATE_LIMITER` / `UPLOAD_RATE_LIMITER`
 Workers Rate Limiting bindings in `wrangler.jsonc` cap `/mcp` and

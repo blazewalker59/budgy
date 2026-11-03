@@ -17,6 +17,7 @@ import { Route as HouseholdRouteImport } from './routes/household'
 import { Route as ImportRouteImport } from './routes/import'
 import { Route as PlanRouteImport } from './routes/plan'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SpendingRouteImport } from './routes/spending'
 import { Route as UpcomingRouteImport } from './routes/upcoming'
 import { Route as JoinTokenRouteImport } from './routes/join.$token'
@@ -61,6 +62,11 @@ const RulesRoute = RulesRouteImport.update({
   path: '/rules',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SpendingRoute = SpendingRouteImport.update({
   id: '/spending',
   path: '/spending',
@@ -86,6 +92,7 @@ export interface FileRoutesByFullPath {
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
+  '/setup': typeof SetupRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
   '/join/$token': typeof JoinTokenRoute
@@ -99,6 +106,7 @@ export interface FileRoutesByTo {
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
+  '/setup': typeof SetupRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
   '/join/$token': typeof JoinTokenRoute
@@ -113,6 +121,7 @@ export interface FileRoutesById {
   '/import': typeof ImportRoute
   '/plan': typeof PlanRoute
   '/rules': typeof RulesRoute
+  '/setup': typeof SetupRoute
   '/spending': typeof SpendingRoute
   '/upcoming': typeof UpcomingRoute
   '/join/$token': typeof JoinTokenRoute
@@ -128,6 +137,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/plan'
     | '/rules'
+    | '/setup'
     | '/spending'
     | '/upcoming'
     | '/join/$token'
@@ -141,6 +151,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/plan'
     | '/rules'
+    | '/setup'
     | '/spending'
     | '/upcoming'
     | '/join/$token'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/import'
     | '/plan'
     | '/rules'
+    | '/setup'
     | '/spending'
     | '/upcoming'
     | '/join/$token'
@@ -168,6 +180,7 @@ export interface RootRouteChildren {
   ImportRoute: typeof ImportRoute
   PlanRoute: typeof PlanRoute
   RulesRoute: typeof RulesRoute
+  SetupRoute: typeof SetupRoute
   SpendingRoute: typeof SpendingRoute
   UpcomingRoute: typeof UpcomingRoute
   JoinTokenRoute: typeof JoinTokenRoute
@@ -231,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/spending': {
       id: '/spending'
       path: '/spending'
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   ImportRoute: ImportRoute,
   PlanRoute: PlanRoute,
   RulesRoute: RulesRoute,
+  SetupRoute: SetupRoute,
   SpendingRoute: SpendingRoute,
   UpcomingRoute: UpcomingRoute,
   JoinTokenRoute: JoinTokenRoute,

@@ -5,7 +5,9 @@
  */
 
 import type { Lens } from '@/lib/model/lens'
+import type { SetupStep } from '@/lib/model/setup'
 import { NO_LENS, readLens } from '@/lib/model/lens'
+import { SETUP_STEPS } from '@/lib/model/setup'
 
 export type Period = 'month' | '3' | '6' | '12'
 
@@ -75,6 +77,17 @@ export function validateSpendingSearch(
     out.period = String(s.period) as Period
   if (typeof s.month === 'string' && MONTH.test(s.month)) out.month = s.month
   return out
+}
+
+export interface SetupSearch {
+  /** The step open on Setup; the first one not done without it. */
+  step?: SetupStep
+}
+
+export function validateSetupSearch(s: Record<string, unknown>): SetupSearch {
+  return SETUP_STEPS.includes(s.step as SetupStep)
+    ? { step: s.step as SetupStep }
+    : {}
 }
 
 /** Only the Lens out of a screen's search, for a link to another screen. */

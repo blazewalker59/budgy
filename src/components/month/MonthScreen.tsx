@@ -31,6 +31,7 @@ import { MonthPicker } from '@/components/shared/Pickers'
 import { LensBar } from '@/components/lens/LensBar'
 import { Section, Stat } from '@/components/shared/Layout'
 import { TxnList } from '@/components/shared/TxnList'
+import { SetupChecklist, useSetupOpen } from '@/components/setup/SetupChecklist'
 
 export function MonthScreen({
   month: monthParam,
@@ -57,6 +58,7 @@ export function MonthScreen({
     }
   }, [book, lens])
   const filtered = scope.ix !== book.ix
+  const setupOpen = useSetupOpen()
   const person =
     lens.people?.length === 1 && filtersOf(lens).length === 1
       ? lens.people[0]
@@ -124,6 +126,8 @@ export function MonthScreen({
         />
       </div>
 
+      {!filtered && <SetupChecklist />}
+
       <div className="space-y-3">
         <Headline
           view={view}
@@ -147,6 +151,7 @@ export function MonthScreen({
                 lens={lens}
                 month={month}
                 onPick={add}
+                setupOpen={setupOpen}
               />
             </Section>
             {(filtered ? spentIn(view.housing) : view.housing).length > 0 && (
@@ -487,19 +492,32 @@ function CategoryRows({
   lens,
   month,
   onPick,
+  setupOpen,
 }: {
   rows: Array<CategoryMonth>
   lens: Lens
   month: string
   onPick: (f: LensFilter) => void
+  /** Setup isn't finished: an empty month points there. */
+  setupOpen?: boolean
 }) {
   const [open, setOpen] = useState<string | null>(null)
   if (!rows.length)
     return (
       <p className="px-3 py-3 text-sm text-muted">
-        {isEmpty(lens)
-          ? 'Nothing spent.'
-          : 'Nothing in the lens this month. See more months on Spending.'}
+        {!isEmpty(lens) ? (
+          'Nothing in the lens this month. See more months on Spending.'
+        ) : setupOpen ? (
+          <>
+            Nothing here yet.{' '}
+            <Link to="/setup" className="font-semibold text-accent">
+              Finish setup
+            </Link>{' '}
+            to bring in your spending.
+          </>
+        ) : (
+          'Nothing spent.'
+        )}
       </p>
     )
   return (

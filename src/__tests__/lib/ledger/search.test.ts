@@ -4,6 +4,7 @@ import {
   validateAccountsSearch,
   validateOverviewSearch,
   validatePlanSearch,
+  validateSetupSearch,
   validateSpendingSearch,
   withLensSearch,
 } from '@/lib/ledger/search'
@@ -82,5 +83,13 @@ describe('screen search', () => {
       tab: 'bills',
     })
     expect(leaving.period).toBeUndefined()
+  })
+
+  it('opens a known setup step, and the default for anything else', () => {
+    expect(validateSetupSearch({ step: 'targets' })).toEqual({
+      step: 'targets',
+    })
+    expect(validateSetupSearch({ step: 'admin' })).toEqual({})
+    expect(validateSetupSearch({})).toEqual({})
   })
 })

@@ -19,6 +19,7 @@ import {
 } from '@/lib/households/membership'
 import { householdMembers } from '@/lib/db/schema'
 import { canSignIn, canUseHousehold } from '@/lib/households/admission'
+import { UserError } from '@/lib/errors'
 
 export interface Member {
   id: string
@@ -93,7 +94,7 @@ export async function sessionState(): Promise<SessionState> {
 export async function requireMember(): Promise<Member> {
   const state = await sessionState()
   if (state.status !== 'member' && state.status !== 'no-household')
-    throw new Error('Sign in required')
+    throw new UserError('Sign in required')
   return state.member
 }
 
@@ -103,9 +104,9 @@ export async function withMember<T>(
 ): Promise<T> {
   const state = await sessionState()
   if (state.status === 'signed-out' || state.status === 'not-allowed')
-    throw new Error('Sign in required')
+    throw new UserError('Sign in required')
   if (state.status !== 'member')
-    throw new Error('Household membership is required')
+    throw new UserError('Household membership is required')
   const member = state.member
   const db = getDb()
   return fn({

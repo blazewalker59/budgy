@@ -44,6 +44,7 @@ import {
   renewUpdate,
   startReceipt,
 } from '@/lib/updates/receipts'
+import { UserError } from '@/lib/errors'
 
 /** An Account by name, any case; the error lists the real names. */
 export async function findAccount(
@@ -55,7 +56,7 @@ export async function findAccount(
     (a) => a.name.toLowerCase() === name.trim().toLowerCase(),
   )
   if (!found)
-    throw new Error(
+    throw new UserError(
       `No account named "${name}". Accounts: ${all.map((a) => a.name).join(', ')}`,
     )
   return found
@@ -79,7 +80,7 @@ export async function saveAccount(
         ),
       )
     if (taken.length)
-      throw new Error(`There's already an account named ${a.name}.`)
+      throw new UserError(`There's already an account named ${a.name}.`)
     await db
       .insert(accounts)
       .values(householdRow(db, { ...a, sourceName: a.name }))
@@ -106,7 +107,8 @@ export async function deleteAccount(db: Database, name: string): Promise<void> {
       .from(transactions)
       .where(inHousehold(db, transactions, eq(transactions.account, name)))
       .limit(1)
-    if (used.length) throw new Error(`${name} has purchases. Close it instead.`)
+    if (used.length)
+      throw new UserError(`${name} has purchases. Close it instead.`)
     await db.batch([
       db
         .delete(balances)
@@ -259,7 +261,7 @@ export async function postTransactions(
   input: PostInput,
 ): Promise<PostSummary> {
   if (input.rows.length > 20_000)
-    throw new Error('An update can include at most 20,000 purchases.')
+    throw new UserError('An update can include at most 20,000 purchases.')
   input = { ...input, rows: input.rows.map((row) => postedRowInput.parse(row)) }
   if (input.rows.some((row) => row.sourceId) && !input.sourceNamespace)
     throw new Error('Source IDs require a connector namespace')
@@ -268,7 +270,7 @@ export async function postTransactions(
       'Identified sources reconcile individually; they cannot replace a date range',
     )
   const account = await findAccount(db, input.account)
-  if (account.closed) throw new Error('Reopen this account to update it.')
+  if (account.closed) throw new UserError('Reopen this account to update it.')
   if (!input.commit)
     return postTransactionsUnlocked(db, { ...input, account: account.name })
   const lease = await acquireUpdate(db, account.name)
@@ -535,7 +537,7 @@ async function postTransactionsUnlocked(
         .onConflictDoNothing(),
     )
   if (input.replaceStarting && statements.length > STATEMENTS_PER_BATCH)
-    throw new Error(
+    throw new UserError(
       'This export is too large to replace starting purchases at once. Split it into smaller date ranges.',
     )
   for (let i = 0; i < statements.length; i += STATEMENTS_PER_BATCH) {

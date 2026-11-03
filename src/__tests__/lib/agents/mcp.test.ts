@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { handleMcp, tool } from '@/lib/agents/mcp'
+import { UserError } from '@/lib/errors'
 
 const echo = tool({
   name: 'echo',
@@ -14,7 +15,7 @@ const broken = tool({
   title: 'Broken',
   description: 'Always fails',
   input: z.object({}),
-  call: () => Promise.reject(new Error('no slate yet')),
+  call: () => Promise.reject(new UserError('no slate yet')),
 })
 const tools = [echo, broken]
 const req = (method: string, params?: object, id: number | string = 1) => ({

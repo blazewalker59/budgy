@@ -10,6 +10,7 @@ import { householdRow } from '@/lib/households/scope'
 import { findAccount, postTransactions } from '@/lib/ledger/accounts'
 import { isDebt } from '@/lib/model/accounts'
 import { recordMoneyIn } from '@/lib/moneyIn/service'
+import { UserError } from '@/lib/errors'
 
 export interface AccountExportInput {
   account: string
@@ -25,13 +26,15 @@ export async function ingestAccountExport(
   source: UpdateSource = 'uploaded',
 ) {
   const account = await findAccount(db, data.account)
-  if (account.closed) throw new Error('Reopen this account to update it.')
+  if (account.closed) throw new UserError('Reopen this account to update it.')
   if (!['credit', 'checking', 'savings'].includes(account.kind))
-    throw new Error(
+    throw new UserError(
       'This account only tracks balances. Record one on its account sheet.',
     )
   if (data.format === 'apple-card' && account.kind !== 'credit')
-    throw new Error('Apple Card exports only work with a credit card account.')
+    throw new UserError(
+      'Apple Card exports only work with a credit card account.',
+    )
   let normalized: ReturnType<typeof normalizeExport>
   try {
     normalized = normalizeExport(data.text, data.format, isDebt(account))

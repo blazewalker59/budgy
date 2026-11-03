@@ -4,6 +4,7 @@ import { householdDatabase } from './scope'
 import { parseOwners, validTimeZone } from './locale'
 import type { Database } from '@/lib/db'
 import { householdMembers, households } from '@/lib/db/schema'
+import { UserError } from '@/lib/errors'
 
 export const LEGACY_HOUSEHOLD_ID = 'hh_initial'
 
@@ -20,7 +21,7 @@ export async function findMemberHousehold(db: Database, memberId: string) {
     .innerJoin(households, eq(households.id, householdMembers.householdId))
     .where(eq(householdMembers.memberId, memberId))
   if (memberships.length > 1)
-    throw new Error('A single Household membership is required')
+    throw new UserError('A single Household membership is required')
   const membership = memberships[0]
   if (!membership) return null
   return {
@@ -34,7 +35,7 @@ export async function findMemberHousehold(db: Database, memberId: string) {
 
 export async function memberHousehold(db: Database, memberId: string) {
   const household = await findMemberHousehold(db, memberId)
-  if (!household) throw new Error('Household membership is required')
+  if (!household) throw new UserError('Household membership is required')
   return household
 }
 
@@ -53,6 +54,6 @@ export async function requireHousehold(
       ),
     )
     .get()
-  if (!membership) throw new Error('Household access denied')
+  if (!membership) throw new UserError('Household access denied')
   return householdDatabase(db, householdId)
 }

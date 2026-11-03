@@ -16,6 +16,7 @@ import { newCategory } from '@/lib/model/defaults'
 import { TRANSFER } from '@/lib/model/ledger'
 import { sha1Hex } from '@/lib/import/rows'
 import { storeName } from '@/lib/import/stores'
+import { UserError } from '@/lib/errors'
 
 /** Where an offset's refund Transaction says it came from. */
 const OFFSET_KEY = 'money-in:'
@@ -130,7 +131,7 @@ export async function fileMoneyIn(
     .from(moneyIn)
     .where(inHousehold(db, moneyIn, eq(moneyIn.id, filing.id)))
     .get()
-  if (!row) throw new Error('That money in is no longer here.')
+  if (!row) throw new UserError('That money in is no longer here.')
   const note =
     filing.note === undefined ? row.note : filing.note?.trim() || null
   const statements = []
@@ -140,10 +141,10 @@ export async function fileMoneyIn(
   if (filing.use === 'offset') {
     category = filing.category?.trim() || null
     if (!category || category === TRANSFER)
-      throw new Error('Choose the category this money comes off.')
+      throw new UserError('Choose the category this money comes off.')
     offset = filing.offset ?? row.amount
     if (!Number.isInteger(offset) || offset < 1 || offset > row.amount)
-      throw new Error(
+      throw new UserError(
         'An offset can be at most the money that came in, and more than $0.',
       )
     txnId =

@@ -11,6 +11,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { txn } from '../../_setup/factories'
 import type { Ledger } from '@/lib/model/types'
 import { LedgerSaveError } from '@/components/shared/LedgerSaveError'
+import { UserError } from '@/lib/errors'
 import {
   LEDGER_KEY,
   SESSION_KEY,
@@ -98,7 +99,7 @@ describe('failed Ledger saves', () => {
   it('refetches the server Ledger and shows the error', async () => {
     const server = ledger('Groceries')
     mocks.getLedger.mockResolvedValue(server)
-    mocks.moveTxn.mockRejectedValue(new Error('Database is busy'))
+    mocks.moveTxn.mockRejectedValue(new UserError('Database is busy'))
     const client = new QueryClient({
       defaultOptions: {
         queries: { retry: false },

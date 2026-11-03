@@ -3,6 +3,7 @@ import type { PostedRow } from '@/lib/import/posted'
 import type { IncomingRow } from '@/lib/model/moneyIn'
 import { parseCsv } from '@/lib/import/csv'
 import { readDate, readMoney } from '@/lib/import/history'
+import { UserError } from '@/lib/errors'
 
 export const EXPORT_FORMATS = [
   'apple-card',
@@ -73,7 +74,7 @@ export function normalizeExport(
   format: ExportFormat,
   debt: boolean,
 ) {
-  if (!withinExportLimit(text)) throw new Error(EXPORT_TOO_LARGE)
+  if (!withinExportLimit(text)) throw new UserError(EXPORT_TOO_LARGE)
   const cells = parseCsv(text.replace(/^\uFEFF/, '')).filter((r) =>
     r.some((c) => c.trim()),
   )
@@ -108,18 +109,18 @@ export function normalizeExport(
     description < 0 ||
     (format === 'debit-credit' ? debit < 0 || credit < 0 : amount < 0)
   )
-    throw new Error(
+    throw new UserError(
       'This CSV is missing a date, description or amount column. Check the export format.',
     )
   if (
     format === 'apple-card' &&
     (!debt || type < 0 || column('amount (usd)') < 0)
   )
-    throw new Error(
+    throw new UserError(
       'The Apple Card format needs an Apple Card CSV on a credit card account.',
     )
   if (cells.length > 20_000)
-    throw new Error(
+    throw new UserError(
       'An export can have at most 20,000 rows. Split it into smaller date ranges.',
     )
   const rows: Array<PostedRow> = []
@@ -188,11 +189,11 @@ export function normalizeExport(
     })
   }
   if (invalid.length)
-    throw new Error(
+    throw new UserError(
       `Couldn’t read ${invalid.length} row${invalid.length === 1 ? '' : 's'}, starting at line ${invalid[0]}. Nothing was imported. Check the dates, amounts and export format.`,
     )
   if (!cells.length)
-    throw new Error('This export is empty. Choose a transactions CSV.')
+    throw new UserError('This export is empty. Choose a transactions CSV.')
   dates.sort()
   return {
     rows,

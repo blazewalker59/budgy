@@ -21,7 +21,7 @@ import {
   postTransactions,
   recordBalances,
 } from '@/lib/ledger/accounts'
-import { clientMessage } from '@/lib/errors'
+import { UserError, clientMessage } from '@/lib/errors'
 import { householdTimeZone } from '@/lib/households/locale'
 import { addDays, dateOn, today } from '@/lib/model/dates'
 import { isDebt } from '@/lib/model/accounts'
@@ -96,7 +96,7 @@ export async function syncConnection(
       ),
     )
   if (!mapped.length)
-    throw new Error('Link a bank account to a Budgy account first.')
+    throw new UserError('Link a bank account to a Budgy account first.')
   const timeZone = await householdTimeZone(db)
   const until = today(timeZone)
   const from = mapped

@@ -18,6 +18,7 @@ import { householdRow, inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
 import { householdTimeZone } from '@/lib/households/locale'
 import { today } from '@/lib/model/dates'
+import { UserError } from '@/lib/errors'
 
 /** Bridge asks clients to stay under 24 requests a day per connection. */
 const DAILY_REQUESTS = 20
@@ -36,7 +37,7 @@ export async function connectSimplefin(
   transport: typeof fetch = fetch,
 ): Promise<{ id: string }> {
   // A setup token works once: don't spend it unless it can be stored.
-  if (!connectionKeyReady(secret)) throw new Error(NOT_CONFIGURED)
+  if (!connectionKeyReady(secret)) throw new UserError(NOT_CONFIGURED)
   const access = await claimSimplefin(input.setupToken, transport)
   const accessHash = await hashToken(access)
   const taken = await db
@@ -44,7 +45,7 @@ export async function connectSimplefin(
     .from(bankConnections)
     .where(eq(bankConnections.accessHash, accessHash))
     .get()
-  if (taken) throw new Error('This SimpleFIN access is already connected.')
+  if (taken) throw new UserError('This SimpleFIN access is already connected.')
   const id = crypto.randomUUID()
   await db.insert(bankConnections).values(
     householdRow(db, {
@@ -85,7 +86,7 @@ async function spendRequest(db: HouseholdDatabase, id: string) {
     )
     .returning({ id: bankConnections.id })
   if (!spent.length)
-    throw new Error(
+    throw new UserError(
       'This connection has reached today’s SimpleFIN request limit. Try again tomorrow.',
     )
 }
@@ -117,8 +118,8 @@ export async function readBridge(
     .from(bankConnections)
     .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
     .get()
-  if (!connection) throw new Error('That bank connection no longer exists.')
-  if (!connectionKeyReady(secret)) throw new Error(NOT_CONFIGURED)
+  if (!connection) throw new UserError('That bank connection no longer exists.')
+  if (!connectionKeyReady(secret)) throw new UserError(NOT_CONFIGURED)
   await spendRequest(db, id)
   let found: Awaited<ReturnType<typeof fetchSimplefin>>
   try {
@@ -137,7 +138,7 @@ export async function readBridge(
       .update(bankConnections)
       .set({ status: 'attention', lastError: message })
       .where(inHousehold(db, bankConnections, eq(bankConnections.id, id)))
-    throw new Error(message)
+    throw error instanceof SimplefinError ? error : new UserError(message)
   }
   const statements = found.accounts.map((a) =>
     db
@@ -205,13 +206,13 @@ export async function mapBankAccount(
     ),
   )
   const found = await db.select().from(bankAccounts).where(where).get()
-  if (!found) throw new Error('That bank account no longer exists.')
+  if (!found) throw new UserError('That bank account no longer exists.')
   let name: string | null = null
   if (input.account !== null) {
     const account = await findAccount(db, input.account)
-    if (account.closed) throw new Error('Reopen this account to link it.')
+    if (account.closed) throw new UserError('Reopen this account to link it.')
     if (found.currency.toUpperCase() !== 'USD')
-      throw new Error('Budgy only supports USD accounts.')
+      throw new UserError('Budgy only supports USD accounts.')
     const linked = await db
       .select({
         name: bankAccounts.name,
@@ -228,7 +229,9 @@ export async function mapBankAccount(
       (linked.connectionId !== found.connectionId ||
         linked.providerId !== found.providerId)
     )
-      throw new Error(`${account.name} is already linked to ${linked.name}.`)
+      throw new UserError(
+        `${account.name} is already linked to ${linked.name}.`,
+      )
     name = account.name
   }
   await db.update(bankAccounts).set({ account: name }).where(where)

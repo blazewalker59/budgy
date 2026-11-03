@@ -20,6 +20,7 @@ import {
 import { DEFAULT_TIME_ZONE } from '@/lib/model/dates'
 import { DEFAULT_CATEGORIES } from '@/lib/model/defaults'
 import { rowsPerInsert } from '@/lib/ledger/importer'
+import { UserError } from '@/lib/errors'
 
 export interface HouseholdActor {
   id: string
@@ -41,7 +42,7 @@ const MAX_INVITES = 20
 
 function verified(actor: HouseholdActor) {
   if (!actor.emailVerified)
-    throw new Error('Sign in with a verified Google account')
+    throw new UserError('Sign in with a verified Google account')
 }
 
 function ownerGuard(db: HouseholdDatabase, actorId: string) {
@@ -64,7 +65,7 @@ async function requireOwner(db: HouseholdDatabase, actor: HouseholdActor) {
       ),
     )
     .get()
-  if (!membership) throw new Error('Only the Household owner can do this')
+  if (!membership) throw new UserError('Only the Household owner can do this')
 }
 
 export async function createHousehold(
@@ -76,14 +77,14 @@ export async function createHousehold(
   verified(actor)
   // An invitation admits someone to join a Household, not to start one.
   if (!(await canCreateHousehold(db, actor.email, allowedEmails)))
-    throw new Error(
+    throw new UserError(
       'Budgy is invitation-only for now. Open the invitation link you were sent to join a Household.',
     )
   name = name.trim()
   if (!name || name.length > 60)
-    throw new Error('Name your Household (up to 60 characters)')
+    throw new UserError('Name your Household (up to 60 characters)')
   if (await findMemberHousehold(db, actor.id))
-    throw new Error('You already belong to a Household')
+    throw new UserError('You already belong to a Household')
   const id = `hh_${crypto.randomUUID().replaceAll('-', '')}`
   // A unique membership per Member makes simultaneous create/join attempts
   // conflict; D1's atomic batch rolls the losing attempt back completely.
@@ -124,7 +125,7 @@ export async function householdDetails(
 ) {
   const household = await memberHousehold(db, actor.id)
   if (household.id !== db.householdId)
-    throw new Error('Household access denied')
+    throw new UserError('Household access denied')
   const members = await db
     .select({
       id: householdMembers.memberId,
@@ -166,7 +167,7 @@ export async function createInvite(
   await requireOwner(db, actor)
   email = normalizeEmail(email)
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254)
-    throw new Error('Enter a valid email address')
+    throw new UserError('Enter a valid email address')
   const existing = await db
     .select({ id: user.id })
     .from(user)
@@ -179,7 +180,7 @@ export async function createInvite(
     )
     .get()
   if (existing || email === normalizeEmail(actor.email))
-    throw new Error('This person is already in a Household')
+    throw new UserError('This person is already in a Household')
   const token = randomToken()
   const tokenHash = await hashToken(token)
   const id = crypto.randomUUID()
@@ -226,7 +227,7 @@ export async function createInvite(
       .returning({ id: householdInvites.id }),
   ])
   if (!inserted.length)
-    throw new Error(
+    throw new UserError(
       'Invitation not created. Revoke an unused one and try again.',
     )
   return { id, token, email, expiresAt }
@@ -259,7 +260,9 @@ export async function previewInvite(
 ) {
   verified(actor)
   if (!/^[A-Za-z0-9_-]{43}$/.test(token))
-    throw new Error('This invitation is unavailable or for a different email')
+    throw new UserError(
+      'This invitation is unavailable or for a different email',
+    )
   const invite = await db
     .select({
       id: householdInvites.id,
@@ -277,7 +280,9 @@ export async function previewInvite(
     )
     .get()
   if (!invite)
-    throw new Error('This invitation is unavailable or for a different email')
+    throw new UserError(
+      'This invitation is unavailable or for a different email',
+    )
   return invite
 }
 
@@ -289,7 +294,7 @@ export async function acceptInvite(
 ): Promise<Household> {
   const invite = await previewInvite(db, actor, token, now)
   if (await findMemberHousehold(db, actor.id))
-    throw new Error('You already belong to a Household')
+    throw new UserError('You already belong to a Household')
   const [inserted] = await db.batch([
     db
       .insert(householdMembers)
@@ -323,10 +328,10 @@ export async function acceptInvite(
       ),
   ])
   if (!inserted.length)
-    throw new Error('This invitation is no longer available')
+    throw new UserError('This invitation is no longer available')
   const joined = await findMemberHousehold(db, actor.id)
   if (!joined || joined.id !== invite.householdId)
-    throw new Error('This invitation is no longer available')
+    throw new UserError('This invitation is no longer available')
   return joined
 }
 
@@ -337,7 +342,7 @@ export async function removeMember(
 ) {
   await requireOwner(db, actor)
   if (memberId === actor.id)
-    throw new Error('Transfer ownership before leaving your Household')
+    throw new UserError('Transfer ownership before leaving your Household')
   const target = await db
     .select({ id: householdMembers.memberId })
     .from(householdMembers)
@@ -352,7 +357,7 @@ export async function removeMember(
       ),
     )
     .get()
-  if (!target) throw new Error('That person isn’t in this Household')
+  if (!target) throw new UserError('That person isn’t in this Household')
   const targetGuard = sql`exists (select 1 from ${householdMembers} where ${householdMembers.householdId} = ${db.householdId} and ${householdMembers.memberId} = ${memberId} and ${householdMembers.role} = 'member')`
   await db.batch([
     // Revoke rather than merely relying on missing membership: a later
@@ -410,7 +415,7 @@ export async function transferOwnership(
 ) {
   await requireOwner(db, actor)
   if (memberId === actor.id)
-    throw new Error('Choose someone other than yourself')
+    throw new UserError('Choose someone other than yourself')
   const [promoted] = await db.batch([
     db
       .update(householdMembers)
@@ -441,5 +446,6 @@ export async function transferOwnership(
         ),
       ),
   ])
-  if (!promoted.length) throw new Error('That person isn’t in this Household')
+  if (!promoted.length)
+    throw new UserError('That person isn’t in this Household')
 }

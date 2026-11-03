@@ -42,6 +42,7 @@ import { monthlySetAside } from '@/lib/model/plans'
 import { suggestPlans } from '@/lib/model/detect'
 import { addDays, monthRange, shiftMonth } from '@/lib/model/dates'
 import { CADENCE_LABELS, PAY_CADENCE_LABELS } from '@/lib/model/types'
+import { UserError } from '@/lib/errors'
 
 export const INSTRUCTIONS = `Budgy is a household budget. Your token accesses only its own Household. Discover account owners from the Ledger rather than assuming their names. All amounts are US dollars; spending is positive, refunds negative. Spending is filed in Categories. Everyday Categories have monthly Targets (the Budget); Housing (mortgage, utilities, upkeep) has none. Planned Expenses are known bills. Those less often than monthly (car insurance twice a year) are set aside: budgeted on their due dates and kept out of everyday totals and Targets. Monthly ones (subscriptions) count toward their Category's Target like any purchase. "Typical" is the average month without set-aside bills. Purchases arrive per account (a Member's upload of that account's export, or an Agent's add_transactions), so data is only as fresh as each account's latest: check freshness before calling a day quiet. Accounts also have balances over time (cards, bank, investment, retirement, 529s), recorded by hand or by an Agent; get_net_worth reads them. For a daily report: if you have an account's new purchases (say, the day's Apple Card activity), add them with add_transactions (commit true), then call get_daily_digest (yesterday by default), which includes Budget Alerts.`
 
@@ -317,7 +318,7 @@ export function budgyTools(
         const period = monthRange(lastFull, months)
         const h = categoryHistory(b.ix, period, b.plannedIds).get(category)
         if (!h && !b.ix.categories.has(category))
-          throw new Error(
+          throw new UserError(
             `No category named ${category}; see list_accounts_and_categories`,
           )
         const typical3 =
@@ -632,7 +633,7 @@ export function budgyTools(
       call: async ({ id, category, note }) => {
         const b = await book()
         const t = everyTxn(b.ix).find((x) => x.id === id)
-        if (!t) throw new Error(`No purchase with id ${id}`)
+        if (!t) throw new UserError(`No purchase with id ${id}`)
         if (category !== undefined) await moveTransaction(db, id, category)
         if (note !== undefined) await noteTransaction(db, id, note)
         cached = null

@@ -5,6 +5,7 @@
  */
 import { z } from 'zod'
 import { readLimited } from './http'
+import { UserError } from '@/lib/errors'
 
 const MESSAGES = {
   claim: 'That setup token didn’t work. Make a new one in SimpleFIN Bridge.',
@@ -15,7 +16,8 @@ const MESSAGES = {
   invalid: 'SimpleFIN sent data Budgy couldn’t read. Try again later.',
 }
 
-export class SimplefinError extends Error {
+/** Its messages are written for Members; `kind` tells a retry what failed. */
+export class SimplefinError extends UserError {
   constructor(public kind: keyof typeof MESSAGES) {
     super(MESSAGES[kind])
   }

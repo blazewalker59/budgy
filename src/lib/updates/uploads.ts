@@ -12,6 +12,7 @@ import { prefixedToken } from '@/lib/secret'
 import { accounts, householdMembers, uploadTokens } from '@/lib/db/schema'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import { findAccount } from '@/lib/ledger/accounts'
+import { UserError } from '@/lib/errors'
 
 /** Distinct from Agent tokens (bg_), so neither is accepted for the other. */
 const UPLOAD_PREFIX = 'bu_'
@@ -27,11 +28,13 @@ export async function createUploadToken(
   format: ExportFormat,
 ): Promise<{ id: string; token: string; account: string }> {
   const account = await findAccount(db, accountName)
-  if (account.closed) throw new Error('Reopen this account to update it.')
+  if (account.closed) throw new UserError('Reopen this account to update it.')
   if (!['credit', 'checking', 'savings'].includes(account.kind))
-    throw new Error('Only card and bank accounts take purchase exports.')
+    throw new UserError('Only card and bank accounts take purchase exports.')
   if (format === 'apple-card' && account.kind !== 'credit')
-    throw new Error('Apple Card exports only work with a credit card account.')
+    throw new UserError(
+      'Apple Card exports only work with a credit card account.',
+    )
   const active = await db
     .select({ id: uploadTokens.id })
     .from(uploadTokens)
@@ -46,7 +49,7 @@ export async function createUploadToken(
       ),
     )
   if (active.length >= MAX_ACTIVE_PER_ACCOUNT)
-    throw new Error(
+    throw new UserError(
       `${account.name} already has ${MAX_ACTIVE_PER_ACCOUNT} Shortcut tokens. Revoke one you no longer use.`,
     )
   const token = prefixedToken(UPLOAD_PREFIX)

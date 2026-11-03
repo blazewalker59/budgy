@@ -1,3 +1,5 @@
+import { UserError } from '@/lib/errors'
+
 /** AES-GCM ciphertext cannot be moved between Households or connections. */
 function bytes(text: string) {
   return Uint8Array.from(
@@ -18,7 +20,7 @@ export function connectionKeyReady(secret?: string) {
 }
 async function key(secret?: string) {
   if (!connectionKeyReady(secret))
-    throw new Error('Bank connection encryption is not configured')
+    throw new UserError('Bank connection encryption is not configured')
   return crypto.subtle.importKey('raw', bytes(secret!), 'AES-GCM', false, [
     'encrypt',
     'decrypt',
@@ -64,7 +66,7 @@ export async function decryptAccess(
     )
     return new TextDecoder().decode(decrypted)
   } catch {
-    throw new Error(
+    throw new UserError(
       'Couldn’t open this connection. Disconnect it and connect again.',
     )
   }

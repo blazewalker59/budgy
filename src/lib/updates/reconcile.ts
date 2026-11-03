@@ -4,6 +4,7 @@ import type { ImportRules } from '@/lib/import/rules'
 import { preparePosted } from '@/lib/import/posted'
 import { sha1Hex } from '@/lib/import/rows'
 import { isSpending, storeName } from '@/lib/import/stores'
+import { UserError } from '@/lib/errors'
 
 export interface ExistingPurchase {
   id: string
@@ -65,7 +66,7 @@ export async function prepareIdentified(input: {
     const signature = JSON.stringify([row.date, row.description, row.amount])
     if (seen.has(sourceKey)) {
       if (seen.get(sourceKey) !== signature)
-        throw new Error(
+        throw new UserError(
           'A source ID describes conflicting purchases in this update',
         )
       prepared.alreadyHad++

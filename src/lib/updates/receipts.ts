@@ -3,6 +3,7 @@ import type { HouseholdDatabase } from '@/lib/households/scope'
 import type { PostSummary } from '@/lib/ledger/accounts'
 import { householdRow, inHousehold } from '@/lib/households/scope'
 import { accountUpdateLocks, accountUpdates } from '@/lib/db/schema'
+import { UserError } from '@/lib/errors'
 
 export type UpdateSource = 'uploaded' | 'posted' | 'shortcut' | 'simplefin'
 const LEASE_MS = 10 * 60_000
@@ -21,7 +22,7 @@ export async function acquireUpdate(db: HouseholdDatabase, account: string) {
     })
     .returning({ token: accountUpdateLocks.token })
   if (!locked.length)
-    throw new Error(
+    throw new UserError(
       'This Account is already updating. Wait a moment and try again.',
     )
   return token
@@ -46,7 +47,8 @@ export async function renewUpdate(
       ),
     )
     .returning({ token: accountUpdateLocks.token })
-  if (!renewed.length) throw new Error('This update took too long. Try again.')
+  if (!renewed.length)
+    throw new UserError('This update took too long. Try again.')
 }
 
 export async function releaseUpdate(

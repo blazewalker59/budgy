@@ -10,6 +10,7 @@ import { createToken } from './tokens'
 import { apiTokens } from '@/lib/db/schema'
 import { withMember } from '@/lib/auth/session'
 import { inHousehold } from '@/lib/households/scope'
+import { UserError } from '@/lib/errors'
 
 /** Enough for a few Agents; more is likely tokens nobody revoked. */
 const MAX_ACTIVE_TOKENS = 10
@@ -70,7 +71,7 @@ export const createApiToken = createServerFn({ method: 'POST' })
           ),
         )
       if (active.length >= MAX_ACTIVE_TOKENS) {
-        throw new Error(
+        throw new UserError(
           `You have ${MAX_ACTIVE_TOKENS} tokens: revoke one to make another`,
         )
       }

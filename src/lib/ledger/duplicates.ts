@@ -9,6 +9,7 @@ import type { HouseholdDatabase as Database } from '@/lib/households/scope'
 import { inHousehold } from '@/lib/households/scope'
 import { imports, transactions } from '@/lib/db/schema'
 import { filedFirst, pairKey, staysFirst } from '@/lib/model/duplicates'
+import { UserError } from '@/lib/errors'
 
 /**
  * One copy goes; the one the next update will know stays (`staysFirst`),
@@ -51,14 +52,14 @@ export async function mergeDuplicate(
     const t = rows.find((r) => r.id === id)
     return t && { ...t, starting: !!t.starting, synced: !!t.sourceKey }
   })
-  if (!x || !y) throw new Error('One of these purchases is gone')
+  if (!x || !y) throw new UserError('One of these purchases is gone')
   if (
     x.id === y.id ||
     (x.synced && y.synced) ||
     x.account !== y.account ||
     x.amount !== y.amount
   )
-    throw new Error('These purchases can’t be merged')
+    throw new UserError('These purchases can’t be merged')
   const [stays, goes] = staysFirst(y, x) ? [y, x] : [x, y]
   const [filed, other] = filedFirst(stays, goes) ? [stays, goes] : [goes, stays]
   await db.batch([

@@ -44,9 +44,11 @@ import {
 } from '@/lib/updates/connections'
 import { decryptAccess, encryptAccess } from '@/lib/updates/crypto'
 import {
+  API_PROBLEM,
   SimplefinError,
   claimSimplefin,
   fetchSimplefin,
+  issueKind,
 } from '@/lib/updates/simplefinClient'
 
 const open: Array<DatabaseSync> = []
@@ -274,7 +276,7 @@ describe('SimpleFIN connections', () => {
     )
     expect(calls.map((c) => c.url)).toEqual([
       'https://beta-bridge.simplefin.org/simplefin/claim/demo',
-      'https://beta-bridge.simplefin.org/simplefin/accounts?balances-only=1',
+      'https://beta-bridge.simplefin.org/simplefin/accounts?balances-only=1&version=2',
     ])
     expect(calls[1].authorization).toBe(`Basic ${btoa('user:secret')}`)
 
@@ -544,6 +546,7 @@ describe('SimpleFIN client', () => {
     expect(accounts).toEqual([
       {
         id: 'ACT-1',
+        connId: 'CON-1',
         name: 'Sapphire',
         institution: 'Chase',
         currency: 'USD',
@@ -582,6 +585,81 @@ describe('SimpleFIN client', () => {
     }
     expect(errors.join()).toContain('accounts.0.balance')
     expect(errors.join()).not.toContain('secret-balance-9999')
+  })
+
+  it('asks for a window and single accounts, in protocol 2', async () => {
+    const urls: Array<string> = []
+    const transport = ((url: string) => {
+      urls.push(url)
+      return Promise.resolve(Response.json({ accounts: [] }))
+    }) as typeof fetch
+    await fetchSimplefin(
+      ACCESS,
+      { start: 100, end: 200, accounts: ['ACT-1', 'ACT 2'] },
+      transport,
+    )
+    const url = new URL(urls[0])
+    expect(url.searchParams.get('start-date')).toBe('100')
+    expect(url.searchParams.get('end-date')).toBe('200')
+    expect(url.searchParams.getAll('account')).toEqual(['ACT-1', 'ACT 2'])
+    expect(url.searchParams.get('version')).toBe('2')
+  })
+
+  it('reads errlist codes, falling back to their prefix, and keeps developer errors from Members', async () => {
+    expect(issueKind('con.auth')).toBe('con.auth')
+    expect(issueKind('con.mfa')).toBe('con')
+    expect(issueKind('ACT.MISSINGDATA')).toBe('act.missingdata')
+    expect(issueKind('act.new-thing')).toBe('act')
+    expect(issueKind('gen.')).toBe('gen')
+    expect(issueKind('weird')).toBe('unknown')
+    expect(issueKind(7)).toBe('unknown')
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const transport = (() =>
+      Promise.resolve(
+        Response.json({
+          errlist: [
+            { code: 'con.auth', msg: 'Sign in to Chase', conn_id: 'CON-1' },
+            { code: 'act.failed', msg: 'Try later', account_id: 'ACT-1' },
+            { code: 'gen.api', msg: 'bad param start-date=secret-123' },
+          ],
+          accounts: [],
+        }),
+      )) as typeof fetch
+    const { issues, problems } = await fetchSimplefin(ACCESS, {}, transport)
+    expect(issues).toEqual([
+      { kind: 'con.auth', message: 'Sign in to Chase', connId: 'CON-1' },
+      { kind: 'act.failed', message: 'Try later', accountId: 'ACT-1' },
+      { kind: 'gen.api', message: API_PROBLEM },
+    ])
+    expect(problems.join()).not.toContain('secret-123')
+    expect(JSON.stringify(log.mock.calls)).toContain('gen.api')
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secret-123')
+    log.mockRestore()
+  })
+
+  it('treats gen.auth like a 403, and says plainly when the subscription lapsed', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const genAuth = (() =>
+      Promise.resolve(
+        Response.json({ errlist: [{ code: 'gen.auth' }], accounts: [] }),
+      )) as typeof fetch
+    await expect(fetchSimplefin(ACCESS, {}, genAuth)).rejects.toMatchObject({
+      kind: 'auth',
+    })
+    const lapsed = (() =>
+      Promise.resolve(new Response('', { status: 402 }))) as typeof fetch
+    await expect(fetchSimplefin(ACCESS, {}, lapsed)).rejects.toThrow(
+      'Your SimpleFIN Bridge subscription needs renewing. Renew it at https://bridge.simplefin.org/',
+    )
+    log.mockRestore()
+  })
+
+  it('warns that a setup token claimed already may be compromised', async () => {
+    const taken = (() =>
+      Promise.resolve(new Response('', { status: 403 }))) as typeof fetch
+    await expect(claimSimplefin(SETUP, taken)).rejects.toThrow(
+      /someone else may have: disable it in SimpleFIN Bridge/,
+    )
   })
 
   it('rejects an access URL from a claim that points elsewhere', async () => {
@@ -701,7 +779,7 @@ describe('SimpleFIN sync', () => {
     expect(await db.select().from(balances)).toMatchObject([
       { householdId: 'a', account: 'Card', amount: 12_050 },
     ])
-    expect(urls.at(-1)).toMatch(/accounts\?start-date=\d+$/)
+    expect(urls.at(-1)).toMatch(/accounts\?start-date=\d+&version=2$/)
 
     // The next sync overlaps; nothing is added twice, and a posted
     // pending purchase arrives under its own ID.

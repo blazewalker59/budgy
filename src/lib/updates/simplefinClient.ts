@@ -7,11 +7,17 @@ import { z } from 'zod'
 import { readLimited } from './http'
 import { UserError } from '@/lib/errors'
 
+/** Where a Member renews a lapsed SimpleFIN Bridge subscription. */
+export const SIMPLEFIN_BRIDGE = 'https://bridge.simplefin.org/'
+
 const MESSAGES = {
   claim: 'That setup token didn’t work. Make a new one in SimpleFIN Bridge.',
-  auth: 'SimpleFIN no longer accepts this connection. Disconnect it and connect again with a new setup token.',
-  payment:
-    'SimpleFIN needs an active subscription. Check your plan in SimpleFIN Bridge.',
+  // The protocol: a 403 on claim means the token may have been claimed by
+  // someone else, so the Member should disable it.
+  claimed:
+    'That setup token was already used. If you didn’t use it, someone else may have: disable it in SimpleFIN Bridge, then make a new one.',
+  auth: 'SimpleFIN no longer accepts this connection: its access was revoked or its credentials changed. Make a new setup token in SimpleFIN Bridge and reconnect.',
+  payment: `Your SimpleFIN Bridge subscription needs renewing. Renew it at ${SIMPLEFIN_BRIDGE}, then Budgy syncs again on its own.`,
   network: 'SimpleFIN couldn’t be reached. Try again later.',
   invalid: 'SimpleFIN sent data Budgy couldn’t read. Try again later.',
 }
@@ -90,6 +96,7 @@ export async function claimSimplefin(
     throw new SimplefinError('claim')
   }
   const response = await call(url, { method: 'POST' }, transport)
+  if (response.status === 403) throw new SimplefinError('claimed')
   if (!response.ok) throw new SimplefinError('claim')
   try {
     const access = (await readLimited(response.body, 4096)).trim()
@@ -157,6 +164,8 @@ const accountSet = z.object({
 /** One account as Budgy uses it, whichever protocol version Bridge spoke. */
 export interface SimplefinAccount {
   id: string
+  /** Protocol 2: the Bridge connection (institution login) it comes from. */
+  connId: string | null
   name: string
   institution: string
   currency: string
@@ -185,6 +194,7 @@ function normalize(set: z.infer<typeof accountSet>): Array<SimplefinAccount> {
     const connection = a.conn_id ? connections.get(a.conn_id) : undefined
     return {
       id: a.id,
+      connId: a.conn_id ?? null,
       name: a.name?.trim() || 'Unnamed account',
       institution:
         a.org?.name ??
@@ -209,15 +219,79 @@ function normalize(set: z.infer<typeof accountSet>): Array<SimplefinAccount> {
 }
 
 /**
+ * What a protocol 2 `errlist` entry is about. Unknown subcodes count as
+ * their prefix (`con.mfa` is a `con`); a v1 string is `unknown`.
+ */
+export type IssueKind =
+  | 'gen'
+  | 'gen.api'
+  | 'gen.auth'
+  | 'con'
+  | 'con.auth'
+  | 'act'
+  | 'act.failed'
+  | 'act.missingdata'
+  | 'unknown'
+
+/** One problem Bridge reported, with its message cleaned for Members. */
+export interface SimplefinIssue {
+  kind: IssueKind
+  message: string
+  connId?: string
+  accountId?: string
+}
+
+const KNOWN: ReadonlyArray<IssueKind> = [
+  'gen.api',
+  'gen.auth',
+  'con.auth',
+  'act.failed',
+  'act.missingdata',
+]
+
+/** A code as Budgy acts on it (the protocol's fallback to the prefix). */
+export function issueKind(code: unknown): IssueKind {
+  if (typeof code !== 'string') return 'unknown'
+  const lower = code.trim().toLowerCase()
+  if ((KNOWN as ReadonlyArray<string>).includes(lower))
+    return lower as IssueKind
+  const prefix = lower.split('.')[0]
+  return prefix === 'gen' || prefix === 'con' || prefix === 'act'
+    ? prefix
+    : 'unknown'
+}
+
+/** Bridge ids are opaque; anything odd isn't one Budgy will match. */
+const reference = (value: unknown) =>
+  typeof value === 'string' && value.length > 0 && value.length <= 200
+    ? value
+    : undefined
+
+export interface SimplefinOptions {
+  balancesOnly?: boolean
+  /** Unix seconds. Bridge allows at most 90 days from start to end. */
+  start?: number
+  /** Unix seconds, exclusive; now when absent. */
+  end?: number
+  /** Only these accounts (Bridge's separate per-account quota). */
+  accounts?: ReadonlyArray<string>
+}
+
+/**
  * Bridge's accounts, and any problems it reported (often an institution
  * needing a new login): what it returned is real but partial. The protocol
  * means these messages for the user, so they're kept, cleaned and short.
+ * A `gen.auth` problem is the same as a 403: the access no longer works.
  */
 export async function fetchSimplefin(
   access: string,
-  options: { balancesOnly?: boolean; start?: number; end?: number },
+  options: SimplefinOptions,
   transport: typeof fetch = fetch,
-): Promise<{ accounts: Array<SimplefinAccount>; problems: Array<string> }> {
+): Promise<{
+  accounts: Array<SimplefinAccount>
+  problems: Array<string>
+  issues: Array<SimplefinIssue>
+}> {
   const url = trustedUrl(access, false)
   let credentials: string
   try {
@@ -235,6 +309,9 @@ export async function fetchSimplefin(
     url.searchParams.set('start-date', String(options.start))
   if (options.end !== undefined)
     url.searchParams.set('end-date', String(options.end))
+  for (const account of options.accounts ?? [])
+    url.searchParams.append('account', account)
+  url.searchParams.set('version', '2')
   const response = await call(
     url,
     {
@@ -271,33 +348,62 @@ export async function fetchSimplefin(
     )
     throw new SimplefinError('invalid')
   }
+  const found = issues([
+    ...(parsed.data.errors ?? []),
+    ...(parsed.data.errlist ?? []),
+  ])
+  if (found.some((i) => i.kind === 'gen.api'))
+    // A request Bridge says Budgy got wrong: the code only, never the text.
+    console.error('SimpleFIN reported gen.api')
+  if (found.some((i) => i.kind === 'gen.auth')) {
+    console.error('SimpleFIN reported gen.auth')
+    throw new SimplefinError('auth')
+  }
   return {
     accounts: normalize(parsed.data),
-    problems: problems([
-      ...(parsed.data.errors ?? []),
-      ...(parsed.data.errlist ?? []),
-    ]),
+    problems: [...new Set(found.map((i) => i.message))].slice(0, 5),
+    issues: found,
   }
 }
 
-/** Bridge's messages as plain, short, distinct text (v1 strings, v2 `msg`). */
-function problems(reported: Array<unknown>): Array<string> {
-  const messages = reported.map((entry) => {
+/** For a developer error (gen.api): Bridge's text isn't meant for Members. */
+export const API_PROBLEM =
+  'SimpleFIN couldn’t answer Budgy’s request this time. Budgy will try again.'
+
+/** Bridge's messages as plain, short text (v1 strings, v2 `msg`). */
+function issues(reported: Array<unknown>): Array<SimplefinIssue> {
+  return reported.slice(0, 100).map((entry) => {
+    const record =
+      typeof entry === 'object' && entry !== null
+        ? (entry as Record<string, unknown>)
+        : {}
+    const kind = typeof entry === 'string' ? 'unknown' : issueKind(record.code)
     const text =
       typeof entry === 'string'
         ? entry
-        : typeof entry === 'object' &&
-            entry !== null &&
-            'msg' in entry &&
-            typeof entry.msg === 'string'
-          ? entry.msg
-          : 'An institution needs attention.'
+        : typeof record.msg === 'string'
+          ? record.msg
+          : ''
     const clean = text
       // eslint-disable-next-line no-control-regex
       .replace(/[\u0000-\u001f\u007f<>]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim()
-    return clean.length > 200 ? `${clean.slice(0, 199)}…` : clean
+    const message =
+      kind === 'gen.api'
+        ? API_PROBLEM
+        : !clean
+          ? 'An institution needs attention.'
+          : clean.length > 200
+            ? `${clean.slice(0, 199)}…`
+            : clean
+    return {
+      kind,
+      message,
+      ...(reference(record.conn_id) && { connId: reference(record.conn_id) }),
+      ...(reference(record.account_id) && {
+        accountId: reference(record.account_id),
+      }),
+    }
   })
-  return [...new Set(messages.filter(Boolean))].slice(0, 5)
 }

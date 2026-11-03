@@ -23,6 +23,10 @@ budget. Imports, MCP and future bank connections must obey the same boundary.
 - Server functions resolve exactly one membership from the authenticated
   Member. No client-supplied Household ID grants access. Missing or ambiguous
   membership fails closed; multi-Household switching is not implemented.
+- Server functions answer only same-origin browser requests (`src/start.ts`:
+  `Sec-Fetch-Site`, else `Origin`, must be ours; a request with neither is
+  refused), and a failure reaches the browser only as a message written for
+  Members (`UserError`); anything else is replaced with a generic one.
 - Ledger helpers require a Household-bound database type and explicitly
   scope reads, writes, conflicts, joins and cleanup. A database client cannot
   be rebound to a different Household. This is application-level isolation,

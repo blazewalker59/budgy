@@ -305,9 +305,7 @@ describe('Unified Account Updates UI', () => {
     ])
     mocks.link.mockResolvedValue(undefined)
     mount()
-    expect(
-      await screen.findByText(/SimpleFIN · 0 of 1 accounts linked/),
-    ).toBeTruthy()
+    expect(await screen.findByText(/SimpleFIN · 0 of 1 linked/)).toBeTruthy()
     expect(screen.getByText(/needs attention/)).toBeTruthy()
     // Collapsed: the connection's details aren't shown until opened.
     expect(screen.queryByText(/Vanguard needs attention/)).toBeNull()

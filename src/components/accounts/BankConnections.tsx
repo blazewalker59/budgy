@@ -104,14 +104,16 @@ export function BankConnections({
             <span className="block truncate text-muted">
               {!all.length
                 ? 'Connect SimpleFIN Bridge to sync banks automatically'
-                : `SimpleFIN · ${linked} of ${banks.length} accounts linked`}
-              {note && (
-                <span className={stopped ? 'text-over' : 'text-nice'}>
-                  {' '}
-                  · {note}
-                </span>
-              )}
+                : `SimpleFIN · ${linked} of ${banks.length} linked`}
             </span>
+            {/* Its own line, so a narrow phone never cuts off what's wrong. */}
+            {note && (
+              <span
+                className={`block truncate ${stopped ? 'text-over' : 'text-nice'}`}
+              >
+                {note}
+              </span>
+            )}
           </span>
           <ChevronDown
             size={16}

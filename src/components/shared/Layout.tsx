@@ -101,7 +101,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={label}
-      className="flex w-fit rounded-full bg-sunken p-0.5"
+      className="flex w-fit shrink-0 rounded-full bg-sunken p-0.5"
     >
       {options.map((o) => (
         <button
@@ -111,7 +111,8 @@ export function Segmented<T extends string>({
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            'rounded-full px-2.5 py-0.5 text-xs font-semibold text-muted',
+            // An option never wraps ("Money in"); a crowded row wraps instead.
+            'rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap text-muted',
             value === o.value && 'bg-surface text-foreground shadow-sm',
           )}
         >

@@ -61,7 +61,7 @@ export function AccountsScreen({ lens, tab }: { lens: Lens; tab: Tab }) {
   const navigate = useNavigate({ from: '/accounts' })
   return (
     <div className="mx-auto max-w-3xl space-y-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-extrabold tracking-tight">
           {tab === 'rules'
             ? 'Store Rules'

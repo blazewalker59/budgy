@@ -27,9 +27,9 @@ it.
   the one copied onto the token. A malformed token is refused before any
   database query, and a Workers Rate Limiting binding caps requests per IP
   and per token (429 over the limit; absent locally, so it fails open).
-- Scopes: `read` (every read tool) and `write` (also
-  `import_transactions_csv` and `update_transaction`). Write tools aren't
-  even listed to a read token.
+- Scopes: `read` (every read tool) and `write` (also `add_transactions`,
+  `record_balances` and `update_transaction`). Write tools aren't even
+  listed to a read token.
 - Tools read the Ledger fresh each call and reuse the app's model code
   (month view, breakdown, history, plans), so the agent and the screens
   never disagree. Amounts are dollars.
@@ -48,7 +48,7 @@ it.
 ## Consequences
 
 - A leaked read token reads the household's spending until revoked; a
-  leaked write token can also add rows from a CSV and re-file or note
-  purchases (no deletes). The database alone never reveals a token.
+  leaked write token can also add purchases, record (and replace) a day's
+  Balance, and re-file or note purchases (no deletes). The database alone never reveals a token.
 - The digest is only as fresh as the latest import; it reports each
   account's latest purchase so the agent can say so.

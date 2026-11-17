@@ -18,7 +18,7 @@ export function BudgetMix({ slices }: { slices: Array<MixSlice> }) {
   const color = (i: number, name: string) =>
     name === EVERYTHING_ELSE ? MIX_REST : MIX_COLORS[i % MIX_COLORS.length]
   return (
-    <section className="space-y-1.5 rounded-xl border border-border bg-surface p-3">
+    <section className="@container space-y-1.5 rounded-xl border border-border bg-surface p-3">
       <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted">
         Share of everyday spending
         <span className="ml-1.5 font-normal normal-case tracking-normal">
@@ -29,7 +29,7 @@ export function BudgetMix({ slices }: { slices: Array<MixSlice> }) {
         slices={slices}
         colors={slices.map((s, i) => color(i, s.name))}
       />
-      <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1 text-[11px] sm:grid-cols-3 sm:text-xs">
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-0.5 pt-1 text-[11px] @sm:text-xs @2xl:grid-cols-3">
         {slices.map((s, i) => {
           const shift = Math.round((s.targetShare - s.typicalShare) * 100)
           return (

@@ -39,11 +39,13 @@ const SPANS = [
 ]
 
 /**
- * One grid for every row and the header: two lines on a phone (name and
- * ±, then trend, typical and Target), one line from `sm` up.
+ * One grid for every row and the header, by the list's own width (it may
+ * share the screen): two lines when narrow (name and ±, then trend,
+ * typical and Target), one line once the names have room, and the Tag
+ * picker too when there's room for that.
  */
 const ROW_GRID =
-  'grid items-center gap-x-2 gap-y-0.5 [grid-template-areas:"name_name_diff""spark_typ_target"] grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-y-0 sm:[grid-template-areas:"name_tag_spark_typ_target_diff"] sm:grid-cols-[minmax(0,1fr)_5rem_5.5rem_5rem_5rem_4.5rem]'
+  'grid items-center gap-x-2 gap-y-0.5 [grid-template-areas:"name_name_diff""spark_typ_target"] grid-cols-[auto_minmax(0,1fr)_auto] @min-[30rem]:gap-y-0 @min-[30rem]:[grid-template-areas:"name_spark_typ_target_diff"] @min-[30rem]:grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_4rem] @2xl:[grid-template-areas:"name_tag_spark_typ_target_diff"] @2xl:grid-cols-[minmax(0,1fr)_5.5rem_5rem_5rem_5rem_4rem]'
 
 export function BudgetScreen({ owner }: { owner?: string }) {
   const book = useBook()
@@ -292,7 +294,7 @@ function CategoryList({
   onOpen: (name: string) => void
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-surface">
+    <section className="@container overflow-hidden rounded-xl border border-border bg-surface">
       <div
         className={cn(
           ROW_GRID,
@@ -300,14 +302,14 @@ function CategoryList({
         )}
       >
         <span className="[grid-area:name]">{title}</span>
-        <span className="hidden [grid-area:tag] sm:block">Tag</span>
-        <span className="hidden text-right [grid-area:spark] sm:block">
+        <span className="hidden [grid-area:tag] @2xl:block">Tag</span>
+        <span className="hidden text-right [grid-area:spark] @min-[30rem]:block">
           Trend
         </span>
-        <span className="hidden text-right [grid-area:typ] sm:block">
+        <span className="hidden text-right [grid-area:typ] @min-[30rem]:block">
           Typical
         </span>
-        <span className="hidden text-right [grid-area:target] sm:block">
+        <span className="hidden text-right [grid-area:target] @min-[30rem]:block">
           Target
         </span>
         <span
@@ -372,10 +374,12 @@ function CategoryRow({
         <span
           className={cn('size-2 shrink-0 rounded-full', TAG_BG[category.tag])}
         />
-        <span className="truncate">{name}</span>
+        <span className="truncate" title={name}>
+          {name}
+        </span>
         <ChevronRight size={13} className="shrink-0 text-muted" aria-hidden />
       </button>
-      <span className="hidden [grid-area:tag] sm:block">
+      <span className="hidden [grid-area:tag] @2xl:block">
         <TagSelect
           value={category.tag}
           label={`Tag for ${name}`}
@@ -388,21 +392,25 @@ function CategoryRow({
         onClick={onOpen}
         aria-label={`${name} by month`}
         title="See by month"
-        className="w-20 rounded hover:bg-sunken [grid-area:spark] sm:ml-auto"
+        className="w-20 rounded hover:bg-sunken [grid-area:spark] @min-[30rem]:ml-auto"
       >
         {trend && (
           <TrendSpark values={trend.monthly} target={target} highlight={span} />
         )}
       </button>
-      <span className="tabular-nums [grid-area:typ] sm:text-right">
-        <span className="text-[11px] text-muted sm:hidden">Typical </span>
+      <span className="tabular-nums [grid-area:typ] @min-[30rem]:text-right">
+        <span className="text-[11px] text-muted @min-[30rem]:hidden">
+          Typical{' '}
+        </span>
         {dollars(typical)}
         {h && h.months < h.monthly.length && (
           <span className="ml-1 text-[10px] text-muted">{h.months} mo</span>
         )}
       </span>
       <label className="flex items-center justify-end gap-1 [grid-area:target]">
-        <span className="text-[11px] text-muted sm:hidden">Target</span>
+        <span className="text-[11px] text-muted @min-[30rem]:hidden">
+          Target
+        </span>
         <input
           key={`${from}-${target}`}
           inputMode="decimal"

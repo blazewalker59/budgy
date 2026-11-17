@@ -129,6 +129,23 @@ export function horizon(from: string, due: string): Horizon {
   return 'later'
 }
 
+/**
+ * The month as calendar weeks, Sunday to Saturday: every date of each week
+ * that touches the month, including the neighbouring months' days.
+ */
+export function monthWeeks(month: string): Array<Array<string>> {
+  const first = `${month}-01`
+  const last = lastDayOf(month)
+  const weeks: Array<Array<string>> = []
+  let day = addDays(first, -new Date(toMs(first)).getUTCDay())
+  while (day <= last) {
+    const week: Array<string> = []
+    for (let i = 0; i < 7; i++, day = addDays(day, 1)) week.push(day)
+    weeks.push(week)
+  }
+  return weeks
+}
+
 /** Fallback when a Household has no usable IANA zone of its own. */
 export const DEFAULT_TIME_ZONE = 'America/New_York'
 

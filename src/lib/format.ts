@@ -6,6 +6,13 @@ export const TAG_BG: Record<Tag, string> = {
   fluff: 'bg-fluff',
 }
 
+/** The same tag colors, for SVG fills and inline styles. */
+export const TAG_FILL: Record<Tag, string> = {
+  need: 'var(--color-need)',
+  nice: 'var(--color-nice)',
+  fluff: 'var(--color-fluff)',
+}
+
 /**
  * Whose Account, as a dot color. The same name always maps to the same
  * palette color; no Household's people are special-cased.

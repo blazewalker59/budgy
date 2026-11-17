@@ -5,6 +5,7 @@ import {
   horizon,
   lastDayOf,
   monthRange,
+  monthWeeks,
   monthsBetween,
   relativeDays,
   shiftMonth,
@@ -55,5 +56,26 @@ describe('dates', () => {
     expect(horizon('2026-11-28', '2026-11-28')).toBe('thisWeek')
     expect(horizon('2026-11-28', '2026-12-03')).toBe('nextWeek')
     expect(horizon('2026-11-28', '2026-12-06')).toBe('later')
+  })
+
+  it('lays a month out as Sunday-to-Saturday weeks', () => {
+    // November 2026 starts on a Sunday and ends on a Monday.
+    const weeks = monthWeeks('2026-11')
+    expect(weeks).toHaveLength(5)
+    expect(weeks[0][0]).toBe('2026-11-01')
+    expect(weeks[4]).toEqual([
+      '2026-11-29',
+      '2026-11-30',
+      '2026-12-01',
+      '2026-12-02',
+      '2026-12-03',
+      '2026-12-04',
+      '2026-12-05',
+    ])
+    // October 2026 starts on a Thursday: the week opens in September.
+    const october = monthWeeks('2026-10')
+    expect(october[0][0]).toBe('2026-09-27')
+    expect(october.flat()).toContain('2026-10-31')
+    expect(october.every((w) => w.length === 7)).toBe(true)
   })
 })

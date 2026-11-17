@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  compactDollars,
   dollars,
   money,
   parseDollars,
@@ -14,6 +15,13 @@ describe('money', () => {
     expect(signedDollars(12_000)).toBe('+$120')
     expect(signedDollars(-8_000)).toBe('−$80')
     expect(signedDollars(20)).toBe('$0')
+  })
+
+  it('formats compactly for axes and small tiles', () => {
+    expect(compactDollars(85_000)).toBe('$850')
+    expect(compactDollars(123_456)).toBe('$1.23K')
+    expect(compactDollars(1_360_000)).toBe('$13.6K')
+    expect(compactDollars(0)).toBe('$0')
   })
 
   it('parses what people type', () => {

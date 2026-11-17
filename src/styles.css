@@ -27,6 +27,12 @@
   --need: #2f6db5;
   --nice: #b7791f;
   --fluff: #c2417a;
+  /* Spending by day, least to most: each step readable under --foreground. */
+  --heat-1: #d3e9e1;
+  --heat-2: #b8dccf;
+  --heat-3: #9dccbb;
+  --heat-4: #73b39d;
+  --heat-5: #4a9a80;
   /* Liquid glass (the phone's bottom bar): a tinted pane, a bright rim
      where light catches the top edge, and a soft shadow underneath. */
   --glass: rgb(255 255 255 / 0.58);
@@ -53,6 +59,11 @@
   --need: #7fb2f0;
   --nice: #e9b35a;
   --fluff: #f08bb7;
+  --heat-1: #1b2c27;
+  --heat-2: #1b3b33;
+  --heat-3: #1c4c40;
+  --heat-4: #1d5f4e;
+  --heat-5: #1f755e;
   --glass: rgb(30 36 34 / 0.55);
   --glass-active: rgb(255 255 255 / 0.12);
   --glass-rim: rgb(255 255 255 / 0.16);

@@ -182,6 +182,14 @@ payments. A Category that started inside that span is averaged over the
 months since its first purchase, so a new expense isn't diluted. The fair
 starting point for a Target; its trend shows the last 12 months beside it.
 
+**Pace**:
+Everyday spending adding up through a month, against the Budget's **even
+pace** (the Budget spread evenly over the month's days) and against the
+**usual**: what the last 6 months with spending had spent by the same day,
+each stretched to this month's length. Unlike a Typical month, the usual is
+for all everyday spending together and says _when_ in a month it lands.
+_Avoid_: typical (for the usual)
+
 **Planned Expense**:
 A known, usually lumpy bill (car insurance twice a year, an annual renewal)
 with an amount, a cadence and a due date. Less frequent than monthly, it is

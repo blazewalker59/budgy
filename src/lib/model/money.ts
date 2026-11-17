@@ -29,6 +29,13 @@ export function shortDollars(cents: number): string {
     : compact.format(cents / 100)
 }
 
+/** "$850" under $1,000, then "$1.2K", "$13.6K": for axes and small tiles. */
+export function compactDollars(cents: number): string {
+  return Math.abs(cents) < 100_000
+    ? dollars(cents)
+    : compact.format(cents / 100)
+}
+
 /** "$1,234.56" */
 export function money(cents: number): string {
   return exact.format(cents / 100)

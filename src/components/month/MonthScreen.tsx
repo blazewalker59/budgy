@@ -30,6 +30,7 @@ import { MonthPicker } from '@/components/shared/Pickers'
 import { LensBar } from '@/components/lens/LensBar'
 import { Section, Stat } from '@/components/shared/Layout'
 import { ComingUp } from '@/components/month/ComingUp'
+import { Visuals } from '@/components/month/visuals/Visuals'
 import { TxnList } from '@/components/shared/TxnList'
 import { SetupChecklist, useSetupOpen } from '@/components/setup/SetupChecklist'
 
@@ -129,6 +130,13 @@ export function MonthScreen({
       {!filtered && <SetupChecklist />}
 
       <div className="space-y-3">
+        <Visuals
+          view={view}
+          ix={scope.ix}
+          occurrences={scope.occurrences}
+          today={book.today}
+          takeHome={pay?.amount ?? null}
+        />
         <Headline
           view={view}
           isCurrent={isCurrent}

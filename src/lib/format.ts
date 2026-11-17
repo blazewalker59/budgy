@@ -45,6 +45,18 @@ export const MIX_COLORS = [
 ]
 export const MIX_REST = '#8a8f93'
 
+/** Each kind of Account one color, wherever it's charted (accounts/AccountsChart). */
+export const ACCOUNT_GROUP_COLORS: Record<string, string> = {
+  Cash: '#1f9a78',
+  'Credit cards': '#e0663f',
+  Investments: '#2f7fc1',
+  Retirement: '#7d5cf0',
+  Education: '#d39a2a',
+  'Home & property': '#3db3c9',
+  Loans: '#d1497f',
+  Other: MIX_REST,
+}
+
 /** The parts of take-home pay on the Budget (charts/IncomeChart). */
 export const SPLIT_LABELS = {
   everyday: 'Everyday',

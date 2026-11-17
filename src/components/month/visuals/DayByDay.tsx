@@ -5,13 +5,13 @@
  */
 
 import { useState } from 'react'
-import { PaneHeader } from './PaneHeader'
 import type { MonthView } from '@/lib/model/month'
 import type { Occurrence } from '@/lib/model/plans'
 import { SPEND_LEVELS, dailySpend, spendLevels } from '@/lib/model/pace'
 import { dayLabel, monthWeeks } from '@/lib/model/dates'
 import { compactDollars, dollars } from '@/lib/model/money'
 import { cn } from '@/lib/utils'
+import { ChartCard } from '@/components/charts/ChartCard'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
@@ -48,37 +48,38 @@ export function DayByDay({
     .sort((a, b) => b.amount - a.amount)
 
   return (
-    <div>
-      <PaneHeader
-        hint={
-          <span className="inline-flex items-center gap-1">
-            Less
-            {Array.from({ length: SPEND_LEVELS }, (_, i) => (
-              <span
-                key={i}
-                aria-hidden
-                className="inline-block size-3 rounded-sm"
-                style={{ background: shade(i + 1) }}
-              />
-            ))}
-            More
-          </span>
-        }
-      >
-        {biggest.day >= 0 && (
-          <span className="tabular-nums">
+    <ChartCard
+      bare
+      caption={
+        <span className="inline-flex items-center gap-1">
+          Less
+          {Array.from({ length: SPEND_LEVELS }, (_, i) => (
+            <span
+              key={i}
+              aria-hidden
+              className="inline-block size-3 rounded-sm"
+              style={{ background: shade(i + 1) }}
+            />
+          ))}
+          More
+        </span>
+      }
+      headline={
+        biggest.day >= 0 && (
+          <>
             Biggest day{' '}
             <span className="font-semibold text-foreground">
               {dayLabel(`${month}-${String(biggest.day + 1).padStart(2, '0')}`)}{' '}
               · {dollars(biggest.amount)}
             </span>
-          </span>
-        )}
-      </PaneHeader>
+          </>
+        )
+      }
+    >
       <div
         role="group"
         aria-label="Spending by day"
-        className="grid grid-cols-7 gap-1 text-[11px] sm:grid-cols-[repeat(7,minmax(0,1fr))_auto]"
+        className="grid grid-cols-7 gap-1 text-[11px] text-foreground sm:grid-cols-[repeat(7,minmax(0,1fr))_auto]"
       >
         {WEEKDAYS.map((d, i) => (
           <span
@@ -170,7 +171,7 @@ export function DayByDay({
         })}
       </div>
       {picked ? (
-        <div className="mt-2 rounded-lg bg-sunken p-2 text-xs">
+        <div className="mt-2 rounded-lg bg-sunken p-2 text-xs text-foreground">
           <p className="mb-1 font-semibold">
             {dayLabel(picked)} · {dollars(spentOn(picked))}
           </p>
@@ -208,7 +209,7 @@ export function DayByDay({
           Tap a day for its purchases and bills. Dashed days are ahead.
         </p>
       )}
-    </div>
+    </ChartCard>
   )
 }
 

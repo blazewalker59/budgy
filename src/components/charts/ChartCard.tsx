@@ -13,6 +13,7 @@
  * - Memoize each chart definition (useMemo) on the data it captures.
  * - Give every Chart an `ariaLabel` that states the takeaway, and a fixed
  *   `height` with `initialWidth`.
+ * - Tooltips are the library's (`tooltip` with `content` rows), not custom.
  * - Import charts through ./lazy, so the library loads only when shown.
  */
 
@@ -24,6 +25,8 @@ export const CHART_COLORS = {
   planned: 'var(--color-planned)',
   muted: 'var(--color-muted)',
   foreground: 'var(--color-foreground)',
+  border: 'var(--color-border)',
+  surface: 'var(--color-surface)',
 } as const
 
 export interface LegendItem {
@@ -34,50 +37,78 @@ export interface LegendItem {
 
 export function ChartCard({
   legend = [],
+  caption,
   headline,
   children,
   className,
   footer,
+  bare,
 }: {
   legend?: ReadonlyArray<LegendItem>
+  /** Before the legend: what the chart shows, or a way back. */
+  caption?: React.ReactNode
   headline?: React.ReactNode
   children: React.ReactNode
   className?: string
   footer?: React.ReactNode
+  /** No card of its own, inside one that already is (Overview's visuals). */
+  bare?: boolean
 }) {
   return (
     <figure
       className={cn(
-        'rounded-xl border border-border bg-surface px-2 py-2 text-muted',
+        'text-muted',
+        !bare && 'rounded-xl border border-border bg-surface px-2 py-2',
         className,
       )}
     >
-      {(legend.length > 0 || headline) && (
-        <figcaption className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-1 text-[11px]">
-          <span className="flex flex-wrap gap-x-3 gap-y-1">
+      {(caption || legend.length > 0 || headline) && (
+        <figcaption
+          className={cn(
+            'mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs',
+            !bare && 'px-1',
+          )}
+        >
+          <span className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            {caption}
             {legend.map((l) => (
               <span key={l.label} className="flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    'inline-block',
-                    l.shape === 'line'
-                      ? 'h-0.5 w-3'
-                      : l.shape === 'dot'
-                        ? 'size-2 rounded-full'
-                        : 'size-2 rounded-sm',
-                  )}
-                  style={{ background: l.color }}
-                />
+                <LegendSwatch color={l.color} shape={l.shape} />
                 {l.label}
               </span>
             ))}
           </span>
-          {headline && <span>{headline}</span>}
+          {headline && <span className="tabular-nums">{headline}</span>}
         </figcaption>
       )}
       {children}
-      {footer && <div className="mt-1 px-1 text-[11px]">{footer}</div>}
+      {footer && (
+        <div className={cn('mt-1 text-xs', !bare && 'px-1')}>{footer}</div>
+      )}
     </figure>
+  )
+}
+
+/** A legend's mark: a box, a short line or a dot in the series' color. */
+export function LegendSwatch({
+  color,
+  shape = 'box',
+}: {
+  color: string
+  shape?: LegendItem['shape']
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'inline-block shrink-0',
+        shape === 'line'
+          ? 'h-0.5 w-3'
+          : shape === 'dot'
+            ? 'size-2 rounded-full'
+            : 'size-2 rounded-sm',
+      )}
+      style={{ background: color }}
+    />
   )
 }

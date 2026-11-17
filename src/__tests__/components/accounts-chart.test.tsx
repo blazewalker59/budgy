@@ -51,10 +51,10 @@ function show() {
 }
 
 describe('AccountsChart', () => {
-  it('shows how each kind of account moved since the first day', () => {
+  it('shows how each kind of account moved since the first day', async () => {
     show()
     expect(
-      screen.getByRole('img', {
+      await screen.findByRole('img', {
         name: 'Since Nov 1: Net worth −$700, Cash −$300, Credit cards −$400.',
       }),
     ).toBeTruthy()
@@ -65,11 +65,11 @@ describe('AccountsChart', () => {
     ).toBeTruthy()
   })
 
-  it('opens a kind of account for its accounts, and back', () => {
+  it('opens a kind of account for its accounts, and back', async () => {
     show()
     fireEvent.click(screen.getByRole('button', { name: /^Credit cards,/ }))
     expect(
-      screen.getByRole('img', {
+      await screen.findByRole('img', {
         name: 'Since Nov 1: Credit cards −$400, Card −$400.',
       }),
     ).toBeTruthy()

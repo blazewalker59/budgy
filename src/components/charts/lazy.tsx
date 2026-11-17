@@ -12,6 +12,10 @@ import type { IncomeChart as IncomeChartType } from './IncomeChart'
 import type { IncomeMonths as IncomeMonthsType } from './IncomeMonths'
 import type { MixChart as MixChartType } from './MixChart'
 import type { WorthChart as WorthChartType } from './WorthChart'
+import type { PaceChart as PaceChartType } from './PaceChart'
+import type { FlowChart as FlowChartType } from './FlowChart'
+import type { SpendingDonut as SpendingDonutType } from './SpendingDonut'
+import type { AccountLines as AccountLinesType } from './AccountLines'
 import type { TrendSpark as TrendSparkType } from './TrendSpark'
 
 import type { PlanChart as PlanChartType } from './PlanChart'
@@ -87,4 +91,22 @@ export const IncomeMonths = lazyChart<ComponentProps<typeof IncomeMonthsType>>(
 export const WorthChart = lazyChart<ComponentProps<typeof WorthChartType>>(
   () => import('./WorthChart').then((m) => m.WorthChart),
   200,
+)
+export const PaceChart = lazyChart<ComponentProps<typeof PaceChartType>>(
+  () => import('./PaceChart').then((m) => m.PaceChart),
+  300,
+  true,
+)
+export const FlowChart = lazyChart<ComponentProps<typeof FlowChartType>>(
+  () => import('./FlowChart').then((m) => m.FlowChart),
+  420,
+  true,
+)
+export const SpendingDonut = lazyChart<
+  ComponentProps<typeof SpendingDonutType>
+>(() => import('./SpendingDonut').then((m) => m.SpendingDonut), 260, true)
+export const AccountLines = lazyChart<ComponentProps<typeof AccountLinesType>>(
+  () => import('./AccountLines').then((m) => m.AccountLines),
+  220,
+  true,
 )

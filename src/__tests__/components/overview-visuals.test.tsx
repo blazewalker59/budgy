@@ -106,11 +106,13 @@ function swipe(from: number, to: number, pointerType = 'touch', dy = 0) {
 }
 
 describe('Overview visuals', () => {
-  it('shows Pace first, then any visual tapped, and remembers it', () => {
+  it('shows Pace first, then any visual tapped, and remembers it', async () => {
     show()
     expect(selected()).toBe('Pace')
     expect(
-      screen.getByRole('img', { name: /\$700 everyday spending so far/ }),
+      await screen.findByRole('img', {
+        name: /\$700 everyday spending so far/,
+      }),
     ).toBeTruthy()
 
     fireEvent.click(screen.getByRole('tab', { name: 'Day by day' }))
@@ -143,6 +145,19 @@ describe('Overview visuals', () => {
     expect(selected()).toBe('Pace')
   })
 
+  it('leaves the arrow keys to a chart that has focus', async () => {
+    show()
+    const chart = await screen.findByRole('img', {
+      name: /everyday spending so far/,
+    })
+    fireEvent.keyDown(chart, { key: 'ArrowRight' })
+    expect(selected()).toBe('Pace')
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Pace' }), {
+      key: 'ArrowRight',
+    })
+    expect(selected()).toBe('Where it went')
+  })
+
   it('turns with a sideways swipe, not a scroll or a mouse drag', () => {
     show()
     swipe(300, 200)
@@ -160,11 +175,11 @@ describe('Overview visuals', () => {
     expect(selected()).toBe('Pace')
   })
 
-  it('shows Where it went as a donut, opening a Category for its stores', () => {
+  it('shows Where it went as a donut, opening a Category for its stores', async () => {
     localStorage.setItem(VISUAL_KEY, 'where')
     show()
     expect(
-      screen.getByRole('img', {
+      await screen.findByRole('img', {
         name: '$700 everyday: Need 71%, Nice to have 21%, Fluff 7%.',
       }),
     ).toBeTruthy()
@@ -191,11 +206,11 @@ describe('Overview visuals', () => {
     expect(within(list).getAllByRole('listitem')).toHaveLength(2)
   })
 
-  it('says in words where the money flowed', () => {
+  it('says in words where the money flowed', async () => {
     localStorage.setItem(VISUAL_KEY, 'flow')
     show()
     expect(
-      screen.getByRole('img', {
+      await screen.findByRole('img', {
         name: /^Take-home \$4,000\. Then Everyday \$700, Left \$3,300\. Then Need \$500, Nice to have \$150, Fluff \$50\.$/,
       }),
     ).toBeTruthy()

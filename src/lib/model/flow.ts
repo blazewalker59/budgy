@@ -8,7 +8,6 @@
  */
 
 import { TAGS, TAG_LABELS } from './types'
-import type { FlowLink, FlowNode } from '@/lib/layout/sankey'
 import type { MonthView } from './month'
 import type { Tag } from './types'
 
@@ -23,7 +22,17 @@ export type FlowKind =
   | 'rest'
   | Tag
 
-export interface MoneyNode extends FlowNode {
+export interface FlowLink {
+  from: string
+  to: string
+  value: number
+}
+
+export interface MoneyNode {
+  id: string
+  /** Left to right, from 0. */
+  column: number
+  value: number
   label: string
   kind: FlowKind
 }

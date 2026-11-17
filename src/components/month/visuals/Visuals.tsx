@@ -6,10 +6,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { PaceChart } from './PaceChart'
 import { WhereItWent } from './WhereItWent'
 import { DayByDay } from './DayByDay'
-import { FlowChart } from './FlowChart'
 import type { MonthView } from '@/lib/model/month'
 import type { LedgerIndex } from '@/lib/model/ledger'
 import type { Occurrence } from '@/lib/model/plans'
@@ -17,6 +15,7 @@ import { monthPace } from '@/lib/model/pace'
 import { paydays as paydaysOf } from '@/lib/model/pay'
 import { lastDayOf } from '@/lib/model/dates'
 import { cn } from '@/lib/utils'
+import { FlowChart, PaceChart } from '@/components/charts/lazy'
 
 const VISUALS = [
   { key: 'pace', label: 'Pace' },
@@ -116,7 +115,13 @@ export function Visuals({
     switch (key) {
       case 'pace':
         return (
-          <PaceChart pace={pace} view={view} paydays={paydays} bills={bills} />
+          <PaceChart
+            pace={pace}
+            view={view}
+            paydays={paydays}
+            bills={bills}
+            bare
+          />
         )
       case 'where':
         return <WhereItWent view={view} />
@@ -125,7 +130,7 @@ export function Visuals({
           <DayByDay view={view} today={today} paydays={paydays} bills={bills} />
         )
       case 'flow':
-        return <FlowChart view={view} takeHome={takeHome} />
+        return <FlowChart view={view} takeHome={takeHome} bare />
     }
   }
 
@@ -135,8 +140,11 @@ export function Visuals({
       aria-label="Visuals"
       tabIndex={-1}
       onKeyDown={(e) => {
+        // Arrows switch visuals from the tabs (or the card itself); inside
+        // a chart they move between its points instead.
         const target = e.target as HTMLElement
-        if (target.closest('input, textarea, select')) return
+        if (target !== e.currentTarget && !target.closest('[role=tablist]'))
+          return
         if (e.key === 'ArrowLeft') show(index - 1)
         else if (e.key === 'ArrowRight') show(index + 1)
       }}

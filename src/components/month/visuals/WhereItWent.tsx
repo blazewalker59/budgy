@@ -1,27 +1,23 @@
 /**
- * Where it went: everyday spending as a donut, Need, Nice and Fluff on the
- * outer ring and each one's Categories inside, the total in the middle.
- * Beside it (below on a phone), the Categories ranked. Hover or touch a
- * slice to see it; tap one, or its row, for its Stores.
+ * Where it went: everyday spending as a donut (charts/SpendingDonut), Need,
+ * Nice and Fluff on the outer ring and each one's Categories inside, the
+ * total in the middle. Beside it (below on a phone), the Categories ranked.
+ * Hover or touch a slice to see it; tap one, or its row, for its Stores.
  */
 
 import { useMemo, useState } from 'react'
 import { ChevronLeft } from 'lucide-react'
-import { PaneHeader } from './PaneHeader'
 import type { CategoryMonth, MonthView } from '@/lib/model/month'
 import type { RingSlice } from '@/lib/model/rings'
 import { everydayRings } from '@/lib/model/rings'
-import { arcPath, arcs } from '@/lib/layout/donut'
 import { TAG_LABELS } from '@/lib/model/types'
 import { dollars } from '@/lib/model/money'
 import { MIX_COLORS, MIX_REST, TAG_FILL } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { useWidth } from '@/components/shared/useWidth'
+import { ChartCard, LegendSwatch } from '@/components/charts/ChartCard'
+import { SpendingDonut } from '@/components/charts/lazy'
 
-/** Side by side from this wide; stacked below it. */
-const SIDE_BY_SIDE = 560
-/** Between neighbouring slices, radians. */
-const GAP = 0.014
+const DONUT = 260
 
 const percent = (part: number, whole: number) =>
   whole ? `${Math.round((part / whole) * 100)}%` : '0%'
@@ -38,72 +34,61 @@ const isOver = (c: CategoryMonth | null) =>
   !!c && c.target !== null && c.spent > c.target
 
 export function WhereItWent({ view }: { view: MonthView }) {
-  const [ref, width] = useWidth()
   const rings = useMemo(() => everydayRings(view, MIX_COLORS.length), [view])
   /** The slice tapped, and a Category tapped within a folded one. */
   const [open, setOpen] = useState<RingSlice | null>(null)
   const [inner, setInner] = useState<CategoryMonth | null>(null)
-  const [hover, setHover] = useState<RingSlice | null>(null)
+  const [hover, setHover] = useState<string | null>(null)
 
   // The biggest Categories a color each, by rank; the rest gray.
-  const colorOf = new Map(
-    rings.slices.map((s) => [
-      s,
-      s.rank === null ? MIX_REST : MIX_COLORS[s.rank],
-    ]),
+  const colors = useMemo(
+    () =>
+      new Map(
+        rings.slices.map((s) => [
+          s.name,
+          s.rank === null ? MIX_REST : MIX_COLORS[s.rank],
+        ]),
+      ),
+    [rings],
   )
-  const focus = hover ?? open
+  const byName = new Map(rings.slices.map((s) => [s.name, s]))
+  const focus = hover ?? open?.name ?? null
   const category = inner ?? open?.category ?? null
-
-  const wide = width >= SIDE_BY_SIDE
-  const size = wide ? 280 : Math.min(width, 260)
-  const c = size / 2
-  const outer = arcs(
-    rings.tags.map((t) => t.value),
-    GAP,
-  )
-  const slice = arcs(
-    rings.slices.map((s) => s.value),
-    GAP,
-  )
 
   if (!rings.total)
     return (
       <p className="py-6 text-center text-sm text-muted">Nothing spent yet.</p>
     )
 
+  const inView = hover ? byName.get(hover) : undefined
   const centre = category
     ? { label: category.name, value: category.spent }
-    : focus
-      ? { label: focus.name, value: focus.value }
+    : (inView ?? open)
+      ? { label: (inView ?? open)!.name, value: (inView ?? open)!.value }
       : null
 
   return (
-    <div>
-      <PaneHeader
-        hint={
-          open ? (
-            <button
-              type="button"
-              onClick={() => (inner ? setInner(null) : setOpen(null))}
-              className="inline-flex items-center gap-0.5 font-semibold text-accent"
-            >
-              <ChevronLeft size={14} aria-hidden />
-              {inner ? open.name : 'All Categories'}
-            </button>
-          ) : (
-            'Everyday, by Category'
-          )
-        }
-      >
-        <span className="flex flex-wrap gap-x-3 tabular-nums">
+    <ChartCard
+      bare
+      caption={
+        open ? (
+          <button
+            type="button"
+            onClick={() => (inner ? setInner(null) : setOpen(null))}
+            className="inline-flex items-center gap-0.5 font-semibold text-accent"
+          >
+            <ChevronLeft size={14} aria-hidden />
+            {inner ? open.name : 'All Categories'}
+          </button>
+        ) : (
+          'Everyday, by Category'
+        )
+      }
+      headline={
+        <span className="flex flex-wrap gap-x-3">
           {rings.tags.map((t) => (
-            <span key={t.tag}>
-              <span
-                aria-hidden
-                className="mr-1 inline-block size-2 rounded-full"
-                style={{ background: TAG_FILL[t.tag] }}
-              />
+            <span key={t.tag} className="inline-flex items-center gap-1">
+              <LegendSwatch color={TAG_FILL[t.tag]} shape="dot" />
               {TAG_LABELS[t.tag]}{' '}
               <span className="font-semibold text-foreground">
                 {percent(t.value, rings.total)}
@@ -111,128 +96,104 @@ export function WhereItWent({ view }: { view: MonthView }) {
             </span>
           ))}
         </span>
-      </PaneHeader>
-      <div
-        ref={ref}
-        className={cn(
-          'flex gap-4',
-          wide ? 'flex-row items-center' : 'flex-col items-stretch',
-        )}
-      >
-        <div className="relative shrink-0 self-center">
-          <svg
-            width={size}
-            height={size}
-            role="img"
-            aria-label={`${dollars(rings.total)} everyday: ${rings.tags
-              .map(
-                (t) => `${TAG_LABELS[t.tag]} ${percent(t.value, rings.total)}`,
-              )
-              .join(', ')}.`}
-            onPointerLeave={() => setHover(null)}
+      }
+    >
+      {/* Side by side once the card is wide enough; stacked on a phone. */}
+      <div className="@container">
+        <div className="flex flex-col items-stretch gap-4 @xl:flex-row @xl:items-center">
+          <div
+            className="relative shrink-0 self-center"
+            style={{ width: DONUT, height: DONUT }}
           >
-            {rings.tags.map((t, i) => (
-              <path
-                key={t.tag}
-                d={arcPath(c, c, c - 9, c - 2, outer[i])}
-                fill={TAG_FILL[t.tag]}
-                opacity={focus && focus.tag !== t.tag ? 0.3 : 1}
-                className="transition-opacity"
-              />
-            ))}
-            {rings.slices.map((s, i) => {
-              const lit = !focus || focus === s
-              return (
-                <path
-                  key={s.name}
-                  d={arcPath(
-                    c,
-                    c,
-                    c * 0.56,
-                    focus === s ? c - 10 : c - 14,
-                    slice[i],
-                  )}
-                  fill={colorOf.get(s)}
-                  opacity={lit ? 1 : 0.3}
-                  className="cursor-pointer transition-opacity"
-                  onPointerEnter={(e) => {
-                    if (e.pointerType === 'mouse') setHover(s)
-                  }}
-                  onClick={() => {
-                    setInner(null)
-                    setOpen(open === s ? null : s)
-                  }}
-                />
-              )
-            })}
-          </svg>
-          {/* The total in the middle, or the slice in view. */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-[22%] text-center">
-            <span className="w-full truncate text-xs text-muted">
-              {centre ? centre.label : 'Everyday'}
-            </span>
-            <span className="text-xl font-bold tabular-nums">
-              {dollars(centre ? centre.value : rings.total)}
-            </span>
-            {centre && (
-              <span className="text-xs text-muted tabular-nums">
-                {percent(centre.value, rings.total)} of everyday
+            <SpendingDonut
+              rings={rings}
+              colors={colors}
+              focus={focus}
+              size={DONUT}
+              onHover={setHover}
+              onOpen={(name) => {
+                const s = byName.get(name)
+                setInner(null)
+                setOpen(s && open !== s ? s : null)
+              }}
+            />
+            {/* The total in the middle, or the slice in view. */}
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-[22%] text-center">
+              <span className="w-full truncate text-xs text-muted">
+                {centre ? centre.label : 'Everyday'}
               </span>
+              <span className="text-xl font-bold text-foreground tabular-nums">
+                {dollars(centre ? centre.value : rings.total)}
+              </span>
+              {centre && (
+                <span className="text-xs text-muted tabular-nums">
+                  {percent(centre.value, rings.total)} of everyday
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="min-w-0 flex-1 text-foreground">
+            {category ? (
+              <Stores
+                category={category}
+                color={colors.get(open!.name) ?? MIX_REST}
+              />
+            ) : (
+              <ul className="divide-y divide-border">
+                {(open ? open.folded : rankedSlices(rings.slices)).map(
+                  (row) => {
+                    const isSlice = !('spent' in row)
+                    const name = row.name
+                    const value = isSlice ? row.value : row.spent
+                    const over = isOver(isSlice ? row.category : row)
+                    return (
+                      <li key={name}>
+                        <button
+                          type="button"
+                          aria-label={`${name}, ${dollars(value)}${over ? ', over Target' : ''}`}
+                          onClick={() =>
+                            isSlice ? setOpen(row) : setInner(row)
+                          }
+                          onPointerEnter={(e) => {
+                            if (isSlice && e.pointerType === 'mouse')
+                              setHover(name)
+                          }}
+                          onPointerLeave={() => setHover(null)}
+                          className="flex w-full items-center gap-2 py-1.5 text-left text-[13px] hover:bg-sunken/50"
+                        >
+                          <LegendSwatch
+                            color={
+                              isSlice
+                                ? (colors.get(name) ?? MIX_REST)
+                                : MIX_REST
+                            }
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {name}
+                          </span>
+                          <span
+                            className={cn(
+                              'font-semibold tabular-nums',
+                              over && 'text-over',
+                            )}
+                          >
+                            {dollars(value)}
+                          </span>
+                          <span className="w-9 text-right text-xs text-muted tabular-nums">
+                            {percent(value, rings.total)}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  },
+                )}
+              </ul>
             )}
           </div>
         </div>
-
-        <div className="min-w-0 flex-1">
-          {category ? (
-            <Stores category={category} color={colorOf.get(open!)!} />
-          ) : (
-            <ul className="divide-y divide-border">
-              {(open ? open.folded : rankedSlices(rings.slices)).map((row) => {
-                const isSlice = !('spent' in row)
-                const name = row.name
-                const value = isSlice ? row.value : row.spent
-                const cat = isSlice ? row.category : row
-                const over = isOver(cat)
-                return (
-                  <li key={name}>
-                    <button
-                      type="button"
-                      aria-label={`${name}, ${dollars(value)}${over ? ', over Target' : ''}`}
-                      onClick={() => (isSlice ? setOpen(row) : setInner(row))}
-                      onPointerEnter={(e) => {
-                        if (isSlice && e.pointerType === 'mouse') setHover(row)
-                      }}
-                      onPointerLeave={() => setHover(null)}
-                      className="flex w-full items-center gap-2 py-1.5 text-left text-[13px] hover:bg-sunken/50"
-                    >
-                      <span
-                        aria-hidden
-                        className="size-2.5 shrink-0 rounded-sm"
-                        style={{
-                          background: isSlice ? colorOf.get(row) : MIX_REST,
-                        }}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{name}</span>
-                      <span
-                        className={cn(
-                          'font-semibold tabular-nums',
-                          over && 'text-over',
-                        )}
-                      >
-                        {dollars(value)}
-                      </span>
-                      <span className="w-9 text-right text-xs text-muted tabular-nums">
-                        {percent(value, rings.total)}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
       </div>
-    </div>
+    </ChartCard>
   )
 }
 

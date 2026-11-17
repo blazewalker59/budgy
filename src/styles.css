@@ -169,6 +169,18 @@ body {
   }
 }
 
+/* TanStack Charts: a chart takes focus to step through its points. A click
+   or tap shows no outline (the point, slice or tooltip already does); the
+   keyboard gets a quiet ring so it can see where it is. */
+.ts-chart:focus {
+  outline: none;
+}
+.ts-chart:focus-visible {
+  outline: 1.5px solid var(--border);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
 /* TanStack Charts: tooltips (portaled anywhere) follow the app's theme. */
 :root {
   --ts-chart-tooltip-background: var(--surface);

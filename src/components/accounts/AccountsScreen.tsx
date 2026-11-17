@@ -13,6 +13,7 @@ import { AccountSheet } from './AccountSheet'
 import { AccountUpdates } from './AccountUpdates'
 import { AccountName, AccountRef } from './AccountName'
 import { RemoveStarting } from './RemoveStarting'
+import { AccountsChart } from './AccountsChart'
 import { Baseline, WorthSheet, dayWithYear } from './WorthSheet'
 import { RulesTab } from './RulesTab'
 import { MoneyInTab } from './MoneyInTab'
@@ -22,6 +23,7 @@ import type { Account, AccountKind } from '@/lib/model/types'
 import type { Lens } from '@/lib/model/lens'
 import type { Equity } from '@/lib/model/accounts'
 import { filtersOf } from '@/lib/model/lens'
+import { accountsOverTime } from '@/lib/model/accountsOverTime'
 import { LensBar } from '@/components/lens/LensBar'
 import { useBook } from '@/lib/ledger/book'
 import { useSaveAccount } from '@/lib/ledger/useLedger'
@@ -43,7 +45,6 @@ import { everyTxn } from '@/lib/model/ledger'
 import { ownerColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { Segmented, Stat } from '@/components/shared/Layout'
-import { WorthChart } from '@/components/charts/lazy'
 import { Dropdown } from '@/components/shared/Dropdown'
 
 /** A Balance older than this is worth updating. */
@@ -136,6 +137,13 @@ function AccountsList({ lens }: { lens: Lens }) {
     () => worthHistory(ledger, book.ix.ledger.baseline, book.today),
     [ledger, book.ix.ledger.baseline, book.today],
   )
+  const overTime = useMemo(
+    () =>
+      history && history.baseline < book.today
+        ? accountsOverTime(ledger, history.baseline, book.today)
+        : null,
+    [ledger, history, book.today],
+  )
   const [breakdown, setBreakdown] = useState<WorthView | null>(null)
 
   const open = ledger.accounts.filter((a) => !a.closed)
@@ -185,11 +193,11 @@ function AccountsList({ lens }: { lens: Lens }) {
           </button>
         ))}
       </div>
-      {history && history.points.length > 1 && (
-        <WorthChart
-          points={history.points}
-          label="Net worth"
-          headline={`${signedDollars(history.now - history.start)} since ${dayWithYear(history.baseline, book.today)}`}
+      {overTime && history && (
+        <AccountsChart
+          data={overTime}
+          today={book.today}
+          headline={`Net worth ${signedDollars(history.now - history.start)} since ${dayWithYear(history.baseline, book.today)}`}
         />
       )}
       {history && <Baseline history={history} today={book.today} />}

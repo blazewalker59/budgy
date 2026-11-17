@@ -75,41 +75,57 @@ export async function signedIn(
   // Local development can act as a Member without Google (never in a build).
   if (import.meta.env.DEV && env.DEV_MEMBER_EMAIL) {
     const email = env.DEV_MEMBER_EMAIL
-    // A user row, as Google sign-in would make: tokens are admitted by it.
-    await db
-      .insert(user)
-      .values({
-        id: 'dev',
-        name: email.split('@')[0],
-        email,
-        emailVerified: true,
-      })
-      .onConflictDoNothing()
+    // The user with that email if there is one (a copy of production's data
+    // has the real sign-in's), else a user row as Google sign-in would make:
+    // tokens are admitted by it.
+    const [existing] = await db
+      .select()
+      .from(user)
+      .where(eq(user.email, email))
+      .limit(1)
+    const me = existing ?? {
+      id: 'dev',
+      name: email.split('@')[0],
+      email,
+      image: null,
+      emailVerified: true,
+    }
+    if (!existing)
+      await db
+        .insert(user)
+        .values({
+          id: me.id,
+          name: me.name,
+          email,
+          emailVerified: true,
+        })
+        .onConflictDoNothing()
     await db
       .insert(householdMembers)
       .values({
         householdId: LEGACY_HOUSEHOLD_ID,
-        memberId: 'dev',
+        memberId: me.id,
         role: 'owner',
       })
       .onConflictDoNothing()
-    // A session row, as sign-in would make, for a demo session to bind to.
+    // A session row, as sign-in would make, for a demo session to bind to;
+    // pointed at whichever user this is.
     await db
       .insert(session)
       .values({
         id: 'dev',
         token: 'dev',
-        userId: 'dev',
+        userId: me.id,
         expiresAt: new Date('2100-01-01'),
         updatedAt: new Date(),
       })
-      .onConflictDoNothing()
+      .onConflictDoUpdate({ target: session.id, set: { userId: me.id } })
     return {
       member: {
-        id: 'dev',
-        name: email.split('@')[0],
-        email,
-        image: null,
+        id: me.id,
+        name: me.name,
+        email: me.email,
+        image: me.image ?? null,
         emailVerified: true,
       },
       sessionId: 'dev',

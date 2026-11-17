@@ -116,6 +116,19 @@ export function relativeDays(from: string, to: string): string {
   return `in ${Math.round(n / 30.4)} months`
 }
 
+/** How near a due date is, by calendar weeks (Sunday to Saturday) and month. */
+export type Horizon = 'late' | 'thisWeek' | 'nextWeek' | 'thisMonth' | 'later'
+
+export function horizon(from: string, due: string): Horizon {
+  if (due < from) return 'late'
+  const weekday = new Date(toMs(from)).getUTCDay()
+  const endOfWeek = addDays(from, 6 - weekday)
+  if (due <= endOfWeek) return 'thisWeek'
+  if (due <= addDays(endOfWeek, 7)) return 'nextWeek'
+  if (due.slice(0, 7) === from.slice(0, 7)) return 'thisMonth'
+  return 'later'
+}
+
 /** Fallback when a Household has no usable IANA zone of its own. */
 export const DEFAULT_TIME_ZONE = 'America/New_York'
 

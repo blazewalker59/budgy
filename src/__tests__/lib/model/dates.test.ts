@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addMonths,
   daysBetween,
+  horizon,
   lastDayOf,
   monthRange,
   monthsBetween,
@@ -35,5 +36,24 @@ describe('dates', () => {
     expect(relativeDays('2026-10-08', '2026-10-13')).toBe('in 5 days')
     expect(relativeDays('2026-10-08', '2026-10-29')).toBe('in 3 weeks')
     expect(relativeDays('2026-10-08', '2026-10-04')).toBe('4 days ago')
+  })
+
+  it('places a due date by calendar week (Sunday to Saturday), then month', () => {
+    // Monday, Nov 16 2026: this week runs Nov 15 to 21, next week to Nov 28.
+    const today = '2026-11-16'
+    expect(horizon(today, '2026-11-07')).toBe('late')
+    expect(horizon(today, '2026-11-16')).toBe('thisWeek')
+    expect(horizon(today, '2026-11-21')).toBe('thisWeek')
+    expect(horizon(today, '2026-11-22')).toBe('nextWeek')
+    expect(horizon(today, '2026-11-28')).toBe('nextWeek')
+    expect(horizon(today, '2026-11-29')).toBe('thisMonth')
+    expect(horizon(today, '2026-12-01')).toBe('later')
+  })
+
+  it('keeps next week as next week when it runs into next month', () => {
+    // Saturday, Nov 28 2026: next week is Nov 29 to Dec 5.
+    expect(horizon('2026-11-28', '2026-11-28')).toBe('thisWeek')
+    expect(horizon('2026-11-28', '2026-12-03')).toBe('nextWeek')
+    expect(horizon('2026-11-28', '2026-12-06')).toBe('later')
   })
 })

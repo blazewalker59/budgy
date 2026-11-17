@@ -197,6 +197,8 @@ no Store, within 10% of the amount; within three weeks of the date).
 
 **Coming up**:
 Due dates not yet paid, from a few days ago through the next weeks.
+Overview groups them as late, this week, next week, later this month, and
+after this month (weeks run Sunday to Saturday).
 
 **Set-aside**:
 A set-aside Planned Expense spread over the months between due dates: what

@@ -9,7 +9,6 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, Copy, X } from 'lucide-react'
 import type { CategoryMonth, MonthView, StoreMonth } from '@/lib/model/month'
-import type { Occurrence } from '@/lib/model/plans'
 import type { Lens, LensFilter } from '@/lib/model/lens'
 import type { OverviewSearch } from '@/lib/ledger/search'
 import type { Gap } from '@/lib/model/coverage'
@@ -21,7 +20,7 @@ import { describe, filtersOf, isEmpty, matchLens } from '@/lib/model/lens'
 import { monthView, upcoming } from '@/lib/model/month'
 import { coverageGaps } from '@/lib/model/coverage'
 import { monthBills, monthPay } from '@/lib/model/bills'
-import { addDays, dayLabel, monthLabel, relativeDays } from '@/lib/model/dates'
+import { addDays, dayLabel, monthLabel } from '@/lib/model/dates'
 import { dollars } from '@/lib/model/money'
 import { TAG_LABELS } from '@/lib/model/types'
 import { TAG_BG } from '@/lib/format'
@@ -30,6 +29,7 @@ import { Bar } from '@/components/shared/Bar'
 import { MonthPicker } from '@/components/shared/Pickers'
 import { LensBar } from '@/components/lens/LensBar'
 import { Section, Stat } from '@/components/shared/Layout'
+import { ComingUp } from '@/components/month/ComingUp'
 import { TxnList } from '@/components/shared/TxnList'
 import { SetupChecklist, useSetupOpen } from '@/components/setup/SetupChecklist'
 
@@ -447,45 +447,6 @@ function GapChip({ gaps, month }: { gaps: Array<Gap>; month: string }) {
 }
 
 const GAPS_DISMISSED = 'budgy:gaps-dismissed'
-
-function ComingUp({
-  items,
-  today,
-}: {
-  items: Array<Occurrence>
-  today: string
-}) {
-  return (
-    <Section title="Coming up" hint="next 60 days, unpaid">
-      <ul className="divide-y divide-border text-[13px]">
-        {items.map((o) => (
-          <li
-            key={`${o.plan.id}-${o.due}`}
-            className="flex items-center justify-between gap-2 px-3 py-1.5"
-          >
-            <span className="min-w-0 truncate">
-              <span className="font-semibold">{o.plan.name}</span>
-              <span className="text-muted"> · {dayLabel(o.due)}</span>
-            </span>
-            <span className="shrink-0 tabular-nums">
-              <span
-                className={cn(
-                  'mr-2 text-xs font-semibold',
-                  o.due < today ? 'text-over' : 'text-planned',
-                )}
-              >
-                {o.due < today
-                  ? `due ${relativeDays(today, o.due)}`
-                  : relativeDays(today, o.due)}
-              </span>
-              <span className="font-bold">{dollars(o.plan.amount)}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-    </Section>
-  )
-}
 
 function CategoryRows({
   rows,
